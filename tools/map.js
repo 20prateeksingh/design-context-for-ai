@@ -70,7 +70,7 @@ const server = http.createServer((req, res) => {
   }
 
   // static: serve design-context/, map.html as the home page — no path traversal
-  const rel = decodeURIComponent((req.url.split('?')[0] === '/' ? '/map.html' : req.url.split('?')[0]));
+  const rel = decodeURIComponent((req.url.split('?')[0] === '/' ? '/dashboard.html' : req.url.split('?')[0]));
   const file = path.normalize(path.join(LIB, rel));
   if (!file.startsWith(LIB)) return json(res, 403, { ok: false });
   fs.readFile(file, (err, buf) => {

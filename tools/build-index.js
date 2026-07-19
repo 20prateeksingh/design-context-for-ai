@@ -40,6 +40,60 @@ function extractAiSection(pageMdText) {
   return body && body !== PENDING ? body : null;
 }
 
+// ── Token aggregation: merge per-page computed-tokens into observed scales ────
+// Statistics only (frequency + clustering), stamped method:heuristic. Deterministic:
+// stable sort (count desc, value asc), timestamps from the manifest, never Date.now().
+function normColor(v) {
+  const m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!m) return v.startsWith('#') ? { hex: v.toUpperCase(), alpha: false } : null;
+  const hex = '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return { hex, alpha: m[4] !== undefined && +m[4] < 1 };
+}
+function aggregateTokens(pagesDir, slugs) {
+  const cats = { colors: new Map(), typography: new Map(), spacing: new Map(), radius: new Map(), shadows: new Map() };
+  const bump = (map, key, count, slug, extra) => {
+    if (!map.has(key)) map.set(key, { count: 0, pages: new Set(), ...extra });
+    const e = map.get(key); e.count += count; e.pages.add(slug);
+  };
+  for (const slug of slugs) {
+    const tp = path.join(pagesDir, slug, 'computed-tokens.json');
+    if (!fs.existsSync(tp)) continue;
+    const t = JSON.parse(fs.readFileSync(tp, 'utf8'));
+    for (const c of t.colors || []) { const n = normColor(c.value); if (n) bump(cats.colors, n.hex, c.count, slug, { alpha: n.alpha }); }
+    for (const y of t.typography || []) {
+      const [size, weight, family] = y.value.split(' / ');
+      bump(cats.typography, y.value, y.count, slug, { size: parseFloat(size) || 0, weight, family });
+    }
+    for (const s of t.spacing || []) bump(cats.spacing, s.value, s.count, slug, { px: parseFloat(s.value) || 0 });
+    for (const r of t.radius || []) bump(cats.radius, r.value, r.count, slug, { px: parseFloat(r.value) || 0 });
+    for (const s of t.shadows || []) bump(cats.shadows, s.value, s.count, slug, {});
+  }
+  const list = (map, extraKeys = []) => [...map.entries()]
+    .map(([value, e]) => ({ value, count: e.count, pages: e.pages.size, ...Object.fromEntries(extraKeys.map(k => [k, e[k]])) }))
+    .sort((a, b) => b.count - a.count || (a.value < b.value ? -1 : 1));
+  const multiPage = slugs.length > 1;
+  const keep = (arr) => multiPage ? arr.filter(x => x.pages >= 2) : arr;
+  const colors = list(cats.colors, ['alpha']), typography = list(cats.typography, ['size', 'weight', 'family']);
+  const spacing = list(cats.spacing, ['px']), radius = list(cats.radius, ['px']), shadows = list(cats.shadows);
+  // scale inference: spacing/radius ladder (values seen on 2+ pages, sorted; base-unit share via divisibility)
+  const ladder = (arr) => {
+    const vals = keep(arr).filter(x => x.px > 0).sort((a, b) => a.px - b.px);
+    const share = (n) => vals.length ? vals.filter(v => Math.abs(v.px / n - Math.round(v.px / n)) < 0.01).length / vals.length : 0;
+    const base = share(8) >= 0.7 ? 8 : share(4) >= 0.7 ? 4 : null;
+    return { steps: vals, baseUnit: base, baseUnitShare: base ? +share(base).toFixed(2) : null };
+  };
+  const ramp = keep(typography).sort((a, b) => b.size - a.size || b.count - a.count);
+  return {
+    method: 'heuristic',
+    note: 'OBSERVED values aggregated across captured pages and clustered by statistics — not the product’s authored tokens. Filtered = seen on 2+ pages (raw kept below).',
+    colors: { top: keep(colors).slice(0, 48), droppedSinglePage: colors.length - keep(colors).length },
+    typography: { ramp: ramp.slice(0, 24), droppedSinglePage: typography.length - keep(typography).length },
+    spacing: ladder(spacing), radius: ladder(radius),
+    shadows: { top: keep(shadows).slice(0, 8), droppedSinglePage: shadows.length - keep(shadows).length },
+    raw: { colors, typography, spacing, radius, shadows },
+  };
+}
+
 function buildIndex(libDir) {
   const pagesDir = path.join(libDir, 'pages');
   const sitemap = JSON.parse(fs.readFileSync(path.join(libDir, 'ia', 'sitemap.json'), 'utf8'));
@@ -212,8 +266,10 @@ function buildIndex(libDir) {
   };
   fs.writeFileSync(path.join(libDir, 'registry.json'), JSON.stringify(registry, null, 2), 'utf8');
 
-  // 4b. map.html — the interactive coverage map (self-contained; upgrades when tools/map.js serves it)
-  const tplPath = path.join(__dirname, 'map-template.html');
+  // 4b. tokens.json + dashboard.html — Map · Overview · Design Tokens (self-contained; live via tools/map.js)
+  const tokens = aggregateTokens(pagesDir, ordered);
+  fs.writeFileSync(path.join(libDir, 'tokens.json'), JSON.stringify(tokens, null, 2), 'utf8');
+  const tplPath = path.join(__dirname, 'dashboard-template.html');
   if (fs.existsSync(tplPath)) {
     const mapData = {
       product: sitemap.product, origin: sitemap.origin, generatedAt: manifest.capturedAt,
@@ -231,9 +287,23 @@ function buildIndex(libDir) {
         ...frontier.flatMap(f => (f.underTemplate ? [f.underTemplate] : f.via.slice(0, 3)).map(v => ({ a: v, b: f.id, kind: 'frontier' }))),
       ],
     };
+    const overview = {
+      health: { skipped: manifest.skipped || [], failed: manifest.failed || [], actions: manifest.actions || [], capped: manifest.capped || 0 },
+      nav: ordered.filter(s => !pages[s].meta.template).map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title, route: pages[s].meta.route,
+        desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
+      templates: ordered.filter(s => pages[s].meta.template).map(s => ({ slug: s, pattern: pages[s].meta.pattern, standsFor: pages[s].meta.collapsed + 1,
+        screenshot: `pages/${s}/screenshot.png`, desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
+      recent: ordered.map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title || s, at: pages[s].meta.capturedAt }))
+        .sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 8),
+      statesTotal: ordered.reduce((n, s) => n + pages[s].states.filter(x => x.captured).length, 0),
+      notes: ordered.filter(s => pages[s].notes).map(s => ({ slug: s, notes: pages[s].notes })),
+      standsForTotal: ordered.reduce((n, s) => n + (pages[s].meta.template ? pages[s].meta.collapsed + 1 : 1), 0),
+    };
+    const dash = { map: mapData, overview, tokens: { ...tokens, raw: undefined } }; // raw stays in tokens.json, not the page
     const html = fs.readFileSync(tplPath, 'utf8')
-      .replace('/*__MAPDATA__*/null', JSON.stringify(mapData).replace(/</g, '\\u003c'));
-    fs.writeFileSync(path.join(libDir, 'map.html'), html, 'utf8');
+      .replace('/*__DASHDATA__*/null', JSON.stringify(dash).replace(/</g, '\\u003c'));
+    fs.writeFileSync(path.join(libDir, 'dashboard.html'), html, 'utf8');
+    const stale = path.join(libDir, 'map.html'); if (fs.existsSync(stale)) fs.unlinkSync(stale); // superseded
   }
 
   // 5. INDEX.md — the human front door
@@ -248,7 +318,7 @@ function buildIndex(libDir) {
     '',
     `Captured ${manifest.capturedAt.slice(0, 10)} from ${sitemap.origin} · ${ordered.length} pages · read-only scrape, provenance-stamped.`,
     '',
-    `**🗺 [Open the coverage map](map.html)** — every captured page as a node, plus **${frontierTotal} discovered-but-not-downloaded** pages on the frontier. Run \`node tools/map.js\` to make it interactive (select frontier pages to download, add state URLs).`,
+    `**[Open the dashboard](dashboard.html)** — coverage map (**${frontierTotal}** discovered-but-not-downloaded pages on the frontier), capture overview, and the product's observed design tokens ([tokens.json](tokens.json), method: heuristic). Run \`node tools/map.js\` to make it live (unlock frontier pages, add state URLs).`,
     '',
     '**For AI agents:** read `registry.json` first (same content, machine shape). Every value here is derived from `pages/*/meta.json`; page descriptions are model-written and labeled `method: ai` — everything else is extracted fact.',
     '',

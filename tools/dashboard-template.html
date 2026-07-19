@@ -1,0 +1,478 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Context Dashboard</title>
+<style>
+  /* Design system: "Data-Dense Dashboard" (ui-ux-pro-max rec) · blue data + amber highlights,
+     dark-first · Fira Code/Fira Sans substituted with self-contained system stacks. */
+  :root { --bg:#0B1220; --panel:#111A2C; --card:#152036; --line:#243350; --txt:#E4EAF4; --dim:#8FA0BC;
+          --primary:#3B82F6; --primary-strong:#60A5FA; --accent:#F59E0B; --ok:#22C55E; --bad:#EF4444; --tpl:#A78BFA;
+          --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+          --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.55 var(--sans); overflow:hidden; }
+  button { font:inherit; cursor:pointer; }
+  a { color:var(--primary-strong); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  :focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition:none!important; animation:none!important; } }
+
+  /* ── shell ── */
+  #shell { position:fixed; top:0; left:0; right:0; height:52px; display:flex; align-items:center; gap:10px;
+           padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; }
+  #shell h1 { font-size:14px; font-weight:650; margin-right:8px; white-space:nowrap; }
+  #shell h1 .mono { font-family:var(--mono); color:var(--dim); font-weight:400; font-size:12px; }
+  .tabs { display:flex; gap:2px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:3px; }
+  .tab { display:flex; align-items:center; gap:7px; border:0; background:none; color:var(--dim); font-size:13px;
+         font-weight:550; padding:5px 13px; border-radius:6px; transition:background .2s,color .2s; }
+  .tab svg { width:14px; height:14px; }
+  .tab.active { background:var(--card); color:var(--txt); box-shadow:0 1px 2px rgba(0,0,0,.4); }
+  .tab:hover:not(.active) { color:var(--txt); }
+  .spacer { flex:1; }
+  .pill { font-size:12px; font-family:var(--mono); color:var(--dim); background:var(--bg); border:1px solid var(--line);
+          border-radius:20px; padding:3px 10px; white-space:nowrap; }
+  .pill b { color:var(--txt); }
+  #server-pill.on { color:var(--ok); border-color:#1f4230; }
+  #capbtn { font-size:13px; font-weight:600; background:var(--primary); color:#fff; border:0;
+            border-radius:8px; padding:7px 14px; display:none; transition:background .2s; }
+  #capbtn:hover { background:var(--primary-strong); }
+  #capbtn:disabled { opacity:.5; cursor:wait; }
+
+  /* ── tab panes ── */
+  .pane { position:fixed; inset:52px 0 0 0; display:none; }
+  .pane.active { display:block; }
+  .scrollpane { overflow-y:auto; padding:22px clamp(16px,4vw,44px) 60px; }
+
+  /* ── map pane ── */
+  #canvas { position:absolute; inset:0; cursor:grab; }
+  #maplegend { position:absolute; bottom:12px; left:16px; font-size:11px; color:var(--dim); z-index:4; }
+  #maplegend span { margin-right:14px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  #fitbtn { position:absolute; bottom:12px; right:16px; z-index:4; display:flex; align-items:center; gap:6px;
+            font-size:12px; background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:5px 11px; }
+  #fitbtn svg { width:12px; height:12px; }
+
+  /* ── detail panel (map) ── */
+  #panel { position:fixed; top:52px; right:0; bottom:0; width:364px; background:var(--panel); border-left:1px solid var(--line);
+           padding:16px; overflow-y:auto; transform:translateX(100%); transition:transform .2s ease; z-index:22; }
+  #panel.open { transform:none; }
+  #panel .close { position:absolute; top:10px; right:12px; background:none; border:0; color:var(--dim); font-size:18px; }
+  #panel img { width:100%; border-radius:8px; border:1px solid var(--line); margin:10px 0; }
+  #panel h2 { font-size:16px; margin:2px 24px 2px 0; }
+  #panel .route { font-family:var(--mono); font-size:12px; color:var(--dim); word-break:break-all; }
+  #panel .desc { font-size:13px; margin:10px 0; }
+  #panel .meta { font-size:12px; color:var(--dim); }
+  #panel h3, .scrollpane h3 { font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin:18px 0 8px; font-weight:650; }
+  .state { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:5px 8px;
+           background:var(--bg); border:1px solid var(--line); border-radius:6px; margin-bottom:5px; }
+  .state .tag { font-size:11px; color:var(--ok); font-family:var(--mono); }
+  .state .tag.pending { color:var(--accent); }
+  .urlrow { display:flex; gap:8px; align-items:flex-start; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .urlrow input { margin-top:3px; }
+  .urlrow .u { word-break:break-all; font-family:var(--mono); font-size:11.5px; }
+  .urlrow .u small { color:var(--dim); display:block; font-family:var(--sans); }
+  .btn { font-size:12px; font-weight:600; background:var(--bg); color:var(--txt); border:1px solid var(--line);
+         border-radius:6px; padding:5px 10px; transition:border-color .2s; }
+  .btn:hover { border-color:var(--primary); }
+  .btn.primary { background:var(--primary); color:#fff; border:0; }
+  #stateform input { width:100%; margin-bottom:6px; background:var(--bg); border:1px solid var(--line); color:var(--txt);
+                     border-radius:6px; padding:6px 8px; font-size:13px; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--line);
+           border-radius:8px; padding:9px 16px; font-size:13px; display:none; z-index:30; max-width:80vw; }
+
+  /* ── overview + tokens ── */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .kpi .n { font-family:var(--mono); font-size:26px; font-weight:650; line-height:1.15; }
+  .kpi .l { font-size:11.5px; color:var(--dim); margin-top:2px; }
+  .kpi.blue .n { color:var(--primary-strong); } .kpi.amber .n { color:var(--accent); }
+  .kpi.purple .n { color:var(--tpl); } .kpi.green .n { color:var(--ok); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+  @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
+  table.digest { width:100%; border-collapse:collapse; font-size:13px; }
+  table.digest td { padding:7px 8px; border-top:1px solid var(--line); vertical-align:top; }
+  table.digest tr:hover td { background:rgba(59,130,246,.05); }
+  td.r { font-family:var(--mono); font-size:11.5px; color:var(--dim); white-space:nowrap; }
+  .ai { font-size:9.5px; font-family:var(--mono); color:var(--dim); border:1px dashed var(--line); border-radius:4px; padding:0 4px; vertical-align:1px; }
+  .tplcards { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+  .tplcard { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; transition:border-color .2s; }
+  .tplcard:hover { border-color:var(--primary); }
+  .tplcard img { width:100%; height:110px; object-fit:cover; object-position:top; display:block; border-bottom:1px solid var(--line); }
+  .tplcard .b { padding:9px 11px; }
+  .tplcard .p { font-family:var(--mono); font-size:11px; color:var(--dim); word-break:break-all; }
+  .tplcard .sf { font-size:11.5px; color:var(--tpl); font-family:var(--mono); margin-top:3px; }
+  .hrow { display:flex; gap:8px; align-items:baseline; font-size:13px; padding:5px 0; border-top:1px solid var(--line); }
+  .chip { font-size:10.5px; font-family:var(--mono); border-radius:20px; padding:1px 8px; white-space:nowrap; }
+  .chip.warn { background:rgba(245,158,11,.12); color:var(--accent); }
+  .chip.bad { background:rgba(239,68,68,.12); color:var(--bad); }
+  .chip.ok { background:rgba(34,197,94,.12); color:var(--ok); }
+  .provenance { border:1px dashed var(--line); border-radius:8px; padding:8px 12px; font-size:12px; color:var(--dim); margin:6px 0 14px; }
+  .provenance code { font-family:var(--mono); color:var(--accent); }
+  .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:8px; }
+  .sw { background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .sw .c { height:44px; }
+  .sw .i { padding:6px 8px; font-family:var(--mono); font-size:10.5px; color:var(--dim); }
+  .sw .i b { color:var(--txt); display:block; font-weight:550; }
+  .typerow { display:flex; align-items:baseline; gap:14px; padding:8px 0; border-top:1px solid var(--line); overflow:hidden; }
+  .typerow .sample { white-space:nowrap; }
+  .typerow .m { font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap; }
+  .bar { display:flex; align-items:center; gap:10px; padding:4px 0; }
+  .bar .rect { height:14px; background:var(--primary); border-radius:3px; opacity:.85; }
+  .bar .m { font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap; }
+  .radrow { display:flex; gap:14px; flex-wrap:wrap; }
+  .rad { text-align:center; }
+  .rad .sq { width:52px; height:52px; background:var(--card); border:2px solid var(--primary); margin-bottom:4px; }
+  .rad .m { font-family:var(--mono); font-size:10.5px; color:var(--dim); }
+  .shrow { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
+  .sh { background:#E8ECF4; border-radius:10px; height:64px; }
+  .sh + .m { font-family:var(--mono); font-size:9.5px; color:var(--dim); word-break:break-all; margin-top:5px; }
+  .secgap { margin-top:26px; }
+</style>
+</head>
+<body>
+<div id="shell">
+  <h1 id="title"></h1>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
+    <button class="tab" data-tab="overview" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Overview</button>
+    <button class="tab" data-tab="tokens" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><circle cx="5.5" cy="6" r="1" fill="currentColor"/><circle cx="10.5" cy="6" r="1" fill="currentColor"/><circle cx="5.8" cy="10" r="1" fill="currentColor"/><path d="M14.2 8c0 1.8-1.4 2-2.6 2s-2 .8-1.2 2.2c.6 1-.2 2-1.4 2"/></svg>Tokens</button>
+  </div>
+  <span class="spacer"></span>
+  <span class="pill"><b id="n-cap">0</b> unlocked</span>
+  <span class="pill"><b id="n-fro">0</b> locked</span>
+  <span class="pill" id="server-pill">static view</span>
+  <button id="capbtn"></button>
+</div>
+
+<section class="pane active" id="pane-map">
+  <canvas id="canvas"></canvas>
+  <div id="maplegend">
+    <span><span class="dot" style="background:var(--primary)"></span>page</span>
+    <span><span class="dot" style="background:var(--tpl)"></span>template (1 stands for many)</span>
+    <span><span class="dot" style="border:1.5px dashed var(--dim)"></span>locked — discovered, not downloaded</span>
+    <span>hover: real links · click: details</span>
+  </div>
+  <button id="fitbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>fit</button>
+</section>
+
+<section class="pane scrollpane" id="pane-overview"></section>
+<section class="pane scrollpane" id="pane-tokens"></section>
+
+<div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
+<div id="toast" role="status"></div>
+
+<script>
+const DASH = /*__DASHDATA__*/null;
+const DATA = DASH.map;
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+// ── tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t.dataset.tab));
+  if (t.dataset.tab==='map') resize();
+});
+
+// ═════════════════════════ MAP TAB (coverage skill tree) ═════════════════════
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+let W, H, DPR = devicePixelRatio || 1;
+function resize(){ const r = canvas.parentElement.getBoundingClientRect(); W = r.width; H = r.height;
+  canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; }
+addEventListener('resize', resize); resize();
+
+const nodes = [], byId = {};
+DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
+DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
+const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]);
+const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
+edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
+document.getElementById('title').innerHTML = esc(DATA.product) + ' <span class="mono">design context</span>';
+document.title = DATA.product + ' — design context';
+const lockedTotal = DATA.frontier.reduce((s,f)=>s+(f.count||1),0);
+document.getElementById('n-cap').textContent = DATA.nodes.length;
+document.getElementById('n-fro').textContent = lockedTotal;
+
+const root = nodes.find(n=>!n.locked && n.route==='/') || nodes.find(n=>!n.locked) || nodes[0];
+const children = {}; nodes.forEach(n=>children[n.id]=[]);
+const inbound = {}; nodes.forEach(n=>inbound[n.id]=[]);
+edges.forEach(e=>inbound[e.b].push(e.a));
+nodes.forEach(n=>{
+  if (n===root) return;
+  let p = null;
+  if (n.locked) p = inbound[n.id].find(a=>byId[a] && !byId[a].locked) || root.id;
+  else if (adj[root.id].has(n.id)) p = root.id;
+  else p = inbound[n.id].find(a=>byId[a] && !byId[a].locked && a!==n.id) || root.id;
+  n.parent = p; children[p].push(n.id);
+});
+function leaves(id){ const c = children[id]; return c.length ? c.reduce((s,k)=>s+leaves(k),0) : 1; }
+const weight = (id) => byId[id].locked ? 0.35 : 1 + 0.15*Math.min(leaves(id), 8);
+const RING = [0, 250, 450, 610];
+function placeLockedFan(parent, kids){
+  const span = Math.min(parent.span || Math.PI/3, Math.PI/2.8);
+  const step = 0.09, perRow = Math.max(3, Math.floor(span/step));
+  const pr = Math.hypot(parent.x, parent.y) || 1;
+  kids.forEach((k,i)=>{
+    const row = Math.floor(i/perRow), left = kids.length - row*perRow, cnt = Math.min(left, perRow);
+    const a = parent.angle + (i%perRow - (cnt-1)/2)*step;
+    const r = pr + 120 + row*58;
+    const kn = byId[k]; kn.x = Math.cos(a)*r; kn.y = Math.sin(a)*r; kn.angle = a; kn.depth = parent.depth+1; kn.span = step;
+  });
+}
+function place(id, a0, a1, depth){
+  const n = byId[id];
+  const mid = (a0+a1)/2, r = RING[Math.min(depth, RING.length-1)];
+  n.x = Math.cos(mid)*r; n.y = Math.sin(mid)*r; n.angle = mid; n.depth = depth; n.span = a1-a0;
+  const cap = children[id].filter(k=>!byId[k].locked), locked = children[id].filter(k=>byId[k].locked);
+  if (cap.length){
+    const total = cap.reduce((s,k)=>s+weight(k),0); let a = a0;
+    cap.forEach((k,idx)=>{ const span = (a1-a0)*weight(k)/total; byId[k].lblAlt = idx%2; place(k, a, a+span, depth+1); a += span; });
+  }
+  if (locked.length) placeLockedFan(n, locked);
+}
+root.x = 0; root.y = 0; root.depth = 0; root.angle = -Math.PI/2; root.span = 2*Math.PI;
+{ const kids = children[root.id];
+  const cap = kids.filter(k=>!byId[k].locked), locked = kids.filter(k=>byId[k].locked);
+  const total = kids.reduce((s,k)=>s+weight(k),0); let a = -Math.PI/2;
+  cap.concat(locked).forEach((k,idx)=>{ byId[k].lblAlt = idx%2; const span = 2*Math.PI*weight(k)/total;
+    if (byId[k].locked){ const kn=byId[k]; const mid=a+span/2; kn.x=Math.cos(mid)*(RING[1]+130); kn.y=Math.sin(mid)*(RING[1]+130); kn.angle=mid; kn.depth=1; kn.span=span; }
+    else place(k, a, a+span, 1);
+    a += span; }); }
+
+let tx=0, ty=0, scale=1, minScale=0.2;
+function fit(){
+  const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
+  const bw = Math.max(...xs)-Math.min(...xs)+300, bh = Math.max(...ys)-Math.min(...ys)+300;
+  scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
+  tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
+}
+fit();
+document.getElementById('fitbtn').onclick = fit;
+function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
+function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
+
+const selected = new Set();
+let serverMode=false, activeNode=null, hoverNode=null, dragNode=null;
+const isNeighbor = (n) => { const f = hoverNode||activeNode; if (!f) return true; return n===f || adj[f.id].has(n.id); };
+
+const short = (s,n=24) => { s = s||''; return s.length>n ? s.slice(0,n-1)+'…' : s; };
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
+function drawLabel(x,y,text,color,size){
+  ctx.font = `${size}px ${'system-ui'}`; const w = ctx.measureText(text).width;
+  ctx.fillStyle='rgba(11,18,32,.85)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
+  ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
+}
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
+  const focus = hoverNode||activeNode;
+  nodes.forEach(n=>{ if (n===root || !n.parent) return; const p = byId[n.parent];
+    const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
+    ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
+    const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
+    ctx.strokeStyle = dimmed ? 'rgba(120,140,180,.05)' : n.locked ? 'rgba(143,160,188,.16)' : 'rgba(96,165,250,.28)';
+    ctx.lineWidth = 1.2;
+    const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
+    ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
+  });
+  if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
+    const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
+    ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
+    ctx.strokeStyle='rgba(96,165,250,.6)'; ctx.lineWidth=1.6;
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
+  nodes.forEach(n=>{
+    const [x,y]=toScreen(n.x,n.y);
+    const dimmed = focus && !isNeighbor(n);
+    ctx.globalAlpha = dimmed ? 0.22 : 1;
+    if (n.locked){
+      const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
+      ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
+      ctx.fillStyle='rgba(143,160,188,.14)'; ctx.fill();
+      ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#F59E0B' : '#5A6A88'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
+      if (n.kind==='frontier-group'){ ctx.fillStyle='#8FA0BC'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
+      if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
+        drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#8FA0BC', Math.max(9.5,10*Math.min(scale,1)));
+    } else {
+      const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
+      ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
+      ctx.fillStyle = n.kind==='template' ? '#A78BFA' : '#3B82F6';
+      if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
+      ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle='rgba(11,18,32,.9)'; ctx.lineWidth=2; ctx.stroke();
+      if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#22C55E'; ctx.fill(); }
+      drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#5A6A88':'#DCE3F0', Math.max(10,11*Math.min(scale,1)));
+      if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#9d86d8', 9.5);
+    }
+    ctx.globalAlpha = 1;
+  });
+  requestAnimationFrame(draw);
+}
+
+let panning=false, px0=0, py0=0, moved=false;
+function nodeAt(px,py){ const [wx,wy]=toWorld(px,py);
+  let best=null, bd=1e9;
+  nodes.forEach(n=>{ const dx=n.x-wx, dy=n.y-wy; const d=dx*dx+dy*dy; const hit=Math.pow(16/Math.min(scale,1)+4,2);
+    if (d<hit && d<bd){ best=n; bd=d; } });
+  return best; }
+canvas.addEventListener('mousedown', e=>{ const n=nodeAt(e.clientX,e.clientY-52);
+  if (n){ dragNode=n; } else { panning=true; } px0=e.clientX; py0=e.clientY; moved=false; canvas.style.cursor='grabbing'; });
+addEventListener('mousemove', e=>{ if (!document.getElementById('pane-map').classList.contains('active')) return;
+  const dx=e.clientX-px0, dy=e.clientY-py0;
+  if (dragNode){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; dragNode.x += dx/scale; dragNode.y += dy/scale; px0=e.clientX; py0=e.clientY; }
+  else if (panning){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; tx += dx/scale; ty += dy/scale; px0=e.clientX; py0=e.clientY; }
+  else { hoverNode = nodeAt(e.clientX,e.clientY-52) || null; canvas.style.cursor = hoverNode?'pointer':'grab'; }});
+addEventListener('mouseup', ()=>{ if (dragNode && !moved) openPanel(dragNode);
+  dragNode=null; panning=false; canvas.style.cursor='grab'; });
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f = e.deltaY<0?1.12:0.89;
+  const [wx,wy]=toWorld(e.clientX,e.clientY-52); scale=Math.min(Math.max(scale*f,minScale),3);
+  const [wx2,wy2]=toWorld(e.clientX,e.clientY-52); tx+=wx2-wx; ty+=wy2-wy; }, {passive:false});
+
+function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
+  if (n.locked){
+    const urls = n.urls || [n.url];
+    el.innerHTML = `<h2>Locked — not downloaded yet</h2>
+      <div class="route">${esc(n.pattern||'')}</div>
+      <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
+      ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
+      <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
+      ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
+        <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
+      <div style="margin-top:10px"><button class="btn" id="selall">Select all shown</button></div>`;
+    el.querySelectorAll('input[data-u]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.u):selected.delete(cb.dataset.u); n.someSelected=[...selected].some(u=>urls.includes(u)); syncCapBtn(); });
+    el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
+  } else {
+    const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
+    el.innerHTML = `<h2>${esc(n.label||n.id)}</h2>
+      <div class="route">${esc(n.route)}</div>
+      ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt="screenshot of ${esc(n.label||n.id)}"></a>`:''}
+      <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
+      <div class="desc">${esc(n.desc||'')} <span class="ai" title="model-written orientation, not extracted fact">ai</span></div>
+      <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
+      ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
+      <h3>States</h3>
+      ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
+      <div id="stateform" style="margin-top:8px">
+        <input id="st-name" placeholder="state name (e.g. empty, error)" aria-label="state name">
+        <input id="st-url" placeholder="URL that shows this state" aria-label="state url">
+        <button class="btn primary" id="st-add">Add &amp; download state</button>
+        <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
+      </div>`;
+    el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
+      if(!name||!url) return toast('Give the state a name and a URL');
+      if (serverMode){ toast('Capturing state — watch the browser window…', true);
+        const r = await api('/api/state',{slug:n.id,name,url}); r.ok ? location.reload() : toast('Failed: '+r.error); }
+      else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
+  }
+  document.getElementById('panel').classList.add('open');
+}
+function closePanel(){ document.getElementById('panel').classList.remove('open'); activeNode=null; }
+
+const capbtn = document.getElementById('capbtn');
+function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
+  capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
+capbtn.onclick = async ()=>{
+  const urls=[...selected];
+  if (serverMode){ capbtn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
+    const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); capbtn.disabled=false; } }
+  else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
+    try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
+    catch(_){ prompt('Run this in the terminal:', cmd); } }
+};
+async function api(p,body){ try { const r = await fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return await r.json(); } catch(e){ return {ok:false,error:String(e)}; } }
+function toast(msg, sticky){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); if(!sticky) t._h=setTimeout(()=>t.style.display='none', 6000); }
+fetch('/api/ping').then(r=>r.json()).then(()=>{ serverMode=true;
+  const p=document.getElementById('server-pill'); p.textContent='live · can unlock'; p.classList.add('on'); syncCapBtn(); }).catch(()=>{});
+
+// ═════════════════════════ OVERVIEW TAB ══════════════════════════════════════
+(function renderOverview(){
+  const O = DASH.overview, el = document.getElementById('pane-overview');
+  const covered = DATA.nodes.length, coverage = Math.round(100*covered/(covered+lockedTotal));
+  const tplCount = O.templates.length, standsFor = O.standsForTotal;
+  const health = [];
+  O.health.skipped.forEach(s=>health.push(`<div class="hrow"><span class="chip warn">${esc(s.reason)}</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span></div>`));
+  O.health.failed.forEach(s=>health.push(`<div class="hrow"><span class="chip bad">failed</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span><span class="pill">${esc(s.error||'')}</span></div>`));
+  O.health.actions.forEach(a=>health.push(`<div class="hrow"><span class="chip warn">action</span><span>dismissed a cookie banner via “${esc(a.buttonText)}” — the one sanctioned click, logged</span></div>`));
+  if (O.health.capped) health.push(`<div class="hrow"><span class="chip warn">cap</span><span>${O.health.capped} nav candidates beyond the cap stayed on the frontier</span></div>`);
+  el.innerHTML = `
+    <div class="kpis">
+      <div class="kpi blue"><div class="n">${covered}</div><div class="l">pages unlocked</div></div>
+      <div class="kpi purple"><div class="n">~${standsFor}</div><div class="l">pages represented (templates)</div></div>
+      <div class="kpi amber"><div class="n">${lockedTotal}</div><div class="l">discovered, locked</div></div>
+      <div class="kpi blue"><div class="n">${coverage}%</div><div class="l">of known surface unlocked</div></div>
+      <div class="kpi green"><div class="n">${O.statesTotal}</div><div class="l">states captured</div></div>
+      <div class="kpi purple"><div class="n">${tplCount}</div><div class="l">layout templates found</div></div>
+    </div>
+    <div class="grid2 secgap">
+      <div class="card">
+        <h3 style="margin-top:0">Navigation — the product's own IA <span class="ai" title="descriptions are model-written">ai</span></h3>
+        <table class="digest">${O.nav.map(n=>`<tr>
+          <td style="white-space:nowrap"><b>${esc(short(n.label,26))}</b><br><span class="r">${esc(n.route)}</span></td>
+          <td>${esc(n.desc||'')} <a href="pages/${esc(n.slug)}/page.md" target="_blank" style="white-space:nowrap">doc</a></td></tr>`).join('')}
+        </table>
+      </div>
+      <div>
+        <div class="card">
+          <h3 style="margin-top:0">Capture health</h3>
+          ${health.length? health.join('') : '<div class="hrow"><span class="chip ok">clean</span><span>nothing skipped, nothing failed</span></div>'}
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin-top:0">Recent captures</h3>
+          ${O.recent.map(r=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px;color:var(--dim)">${esc((r.at||'').slice(0,10))}</span><span>${esc(short(r.label,40))}</span></div>`).join('')}
+        </div>
+        ${O.notes.length?`<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Designer notes</h3>
+          ${O.notes.map(n=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px">${esc(n.slug)}</span><span>${esc(n.notes)}</span></div>`).join('')}</div>`:''}
+      </div>
+    </div>
+    <h3 class="secgap">Layout templates — one unlocked page stands for many <span class="ai">ai</span></h3>
+    <div class="tplcards">
+      ${O.templates.map(t=>`<a class="tplcard" href="pages/${esc(t.slug)}/page.md" target="_blank" style="color:inherit;text-decoration:none">
+        <img src="${esc(t.screenshot)}" loading="lazy" alt="">
+        <div class="b"><div class="p">${esc(t.pattern)}</div><div class="sf">1 captured of ${t.standsFor}</div>
+        <div style="font-size:12px;color:var(--dim);margin-top:4px">${esc(short(t.desc||'',90))}</div></div></a>`).join('')}
+    </div>`;
+})();
+
+// ═════════════════════════ TOKENS TAB ════════════════════════════════════════
+(function renderTokens(){
+  const T = DASH.tokens, el = document.getElementById('pane-tokens');
+  const lum = h => { const n = parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255)); };
+  const sw = c => `<div class="sw"><div class="c" style="background:${esc(c.value)};${lum(c.value)>235?'border-bottom:1px solid var(--line);':''}"></div>
+    <div class="i"><b>${esc(c.value)}</b>×${c.count.toLocaleString()} · ${c.pages}p${c.alpha?' · α':''}</div></div>`;
+  const spacing = T.spacing, radius = T.radius;
+  el.innerHTML = `
+    <div class="provenance">Everything below is <code>method: heuristic</code> — values <b>observed</b> on the captured pages, aggregated and clustered by statistics.
+      They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
+      (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
+    <h3>Color — ${T.colors.top.length} recurring values</h3>
+    <div class="swatches">${T.colors.top.map(sw).join('')}</div>
+    <div class="grid2 secgap">
+      <div class="card">
+        <h3 style="margin-top:0">Type ramp — size / weight / family</h3>
+        ${T.typography.ramp.map(t=>`<div class="typerow">
+          <span class="sample" style="font-size:${Math.min(t.size,34)}px;font-weight:${esc(t.weight)};line-height:1.1">Ag</span>
+          <span class="m">${esc(t.value)}</span><span class="m">×${t.count.toLocaleString()} · ${t.pages}p</span></div>`).join('')}
+        <div class="m" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:8px">samples rendered in a system font; family names are as observed</div>
+      </div>
+      <div>
+        <div class="card">
+          <h3 style="margin-top:0">Spacing ladder ${spacing.baseUnit?`— base unit <span style="color:var(--accent);font-family:var(--mono)">${spacing.baseUnit}px</span> (${Math.round(spacing.baseUnitShare*100)}% of values fit)`:''}</h3>
+          ${spacing.steps.slice(0,16).map(s=>`<div class="bar"><div class="rect" style="width:${Math.min(s.px*3,280)}px"></div><span class="m">${esc(s.value)} ×${s.count.toLocaleString()} · ${s.pages}p</span></div>`).join('')}
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin-top:0">Corner radius ${radius.baseUnit?`— base ${radius.baseUnit}px`:''}</h3>
+          <div class="radrow">${radius.steps.slice(0,8).map(r=>`<div class="rad"><div class="sq" style="border-radius:${Math.min(r.px,26)}px"></div><div class="m">${esc(r.value)}<br>×${r.count.toLocaleString()}</div></div>`).join('')}</div>
+        </div>
+      </div>
+    </div>
+    <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
+    <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>`;
+})();
+
+draw();
+</script>
+</body>
+</html>
