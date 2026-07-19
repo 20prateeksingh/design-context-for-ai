@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Design Context Dashboard</title>
 <style>
-  /* Design system: "Data-Dense Dashboard" (ui-ux-pro-max rec) · blue data + amber highlights,
-     dark-first · Fira Code/Fira Sans substituted with self-contained system stacks. */
-  :root { --bg:#0B1220; --panel:#111A2C; --card:#152036; --line:#243350; --txt:#E4EAF4; --dim:#8FA0BC;
-          --primary:#3B82F6; --primary-strong:#60A5FA; --accent:#F59E0B; --ok:#22C55E; --bad:#EF4444; --tpl:#A78BFA;
+  /* Design system: light · elegant · minimal (Prateek 2026-07-19). ui-ux-pro-max palette direction
+     (knowledge blue/indigo + violet accent + clean white) on a minimal treatment — its "Liquid Glass"
+     style pick was rejected for its own perf/contrast warnings. System font stacks (no CDN). */
+  :root { --bg:#F8FAFC; --panel:#FFFFFF; --card:#FFFFFF; --line:#E6EAF1; --txt:#101828; --dim:#667085;
+          --primary:#4F46E5; --primary-strong:#4338CA; --accent:#B45309; --ok:#15803D; --bad:#B91C1C; --tpl:#7C3AED;
           --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
           --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
   * { box-sizing:border-box; margin:0; }
@@ -25,17 +26,17 @@
            padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; }
   #shell h1 { font-size:14px; font-weight:650; margin-right:8px; white-space:nowrap; }
   #shell h1 .mono { font-family:var(--mono); color:var(--dim); font-weight:400; font-size:12px; }
-  .tabs { display:flex; gap:2px; background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:3px; }
+  .tabs { display:flex; gap:2px; background:#EEF1F6; border:1px solid var(--line); border-radius:9px; padding:3px; }
   .tab { display:flex; align-items:center; gap:7px; border:0; background:none; color:var(--dim); font-size:13px;
          font-weight:550; padding:5px 13px; border-radius:6px; transition:background .2s,color .2s; }
   .tab svg { width:14px; height:14px; }
-  .tab.active { background:var(--card); color:var(--txt); box-shadow:0 1px 2px rgba(0,0,0,.4); }
+  .tab.active { background:var(--card); color:var(--txt); box-shadow:0 1px 2px rgba(16,24,40,.08); }
   .tab:hover:not(.active) { color:var(--txt); }
   .spacer { flex:1; }
   .pill { font-size:12px; font-family:var(--mono); color:var(--dim); background:var(--bg); border:1px solid var(--line);
           border-radius:20px; padding:3px 10px; white-space:nowrap; }
   .pill b { color:var(--txt); }
-  #server-pill.on { color:var(--ok); border-color:#1f4230; }
+  #server-pill.on { color:var(--ok); border-color:#BBE3C8; }
   #capbtn { font-size:13px; font-weight:600; background:var(--primary); color:#fff; border:0;
             border-radius:8px; padding:7px 14px; display:none; transition:background .2s; }
   #capbtn:hover { background:var(--primary-strong); }
@@ -67,35 +68,35 @@
   #panel .meta { font-size:12px; color:var(--dim); }
   #panel h3, .scrollpane h3 { font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin:18px 0 8px; font-weight:650; }
   .state { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:5px 8px;
-           background:var(--bg); border:1px solid var(--line); border-radius:6px; margin-bottom:5px; }
+           background:#F5F7FA; border:1px solid var(--line); border-radius:6px; margin-bottom:5px; }
   .state .tag { font-size:11px; color:var(--ok); font-family:var(--mono); }
   .state .tag.pending { color:var(--accent); }
   .urlrow { display:flex; gap:8px; align-items:flex-start; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); cursor:pointer; }
   .urlrow input { margin-top:3px; }
   .urlrow .u { word-break:break-all; font-family:var(--mono); font-size:11.5px; }
   .urlrow .u small { color:var(--dim); display:block; font-family:var(--sans); }
-  .btn { font-size:12px; font-weight:600; background:var(--bg); color:var(--txt); border:1px solid var(--line);
+  .btn { font-size:12px; font-weight:600; background:#F5F7FA; color:var(--txt); border:1px solid var(--line);
          border-radius:6px; padding:5px 10px; transition:border-color .2s; }
   .btn:hover { border-color:var(--primary); }
   .btn.primary { background:var(--primary); color:#fff; border:0; }
-  #stateform input { width:100%; margin-bottom:6px; background:var(--bg); border:1px solid var(--line); color:var(--txt);
+  #stateform input { width:100%; margin-bottom:6px; background:#FFFFFF; border:1px solid var(--line); color:var(--txt);
                      border-radius:6px; padding:6px 8px; font-size:13px; }
-  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--line);
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#101828; color:#fff; border:1px solid #101828;
            border-radius:8px; padding:9px 16px; font-size:13px; display:none; z-index:30; max-width:80vw; }
 
   /* ── overview + tokens ── */
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
-  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
   .kpi .n { font-family:var(--mono); font-size:26px; font-weight:650; line-height:1.15; }
   .kpi .l { font-size:11.5px; color:var(--dim); margin-top:2px; }
-  .kpi.blue .n { color:var(--primary-strong); } .kpi.amber .n { color:var(--accent); }
+  .kpi.blue .n { color:var(--primary); } .kpi.amber .n { color:var(--accent); }
   .kpi.purple .n { color:var(--tpl); } .kpi.green .n { color:var(--ok); }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
   @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
   table.digest { width:100%; border-collapse:collapse; font-size:13px; }
   table.digest td { padding:7px 8px; border-top:1px solid var(--line); vertical-align:top; }
-  table.digest tr:hover td { background:rgba(59,130,246,.05); }
+  table.digest tr:hover td { background:rgba(79,70,229,.04); }
   td.r { font-family:var(--mono); font-size:11.5px; color:var(--dim); white-space:nowrap; }
   .ai { font-size:9.5px; font-family:var(--mono); color:var(--dim); border:1px dashed var(--line); border-radius:4px; padding:0 4px; vertical-align:1px; }
   .tplcards { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
@@ -107,9 +108,9 @@
   .tplcard .sf { font-size:11.5px; color:var(--tpl); font-family:var(--mono); margin-top:3px; }
   .hrow { display:flex; gap:8px; align-items:baseline; font-size:13px; padding:5px 0; border-top:1px solid var(--line); }
   .chip { font-size:10.5px; font-family:var(--mono); border-radius:20px; padding:1px 8px; white-space:nowrap; }
-  .chip.warn { background:rgba(245,158,11,.12); color:var(--accent); }
-  .chip.bad { background:rgba(239,68,68,.12); color:var(--bad); }
-  .chip.ok { background:rgba(34,197,94,.12); color:var(--ok); }
+  .chip.warn { background:rgba(180,83,9,.09); color:var(--accent); }
+  .chip.bad { background:rgba(185,28,28,.08); color:var(--bad); }
+  .chip.ok { background:rgba(21,128,61,.09); color:var(--ok); }
   .provenance { border:1px dashed var(--line); border-radius:8px; padding:8px 12px; font-size:12px; color:var(--dim); margin:6px 0 14px; }
   .provenance code { font-family:var(--mono); color:var(--accent); }
   .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:8px; }
@@ -121,14 +122,14 @@
   .typerow .sample { white-space:nowrap; }
   .typerow .m { font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap; }
   .bar { display:flex; align-items:center; gap:10px; padding:4px 0; }
-  .bar .rect { height:14px; background:var(--primary); border-radius:3px; opacity:.85; }
+  .bar .rect { height:14px; background:var(--primary); border-radius:3px; opacity:.75; }
   .bar .m { font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap; }
   .radrow { display:flex; gap:14px; flex-wrap:wrap; }
   .rad { text-align:center; }
   .rad .sq { width:52px; height:52px; background:var(--card); border:2px solid var(--primary); margin-bottom:4px; }
   .rad .m { font-family:var(--mono); font-size:10.5px; color:var(--dim); }
   .shrow { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
-  .sh { background:#E8ECF4; border-radius:10px; height:64px; }
+  .sh { background:#FFFFFF; border:1px solid var(--line); border-radius:10px; height:64px; }
   .sh + .m { font-family:var(--mono); font-size:9.5px; color:var(--dim); word-break:break-all; margin-top:5px; }
   .secgap { margin-top:26px; }
 </style>
@@ -137,8 +138,8 @@
 <div id="shell">
   <h1 id="title"></h1>
   <div class="tabs" role="tablist">
-    <button class="tab active" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
-    <button class="tab" data-tab="overview" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Overview</button>
+    <button class="tab active" data-tab="overview" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Overview</button>
+    <button class="tab" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
     <button class="tab" data-tab="tokens" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><circle cx="5.5" cy="6" r="1" fill="currentColor"/><circle cx="10.5" cy="6" r="1" fill="currentColor"/><circle cx="5.8" cy="10" r="1" fill="currentColor"/><path d="M14.2 8c0 1.8-1.4 2-2.6 2s-2 .8-1.2 2.2c.6 1-.2 2-1.4 2"/></svg>Tokens</button>
   </div>
   <span class="spacer"></span>
@@ -148,7 +149,7 @@
   <button id="capbtn"></button>
 </div>
 
-<section class="pane active" id="pane-map">
+<section class="pane" id="pane-map">
   <canvas id="canvas"></canvas>
   <div id="maplegend">
     <span><span class="dot" style="background:var(--primary)"></span>page</span>
@@ -159,7 +160,7 @@
   <button id="fitbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>fit</button>
 </section>
 
-<section class="pane scrollpane" id="pane-overview"></section>
+<section class="pane scrollpane active" id="pane-overview"></section>
 <section class="pane scrollpane" id="pane-tokens"></section>
 
 <div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
@@ -174,7 +175,7 @@ const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t.dataset.tab));
-  if (t.dataset.tab==='map') resize();
+  if (t.dataset.tab==='map'){ resize(); if (!window.__fitted){ fit(); window.__fitted=true; } }
 });
 
 // ═════════════════════════ MAP TAB (coverage skill tree) ═════════════════════
@@ -249,8 +250,7 @@ function fit(){
   scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
   tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
 }
-fit();
-document.getElementById('fitbtn').onclick = fit;
+document.getElementById('fitbtn').onclick = fit; // first fit happens on first Map-tab open (pane starts hidden)
 function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
 function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
 
@@ -262,7 +262,7 @@ const short = (s,n=24) => { s = s||''; return s.length>n ? s.slice(0,n-1)+'…' 
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
 function drawLabel(x,y,text,color,size){
   ctx.font = `${size}px ${'system-ui'}`; const w = ctx.measureText(text).width;
-  ctx.fillStyle='rgba(11,18,32,.85)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
+  ctx.fillStyle='rgba(248,250,252,.92)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
   ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
 }
 function draw(){
@@ -272,7 +272,7 @@ function draw(){
     const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
     ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
     const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
-    ctx.strokeStyle = dimmed ? 'rgba(120,140,180,.05)' : n.locked ? 'rgba(143,160,188,.16)' : 'rgba(96,165,250,.28)';
+    ctx.strokeStyle = dimmed ? 'rgba(102,112,133,.06)' : n.locked ? 'rgba(102,112,133,.20)' : 'rgba(79,70,229,.22)';
     ctx.lineWidth = 1.2;
     const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
     ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
@@ -280,7 +280,7 @@ function draw(){
   if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
     const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
     ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
-    ctx.strokeStyle='rgba(96,165,250,.6)'; ctx.lineWidth=1.6;
+    ctx.strokeStyle='rgba(79,70,229,.55)'; ctx.lineWidth=1.6;
     ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
   nodes.forEach(n=>{
     const [x,y]=toScreen(n.x,n.y);
@@ -289,21 +289,21 @@ function draw(){
     if (n.locked){
       const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
       ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
-      ctx.fillStyle='rgba(143,160,188,.14)'; ctx.fill();
-      ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#F59E0B' : '#5A6A88'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
-      if (n.kind==='frontier-group'){ ctx.fillStyle='#8FA0BC'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
+      ctx.fillStyle='rgba(152,162,179,.15)'; ctx.fill();
+      ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#B45309' : '#98A2B3'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
+      if (n.kind==='frontier-group'){ ctx.fillStyle='#667085'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
       if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
-        drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#8FA0BC', Math.max(9.5,10*Math.min(scale,1)));
+        drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#667085', Math.max(9.5,10*Math.min(scale,1)));
     } else {
       const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
       ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
-      ctx.fillStyle = n.kind==='template' ? '#A78BFA' : '#3B82F6';
+      ctx.fillStyle = n.kind==='template' ? '#7C3AED' : '#4F46E5';
       if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
       ctx.fill(); ctx.shadowBlur=0;
-      ctx.strokeStyle='rgba(11,18,32,.9)'; ctx.lineWidth=2; ctx.stroke();
-      if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#22C55E'; ctx.fill(); }
-      drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#5A6A88':'#DCE3F0', Math.max(10,11*Math.min(scale,1)));
-      if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#9d86d8', 9.5);
+      ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=2; ctx.stroke();
+      if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#15803D'; ctx.fill(); }
+      drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#98A2B3':'#101828', Math.max(10,11*Math.min(scale,1)));
+      if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#7C3AED', 9.5);
     }
     ctx.globalAlpha = 1;
   });
