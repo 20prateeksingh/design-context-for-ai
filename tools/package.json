@@ -1,0 +1,13 @@
+{
+  "name": "design-context-kit",
+  "version": "0.1.0",
+  "description": "Product-agnostic design-context capture: nav sitemap + editable page snapshots",
+  "scripts": {
+    "login": "node login.js",
+    "capture": "node capture.js"
+  },
+  "dependencies": {
+    "js-beautify": "^1.15.4",
+    "playwright": "^1.40.0"
+  }
+}

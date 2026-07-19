@@ -1,0 +1,301 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Design Context Map</title>
+<style>
+  :root { --bg:#15161c; --panel:#1e2028; --line:#2c2f3a; --txt:#e6e8ef; --dim:#8b90a0;
+          --nav:#7aa2ff; --tpl:#b48cff; --frontier:#565b6b; --ok:#4ade80; --warn:#fbbf24; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.5 system-ui,-apple-system,sans-serif; overflow:hidden; }
+  #canvas { position:fixed; inset:0; cursor:grab; }
+  #topbar { position:fixed; top:0; left:0; right:0; display:flex; gap:14px; align-items:center;
+            padding:10px 16px; background:linear-gradient(var(--bg) 60%, transparent); z-index:5; pointer-events:none; }
+  #topbar > * { pointer-events:auto; }
+  #topbar h1 { font-size:15px; font-weight:650; }
+  .pill { font-size:12px; color:var(--dim); background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:3px 10px; }
+  .pill b { color:var(--txt); }
+  #server-pill.on { color:var(--ok); border-color:#2f4a3a; }
+  #fitbtn { font-size:12px; background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer; }
+  #capbtn { margin-left:auto; font-size:13px; font-weight:600; background:var(--nav); color:#0b1020; border:0;
+            border-radius:8px; padding:7px 14px; cursor:pointer; display:none; }
+  #capbtn:disabled { opacity:.5; cursor:wait; }
+  #panel { position:fixed; top:0; right:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid var(--line);
+           padding:16px; overflow-y:auto; transform:translateX(100%); transition:transform .18s ease; z-index:6; }
+  #panel.open { transform:none; }
+  #panel .close { position:absolute; top:10px; right:12px; background:none; border:0; color:var(--dim); font-size:18px; cursor:pointer; }
+  #panel img { width:100%; border-radius:8px; border:1px solid var(--line); margin:10px 0; }
+  #panel h2 { font-size:16px; margin:2px 24px 2px 0; }
+  #panel .route { font-family:ui-monospace,monospace; font-size:12px; color:var(--dim); word-break:break-all; }
+  #panel .desc { font-size:13px; color:var(--txt); margin:10px 0; }
+  #panel .meta { font-size:12px; color:var(--dim); }
+  #panel .links a { color:var(--nav); font-size:13px; margin-right:12px; text-decoration:none; }
+  #panel h3 { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--dim); margin:16px 0 6px; }
+  .state { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:5px 8px;
+           background:var(--bg); border:1px solid var(--line); border-radius:6px; margin-bottom:5px; }
+  .state .tag { font-size:11px; color:var(--ok); }
+  .state .tag.pending { color:var(--warn); }
+  .urlrow { display:flex; gap:8px; align-items:flex-start; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); }
+  .urlrow input { margin-top:3px; }
+  .urlrow .u { word-break:break-all; color:var(--txt); }
+  .urlrow .u small { color:var(--dim); display:block; }
+  .btn { font-size:12px; font-weight:600; background:var(--bg); color:var(--txt); border:1px solid var(--line);
+         border-radius:6px; padding:5px 10px; cursor:pointer; }
+  .btn.primary { background:var(--nav); color:#0b1020; border:0; }
+  #stateform input { width:100%; margin-bottom:6px; background:var(--bg); border:1px solid var(--line); color:var(--txt);
+                     border-radius:6px; padding:6px 8px; font-size:13px; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--line);
+           border-radius:8px; padding:9px 16px; font-size:13px; display:none; z-index:9; max-width:80vw; }
+  #legend { position:fixed; bottom:14px; left:16px; font-size:11px; color:var(--dim); z-index:4; }
+  #legend span { margin-right:14px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="topbar">
+  <h1 id="title"></h1>
+  <span class="pill"><b id="n-cap">0</b> unlocked</span>
+  <span class="pill"><b id="n-fro">0</b> locked (discovered)</span>
+  <span class="pill" id="server-pill">static view</span>
+  <button id="fitbtn">⤢ fit</button>
+  <button id="capbtn"></button>
+</div>
+<div id="legend">
+  <span><span class="dot" style="background:var(--nav)"></span>page</span>
+  <span><span class="dot" style="background:var(--tpl)"></span>template (1 stands for many)</span>
+  <span><span class="dot" style="border:1.5px dashed var(--frontier)"></span>locked — discovered, not downloaded</span>
+  <span>hover a node to see its real links · click for details</span>
+</div>
+<div id="panel"><button class="close" onclick="closePanel()">×</button><div id="panel-body"></div></div>
+<div id="toast"></div>
+<script>
+const DATA = /*__MAPDATA__*/null;
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+let W, H, DPR = devicePixelRatio || 1;
+function resize(){ W = innerWidth; H = innerHeight; canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; }
+addEventListener('resize', resize); resize();
+
+// ── model + adjacency ────────────────────────────────────────────────────────
+const nodes = [], byId = {};
+DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
+DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
+const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]);
+const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
+edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
+document.getElementById('title').textContent = DATA.product + ' — coverage map';
+document.getElementById('n-cap').textContent = DATA.nodes.length;
+document.getElementById('n-fro').textContent = DATA.frontier.reduce((s,f)=>s+(f.count||1),0);
+
+// ── skill-tree layout: discovery hierarchy, radial tiers ─────────────────────
+// ring 0 = landing · ring 1 = nav pages · ring 2 = templates/deeper captures · outer = locked frontier.
+// The full link mesh is NOT drawn — only the tree skeleton; hover reveals a node's true links.
+const root = nodes.find(n=>!n.locked && n.route==='/') || nodes.find(n=>!n.locked) || nodes[0];
+const children = {}; nodes.forEach(n=>children[n.id]=[]);
+const inbound = {}; nodes.forEach(n=>inbound[n.id]=[]);
+edges.forEach(e=>inbound[e.b].push(e.a));
+// captured pages: parent = root if root links to it, else first captured inbound; frontier: its via/template edge source
+nodes.forEach(n=>{
+  if (n===root) return;
+  let p = null;
+  if (n.locked) p = inbound[n.id].find(a=>byId[a] && !byId[a].locked) || root.id;
+  else if (adj[root.id].has(n.id)) p = root.id;
+  else p = inbound[n.id].find(a=>byId[a] && !byId[a].locked && a!==n.id) || root.id;
+  n.parent = p; children[p].push(n.id);
+});
+// angular spans: captured pages get near-even spacing (they must be READABLE);
+// locked frontier fans compactly behind its parent instead of stealing span.
+function leaves(id){ const c = children[id]; return c.length ? c.reduce((s,k)=>s+leaves(k),0) : 1; }
+const weight = (id) => byId[id].locked ? 0.35 : 1 + 0.15*Math.min(leaves(id), 8);
+const RING = [0, 250, 450, 610];
+function placeLockedFan(parent, kids){
+  const span = Math.min(parent.span || Math.PI/3, Math.PI/2.8);
+  const step = 0.09, perRow = Math.max(3, Math.floor(span/step));
+  const pr = Math.hypot(parent.x, parent.y) || 1;
+  kids.forEach((k,i)=>{
+    const row = Math.floor(i/perRow), left = kids.length - row*perRow, cnt = Math.min(left, perRow);
+    const a = parent.angle + (i%perRow - (cnt-1)/2)*step;
+    const r = pr + 120 + row*58;
+    const kn = byId[k]; kn.x = Math.cos(a)*r; kn.y = Math.sin(a)*r; kn.angle = a; kn.depth = parent.depth+1;
+    kn.span = step;
+  });
+}
+function place(id, a0, a1, depth){
+  const n = byId[id];
+  const mid = (a0+a1)/2, r = RING[Math.min(depth, RING.length-1)];
+  n.x = Math.cos(mid)*r; n.y = Math.sin(mid)*r; n.angle = mid; n.depth = depth; n.span = a1-a0;
+  const cap = children[id].filter(k=>!byId[k].locked), locked = children[id].filter(k=>byId[k].locked);
+  if (cap.length){
+    const total = cap.reduce((s,k)=>s+weight(k),0); let a = a0;
+    cap.forEach((k,idx)=>{ const span = (a1-a0)*weight(k)/total; byId[k].lblAlt = idx%2; place(k, a, a+span, depth+1); a += span; });
+  }
+  if (locked.length) placeLockedFan(n, locked);
+}
+root.x = 0; root.y = 0; root.depth = 0; root.angle = -Math.PI/2; root.span = 2*Math.PI;
+{ const kids = children[root.id];
+  const cap = kids.filter(k=>!byId[k].locked), locked = kids.filter(k=>byId[k].locked);
+  const total = kids.reduce((s,k)=>s+weight(k),0); let a = -Math.PI/2;
+  cap.concat(locked).forEach((k,idx)=>{ byId[k].lblAlt = idx%2; const span = 2*Math.PI*weight(k)/total;
+    if (byId[k].locked){ const kn=byId[k]; const mid=a+span/2; kn.x=Math.cos(mid)*(RING[1]+130); kn.y=Math.sin(mid)*(RING[1]+130); kn.angle=mid; kn.depth=1; kn.span=span; }
+    else place(k, a, a+span, 1);
+    a += span; }); }
+
+// ── viewport: fit-to-view on load, clamped zoom ──────────────────────────────
+let tx=0, ty=0, scale=1, minScale=0.2;
+function fit(){
+  const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
+  const bw = Math.max(...xs)-Math.min(...xs)+300, bh = Math.max(...ys)-Math.min(...ys)+300;
+  scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
+  tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
+}
+fit();
+document.getElementById('fitbtn').onclick = fit;
+function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
+function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
+
+// ── selection state ──────────────────────────────────────────────────────────
+const selected = new Set();
+let serverMode=false, activeNode=null, hoverNode=null, dragNode=null;
+const isNeighbor = (n) => { const f = hoverNode||activeNode; if (!f) return true;
+  return n===f || adj[f.id].has(n.id); };
+
+// ── render ───────────────────────────────────────────────────────────────────
+const short = (s,n=24) => { s = s||''; return s.length>n ? s.slice(0,n-1)+'…' : s; };
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
+function drawLabel(x,y,text,color,size){
+  ctx.font = `${size}px system-ui`; const w = ctx.measureText(text).width;
+  ctx.fillStyle='rgba(21,22,28,.82)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
+  ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
+}
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
+  const focus = hoverNode||activeNode;
+  // 1. tree skeleton (always) — soft curves parent→child
+  nodes.forEach(n=>{ if (n===root || !n.parent) return; const p = byId[n.parent];
+    const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
+    ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
+    const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
+    ctx.strokeStyle = dimmed ? 'rgba(120,128,150,.05)' : n.locked ? 'rgba(130,136,155,.16)' : 'rgba(150,168,215,.28)';
+    ctx.lineWidth = 1.2;
+    const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
+    ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
+  });
+  // 2. focus mesh — the node's REAL links, on demand only
+  if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
+    const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
+    ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
+    ctx.strokeStyle='rgba(122,162,255,.55)'; ctx.lineWidth=1.6;
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
+  // 3. nodes
+  nodes.forEach(n=>{
+    const [x,y]=toScreen(n.x,n.y);
+    const dimmed = focus && !isNeighbor(n);
+    ctx.globalAlpha = dimmed ? 0.22 : 1;
+    if (n.locked){
+      const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
+      ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
+      ctx.fillStyle='rgba(86,91,107,.22)'; ctx.fill();
+      ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#fbbf24' : '#6a7080'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
+      if (n.kind==='frontier-group'){ ctx.fillStyle='#9aa0b0'; ctx.font=`${Math.max(9,9*scale)}px system-ui`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
+      if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
+        drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#8b90a0', Math.max(9.5,10*Math.min(scale,1)));
+    } else {
+      const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
+      ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
+      ctx.fillStyle = n.kind==='template' ? '#b48cff' : '#7aa2ff';
+      if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
+      ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle='rgba(21,22,28,.9)'; ctx.lineWidth=2; ctx.stroke();
+      if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#4ade80'; ctx.fill(); }
+      drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#6a7080':'#e2e5ee', Math.max(10,11*Math.min(scale,1)));
+      if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `⧉ 1 of ${n.standsFor}`, '#9d86d8', 9.5);
+    }
+    ctx.globalAlpha = 1;
+  });
+  requestAnimationFrame(draw);
+}
+
+// ── interactions ─────────────────────────────────────────────────────────────
+let panning=false, px0=0, py0=0, moved=false;
+function nodeAt(px,py){ const [wx,wy]=toWorld(px,py);
+  let best=null, bd=1e9;
+  nodes.forEach(n=>{ const dx=n.x-wx, dy=n.y-wy; const d=dx*dx+dy*dy; const hit=Math.pow(16/Math.min(scale,1)+4,2);
+    if (d<hit && d<bd){ best=n; bd=d; } });
+  return best; }
+canvas.addEventListener('mousedown', e=>{ const n=nodeAt(e.clientX,e.clientY);
+  if (n){ dragNode=n; } else { panning=true; } px0=e.clientX; py0=e.clientY; moved=false; canvas.style.cursor='grabbing'; });
+addEventListener('mousemove', e=>{ const dx=e.clientX-px0, dy=e.clientY-py0;
+  if (dragNode){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; dragNode.x += dx/scale; dragNode.y += dy/scale; px0=e.clientX; py0=e.clientY; }
+  else if (panning){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; tx += dx/scale; ty += dy/scale; px0=e.clientX; py0=e.clientY; }
+  else { hoverNode = nodeAt(e.clientX,e.clientY) || null; canvas.style.cursor = hoverNode?'pointer':'grab'; }});
+addEventListener('mouseup', ()=>{ if (dragNode && !moved) openPanel(dragNode);
+  dragNode=null; panning=false; canvas.style.cursor='grab'; });
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f = e.deltaY<0?1.12:0.89;
+  const [wx,wy]=toWorld(e.clientX,e.clientY); scale=Math.min(Math.max(scale*f,minScale),3);
+  const [wx2,wy2]=toWorld(e.clientX,e.clientY); tx+=wx2-wx; ty+=wy2-wy; }, {passive:false});
+
+// ── panel ────────────────────────────────────────────────────────────────────
+const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
+  if (n.locked){
+    const urls = n.urls || [n.url];
+    el.innerHTML = `<h2>🔒 Locked — not downloaded yet</h2>
+      <div class="route">${esc(n.pattern||'')}</div>
+      <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
+      ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
+      <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
+      ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
+        <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
+      <div style="margin-top:10px"><button class="btn" id="selall">Select all shown</button></div>`;
+    el.querySelectorAll('input[data-u]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.u):selected.delete(cb.dataset.u); n.someSelected=[...selected].some(u=>urls.includes(u)); syncCapBtn(); });
+    el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
+  } else {
+    const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
+    el.innerHTML = `<h2>${esc(n.label||n.id)}</h2>
+      <div class="route">${esc(n.route)}</div>
+      ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt=""></a>`:''}
+      <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
+      <div class="desc">${esc(n.desc||'')}</div>
+      <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a><a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
+      ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
+      <h3>States</h3>
+      ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
+      <div id="stateform" style="margin-top:8px">
+        <input id="st-name" placeholder="state name (e.g. empty, error)">
+        <input id="st-url" placeholder="URL that shows this state">
+        <button class="btn primary" id="st-add">Add & download state</button>
+        <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
+      </div>`;
+    el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
+      if(!name||!url) return toast('Give the state a name and a URL');
+      if (serverMode){ toast('Capturing state — watch the browser window…', true);
+        const r = await api('/api/state',{slug:n.id,name,url}); r.ok ? location.reload() : toast('Failed: '+r.error); }
+      else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
+  }
+  document.getElementById('panel').classList.add('open');
+}
+function closePanel(){ document.getElementById('panel').classList.remove('open'); activeNode=null; }
+
+// ── capture button + server bridge ───────────────────────────────────────────
+const capbtn = document.getElementById('capbtn');
+function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
+  capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
+capbtn.onclick = async ()=>{
+  const urls=[...selected];
+  if (serverMode){ capbtn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
+    const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); capbtn.disabled=false; } }
+  else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
+    try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
+    catch(_){ prompt('Run this in the terminal:', cmd); } }
+};
+async function api(p,body){ try { const r = await fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  return await r.json(); } catch(e){ return {ok:false,error:String(e)}; } }
+function toast(msg, sticky){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); if(!sticky) t._h=setTimeout(()=>t.style.display='none', 6000); }
+fetch('/api/ping').then(r=>r.json()).then(()=>{ serverMode=true;
+  const p=document.getElementById('server-pill'); p.textContent='live · can unlock'; p.classList.add('on'); syncCapBtn(); }).catch(()=>{});
+
+draw();
+</script>
+</body>
+</html>

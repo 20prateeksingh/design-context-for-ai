@@ -1,0 +1,6 @@
+# Browser profiles contain REAL session cookies — never commit or share.
+profiles/
+
+tools/node_modules/
+.DS_Store
+*.preview.png
