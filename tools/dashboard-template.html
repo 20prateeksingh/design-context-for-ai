@@ -41,6 +41,11 @@
             border-radius:8px; padding:7px 14px; display:none; transition:background .2s; }
   #capbtn:hover { background:var(--primary-strong); }
   #capbtn:disabled { opacity:.5; cursor:wait; }
+  #recapbtn { font-size:12px; font-weight:600; background:#F5F7FA; color:var(--txt); border:1px solid var(--line);
+              border-radius:8px; padding:6px 11px; display:none; transition:border-color .2s; }
+  #recapbtn:hover { border-color:var(--primary); }
+  /* onboarding: the tabs and their chrome don't exist yet — hide until the library does */
+  #shell.onboarding .tabs, #shell.onboarding .pill, #shell.onboarding #capbtn, #shell.onboarding #recapbtn { display:none; }
 
   /* ── tab panes ── */
   .pane { position:fixed; inset:52px 0 0 0; display:none; }
@@ -79,6 +84,7 @@
          border-radius:6px; padding:5px 10px; transition:border-color .2s; }
   .btn:hover { border-color:var(--primary); }
   .btn.primary { background:var(--primary); color:#fff; border:0; }
+  .btn.primary:hover { background:var(--primary-strong); }
   #stateform input { width:100%; margin-bottom:6px; background:#FFFFFF; border:1px solid var(--line); color:var(--txt);
                      border-radius:6px; padding:6px 8px; font-size:13px; }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#101828; color:#fff; border:1px solid #101828;
@@ -132,6 +138,37 @@
   .sh { background:#FFFFFF; border:1px solid var(--line); border-radius:10px; height:64px; }
   .sh + .m { font-family:var(--mono); font-size:9.5px; color:var(--dim); word-break:break-all; margin-top:5px; }
   .secgap { margin-top:26px; }
+
+  /* ── onboarding (wizard · login wait · live progress · completion) ── */
+  .ob { max-width:560px; margin:6vh auto 40px; }
+  .ob h2 { font-size:22px; font-weight:680; margin-bottom:6px; }
+  .ob .sub { color:var(--dim); font-size:14px; margin-bottom:20px; }
+  .fld { display:block; margin-top:18px; }
+  .fld > span { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+  .ob input[type=text], .ob select { width:100%; background:#fff; border:1px solid var(--line); border-radius:8px;
+                                      padding:10px 12px; font:inherit; color:var(--txt); }
+  .ob input:focus, .ob select:focus { border-color:var(--primary); outline:none; }
+  .hint { font-size:12px; color:var(--dim); margin-top:6px; }
+  .seg { display:flex; gap:8px; }
+  .segbtn { flex:1; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; font-weight:550; color:var(--txt); }
+  .segbtn.on { border-color:var(--primary); background:rgba(79,70,229,.06); color:var(--primary-strong); }
+  .expect { margin-top:12px; font-size:13px; color:var(--dim); background:var(--panel); border:1px solid var(--line);
+            border-left:3px solid var(--primary); border-radius:8px; padding:10px 12px; }
+  .err { color:var(--bad); font-size:13px; margin-top:12px; min-height:1px; }
+  .btn.big { display:block; width:100%; padding:12px; font-size:15px; margin-top:22px; }
+  .phase { max-width:520px; margin:13vh auto; text-align:center; }
+  .phase h2 { font-size:20px; margin-bottom:8px; }
+  .phase p { color:var(--dim); }
+  .spin { width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--primary); border-radius:50%;
+          margin:22px auto; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){ .spin { animation:none; } }
+  .prog { max-width:760px; margin:5vh auto 40px; }
+  .prog h2 { font-size:21px; font-weight:680; }
+  .prog .counters { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:16px 0; }
+  .oblog { background:#0E1220; color:#D7DCE8; font-family:var(--mono); font-size:12px; line-height:1.5; border-radius:10px;
+           padding:12px 14px; height:44vh; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
+  .ok-note { background:rgba(21,128,61,.06); border:1px solid #BBE3C8; border-radius:10px; padding:14px 16px; margin-top:16px; font-size:14px; }
 </style>
 </head>
 <body>
@@ -146,6 +183,7 @@
   <span class="pill"><b id="n-cap">0</b> unlocked</span>
   <span class="pill"><b id="n-fro">0</b> locked</span>
   <span class="pill" id="server-pill">static view</span>
+  <button id="recapbtn">+ Capture again</button>
   <button id="capbtn"></button>
 </div>
 
@@ -162,317 +200,541 @@
 
 <section class="pane scrollpane active" id="pane-overview"></section>
 <section class="pane scrollpane" id="pane-tokens"></section>
+<section class="pane" id="pane-onboard"></section>
 
 <div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
 <div id="toast" role="status"></div>
 
 <script>
 const DASH = /*__DASHDATA__*/null;
-const DATA = DASH.map;
+const DATA = DASH ? DASH.map : null;
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-
-// ── tabs ─────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
-  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t.dataset.tab));
-  if (t.dataset.tab==='map'){ resize(); if (!window.__fitted){ fit(); window.__fitted=true; } }
-});
-
-// ═════════════════════════ MAP TAB (coverage skill tree) ═════════════════════
-const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-let W, H, DPR = devicePixelRatio || 1;
-function resize(){ const r = canvas.parentElement.getBoundingClientRect(); W = r.width; H = r.height;
-  canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; }
-addEventListener('resize', resize); resize();
-
-const nodes = [], byId = {};
-DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
-DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
-const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]);
-const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
-edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
-document.getElementById('title').innerHTML = esc(DATA.product) + ' <span class="mono">design context</span>';
-document.title = DATA.product + ' — design context';
-const lockedTotal = DATA.frontier.reduce((s,f)=>s+(f.count||1),0);
-document.getElementById('n-cap').textContent = DATA.nodes.length;
-document.getElementById('n-fro').textContent = lockedTotal;
-
-const root = nodes.find(n=>!n.locked && n.route==='/') || nodes.find(n=>!n.locked) || nodes[0];
-const children = {}; nodes.forEach(n=>children[n.id]=[]);
-const inbound = {}; nodes.forEach(n=>inbound[n.id]=[]);
-edges.forEach(e=>inbound[e.b].push(e.a));
-nodes.forEach(n=>{
-  if (n===root) return;
-  let p = null;
-  if (n.locked) p = inbound[n.id].find(a=>byId[a] && !byId[a].locked) || root.id;
-  else if (adj[root.id].has(n.id)) p = root.id;
-  else p = inbound[n.id].find(a=>byId[a] && !byId[a].locked && a!==n.id) || root.id;
-  n.parent = p; children[p].push(n.id);
-});
-function leaves(id){ const c = children[id]; return c.length ? c.reduce((s,k)=>s+leaves(k),0) : 1; }
-const weight = (id) => byId[id].locked ? 0.35 : 1 + 0.15*Math.min(leaves(id), 8);
-const RING = [0, 250, 450, 610];
-function placeLockedFan(parent, kids){
-  const span = Math.min(parent.span || Math.PI/3, Math.PI/2.8);
-  const step = 0.09, perRow = Math.max(3, Math.floor(span/step));
-  const pr = Math.hypot(parent.x, parent.y) || 1;
-  kids.forEach((k,i)=>{
-    const row = Math.floor(i/perRow), left = kids.length - row*perRow, cnt = Math.min(left, perRow);
-    const a = parent.angle + (i%perRow - (cnt-1)/2)*step;
-    const r = pr + 120 + row*58;
-    const kn = byId[k]; kn.x = Math.cos(a)*r; kn.y = Math.sin(a)*r; kn.angle = a; kn.depth = parent.depth+1; kn.span = step;
-  });
-}
-function place(id, a0, a1, depth){
-  const n = byId[id];
-  const mid = (a0+a1)/2, r = RING[Math.min(depth, RING.length-1)];
-  n.x = Math.cos(mid)*r; n.y = Math.sin(mid)*r; n.angle = mid; n.depth = depth; n.span = a1-a0;
-  const cap = children[id].filter(k=>!byId[k].locked), locked = children[id].filter(k=>byId[k].locked);
-  if (cap.length){
-    const total = cap.reduce((s,k)=>s+weight(k),0); let a = a0;
-    cap.forEach((k,idx)=>{ const span = (a1-a0)*weight(k)/total; byId[k].lblAlt = idx%2; place(k, a, a+span, depth+1); a += span; });
-  }
-  if (locked.length) placeLockedFan(n, locked);
-}
-root.x = 0; root.y = 0; root.depth = 0; root.angle = -Math.PI/2; root.span = 2*Math.PI;
-{ const kids = children[root.id];
-  const cap = kids.filter(k=>!byId[k].locked), locked = kids.filter(k=>byId[k].locked);
-  const total = kids.reduce((s,k)=>s+weight(k),0); let a = -Math.PI/2;
-  cap.concat(locked).forEach((k,idx)=>{ byId[k].lblAlt = idx%2; const span = 2*Math.PI*weight(k)/total;
-    if (byId[k].locked){ const kn=byId[k]; const mid=a+span/2; kn.x=Math.cos(mid)*(RING[1]+130); kn.y=Math.sin(mid)*(RING[1]+130); kn.angle=mid; kn.depth=1; kn.span=span; }
-    else place(k, a, a+span, 1);
-    a += span; }); }
-
-let tx=0, ty=0, scale=1, minScale=0.2;
-function fit(){
-  const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
-  const bw = Math.max(...xs)-Math.min(...xs)+300, bh = Math.max(...ys)-Math.min(...ys)+300;
-  scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
-  tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
-}
-document.getElementById('fitbtn').onclick = fit; // first fit happens on first Map-tab open (pane starts hidden)
-function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
-function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
-
-const selected = new Set();
-let serverMode=false, activeNode=null, hoverNode=null, dragNode=null;
-const isNeighbor = (n) => { const f = hoverNode||activeNode; if (!f) return true; return n===f || adj[f.id].has(n.id); };
-
 const short = (s,n=24) => { s = s||''; return s.length>n ? s.slice(0,n-1)+'…' : s; };
-function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
-function drawLabel(x,y,text,color,size){
-  ctx.font = `${size}px ${'system-ui'}`; const w = ctx.measureText(text).width;
-  ctx.fillStyle='rgba(248,250,252,.92)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
-  ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
-}
-function draw(){
-  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
-  const focus = hoverNode||activeNode;
-  nodes.forEach(n=>{ if (n===root || !n.parent) return; const p = byId[n.parent];
-    const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
-    ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
-    const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
-    ctx.strokeStyle = dimmed ? 'rgba(102,112,133,.06)' : n.locked ? 'rgba(102,112,133,.20)' : 'rgba(79,70,229,.22)';
-    ctx.lineWidth = 1.2;
-    const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
-    ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
-  });
-  if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
-    const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
-    ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
-    ctx.strokeStyle='rgba(79,70,229,.55)'; ctx.lineWidth=1.6;
-    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
-  nodes.forEach(n=>{
-    const [x,y]=toScreen(n.x,n.y);
-    const dimmed = focus && !isNeighbor(n);
-    ctx.globalAlpha = dimmed ? 0.22 : 1;
-    if (n.locked){
-      const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
-      ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
-      ctx.fillStyle='rgba(152,162,179,.15)'; ctx.fill();
-      ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#B45309' : '#98A2B3'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
-      if (n.kind==='frontier-group'){ ctx.fillStyle='#667085'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
-      if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
-        drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#667085', Math.max(9.5,10*Math.min(scale,1)));
-    } else {
-      const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
-      ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
-      ctx.fillStyle = n.kind==='template' ? '#7C3AED' : '#4F46E5';
-      if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
-      ctx.fill(); ctx.shadowBlur=0;
-      ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=2; ctx.stroke();
-      if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#15803D'; ctx.fill(); }
-      drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#98A2B3':'#101828', Math.max(10,11*Math.min(scale,1)));
-      if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#7C3AED', 9.5);
-    }
-    ctx.globalAlpha = 1;
-  });
-  requestAnimationFrame(draw);
-}
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let serverMode=false, STATUS=null;
 
-let panning=false, px0=0, py0=0, moved=false;
-function nodeAt(px,py){ const [wx,wy]=toWorld(px,py);
-  let best=null, bd=1e9;
-  nodes.forEach(n=>{ const dx=n.x-wx, dy=n.y-wy; const d=dx*dx+dy*dy; const hit=Math.pow(16/Math.min(scale,1)+4,2);
-    if (d<hit && d<bd){ best=n; bd=d; } });
-  return best; }
-canvas.addEventListener('mousedown', e=>{ const n=nodeAt(e.clientX,e.clientY-52);
-  if (n){ dragNode=n; } else { panning=true; } px0=e.clientX; py0=e.clientY; moved=false; canvas.style.cursor='grabbing'; });
-addEventListener('mousemove', e=>{ if (!document.getElementById('pane-map').classList.contains('active')) return;
-  const dx=e.clientX-px0, dy=e.clientY-py0;
-  if (dragNode){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; dragNode.x += dx/scale; dragNode.y += dy/scale; px0=e.clientX; py0=e.clientY; }
-  else if (panning){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; tx += dx/scale; ty += dy/scale; px0=e.clientX; py0=e.clientY; }
-  else { hoverNode = nodeAt(e.clientX,e.clientY-52) || null; canvas.style.cursor = hoverNode?'pointer':'grab'; }});
-addEventListener('mouseup', ()=>{ if (dragNode && !moved) openPanel(dragNode);
-  dragNode=null; panning=false; canvas.style.cursor='grab'; });
-canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f = e.deltaY<0?1.12:0.89;
-  const [wx,wy]=toWorld(e.clientX,e.clientY-52); scale=Math.min(Math.max(scale*f,minScale),3);
-  const [wx2,wy2]=toWorld(e.clientX,e.clientY-52); tx+=wx2-wx; ty+=wy2-wy; }, {passive:false});
-
-function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
-  if (n.locked){
-    const urls = n.urls || [n.url];
-    el.innerHTML = `<h2>Locked — not downloaded yet</h2>
-      <div class="route">${esc(n.pattern||'')}</div>
-      <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
-      ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
-      <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
-      ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
-        <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
-      <div style="margin-top:10px"><button class="btn" id="selall">Select all shown</button></div>`;
-    el.querySelectorAll('input[data-u]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.u):selected.delete(cb.dataset.u); n.someSelected=[...selected].some(u=>urls.includes(u)); syncCapBtn(); });
-    el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
-  } else {
-    const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
-    el.innerHTML = `<h2>${esc(n.label||n.id)}</h2>
-      <div class="route">${esc(n.route)}</div>
-      ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt="screenshot of ${esc(n.label||n.id)}"></a>`:''}
-      <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
-      <div class="desc">${esc(n.desc||'')} <span class="ai" title="model-written orientation, not extracted fact">ai</span></div>
-      <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
-      ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
-      <h3>States</h3>
-      ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
-      <div id="stateform" style="margin-top:8px">
-        <input id="st-name" placeholder="state name (e.g. empty, error)" aria-label="state name">
-        <input id="st-url" placeholder="URL that shows this state" aria-label="state url">
-        <button class="btn primary" id="st-add">Add &amp; download state</button>
-        <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
-      </div>`;
-    el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
-      if(!name||!url) return toast('Give the state a name and a URL');
-      if (serverMode){ toast('Capturing state — watch the browser window…', true);
-        const r = await api('/api/state',{slug:n.id,name,url}); r.ok ? location.reload() : toast('Failed: '+r.error); }
-      else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
-  }
-  document.getElementById('panel').classList.add('open');
-}
-function closePanel(){ document.getElementById('panel').classList.remove('open'); activeNode=null; }
-
-const capbtn = document.getElementById('capbtn');
-function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
-  capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
-capbtn.onclick = async ()=>{
-  const urls=[...selected];
-  if (serverMode){ capbtn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
-    const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); capbtn.disabled=false; } }
-  else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
-    try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
-    catch(_){ prompt('Run this in the terminal:', cmd); } }
-};
-async function api(p,body){ try { const r = await fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
-  return await r.json(); } catch(e){ return {ok:false,error:String(e)}; } }
+function api(p,body){ return fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
+  .then(r=>r.json()).catch(e=>({ok:false,error:String(e)})); }
 function toast(msg, sticky){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); if(!sticky) t._h=setTimeout(()=>t.style.display='none', 6000); }
-fetch('/api/ping').then(r=>r.json()).then(()=>{ serverMode=true;
-  const p=document.getElementById('server-pill'); p.textContent='live · can unlock'; p.classList.add('on'); syncCapBtn(); }).catch(()=>{});
 
-// ═════════════════════════ OVERVIEW TAB ══════════════════════════════════════
-(function renderOverview(){
-  const O = DASH.overview, el = document.getElementById('pane-overview');
-  const covered = DATA.nodes.length, coverage = Math.round(100*covered/(covered+lockedTotal));
-  const tplCount = O.templates.length, standsFor = O.standsForTotal;
-  const health = [];
-  O.health.skipped.forEach(s=>health.push(`<div class="hrow"><span class="chip warn">${esc(s.reason)}</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span></div>`));
-  O.health.failed.forEach(s=>health.push(`<div class="hrow"><span class="chip bad">failed</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span><span class="pill">${esc(s.error||'')}</span></div>`));
-  O.health.actions.forEach(a=>health.push(`<div class="hrow"><span class="chip warn">action</span><span>dismissed a cookie banner via “${esc(a.buttonText)}” — the one sanctioned click, logged</span></div>`));
-  if (O.health.capped) health.push(`<div class="hrow"><span class="chip warn">cap</span><span>${O.health.capped} nav candidates beyond the cap stayed on the frontier</span></div>`);
-  el.innerHTML = `
-    <div class="kpis">
-      <div class="kpi blue"><div class="n">${covered}</div><div class="l">pages unlocked</div></div>
-      <div class="kpi purple"><div class="n">~${standsFor}</div><div class="l">pages represented (templates)</div></div>
-      <div class="kpi amber"><div class="n">${lockedTotal}</div><div class="l">discovered, locked</div></div>
-      <div class="kpi blue"><div class="n">${coverage}%</div><div class="l">of known surface unlocked</div></div>
-      <div class="kpi green"><div class="n">${O.statesTotal}</div><div class="l">states captured</div></div>
-      <div class="kpi purple"><div class="n">${tplCount}</div><div class="l">layout templates found</div></div>
+// ═════════════════════════ ONBOARDING ════════════════════════════════════════
+// wizard → (login-page capture → login window) → live capture → completion.
+// State lives on the server (product.json + the capture job); this view drives it.
+const OB = { url:'', loggedIn:true, productType:'saas' };
+const TYPES = [
+  { k:'saas',      label:'SaaS / web app',          loginDefault:true,  copy:'App screens + one example of each repeating page. Some flows (wizards, modals) need a later guided pass.' },
+  { k:'ecommerce', label:'E-commerce / marketplace', loginDefault:false, copy:'Thousands of product pages share one layout — we capture one of each kind and count the rest.' },
+  { k:'content',   label:'Content / media',          loginDefault:false, copy:'Article/video pages collapse to templates; live widgets freeze as captured.' },
+  { k:'docs',      label:'Docs / knowledge base',    loginDefault:false, copy:'Mostly one page template — expect a big “stands for N” number.' },
+  { k:'marketing', label:'Marketing site',           loginDefault:false, copy:'Usually captures completely in one pass.' },
+  { k:'notsure',   label:'Not sure',                 loginDefault:false, copy:'We’ll use balanced defaults — you can refine later from the map.' },
+];
+let capCount=0, skipCount=0, navCount=0, tplCount=0;
+
+function mountOnboard(){
+  document.getElementById('shell').classList.add('onboarding');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  const el = document.getElementById('pane-onboard');
+  el.classList.add('active','scrollpane');
+}
+function obEl(){ return document.getElementById('pane-onboard'); }
+
+function showWizard(prefill){
+  const p = prefill || (STATUS && STATUS.product) || {};
+  OB.url = p.url || OB.url || '';
+  OB.loggedIn = (p.loggedIn != null) ? !!p.loggedIn : OB.loggedIn;
+  OB.productType = p.productType || OB.productType || 'saas';
+  obEl().innerHTML = `<div class="ob">
+    <h2>Set up your design context</h2>
+    <p class="sub">Point the kit at the product you design for. Three answers, then watch it capture — you won’t touch the terminal.</p>
+    <label class="fld"><span>Product URL</span>
+      <input type="text" id="w-url" value="${esc(OB.url)}" placeholder="https://app.example.com" autocomplete="off" spellcheck="false"></label>
+    <div class="hint">The address of the product you design for — the page you land on after signing in works best.</div>
+    <div class="fld"><span>Do you sign in to use it?</span>
+      <div class="seg" id="w-seg">
+        <button type="button" class="segbtn" data-v="yes">Yes, I sign in</button>
+        <button type="button" class="segbtn" data-v="no">No, it’s public</button>
+      </div></div>
+    <label class="fld"><span>What kind of product is it?</span>
+      <select id="w-type">${TYPES.map(t=>`<option value="${t.k}">${esc(t.label)}</option>`).join('')}</select></label>
+    <div class="expect" id="w-expect"></div>
+    <div class="err" id="w-err"></div>
+    <button class="btn primary big" id="w-start">Start capture</button>
+  </div>`;
+  const seg = document.getElementById('w-seg');
+  const paintSeg = ()=>seg.querySelectorAll('.segbtn').forEach(b=>b.classList.toggle('on', (b.dataset.v==='yes')===OB.loggedIn));
+  seg.querySelectorAll('.segbtn').forEach(b=>b.onclick=()=>{ OB.loggedIn = b.dataset.v==='yes'; paintSeg(); });
+  paintSeg();
+  const sel = document.getElementById('w-type'); sel.value = OB.productType;
+  const paintExpect = ()=>{ const t = TYPES.find(x=>x.k===sel.value)||TYPES[0]; document.getElementById('w-expect').textContent = t.copy; };
+  sel.onchange = ()=>{ OB.productType = sel.value; const t = TYPES.find(x=>x.k===OB.productType);
+    if (t && !prefill) { OB.loggedIn = t.loginDefault; paintSeg(); } paintExpect(); };
+  paintExpect();
+  document.getElementById('w-start').onclick = startFlow;
+}
+
+function showPhase(title, sub){
+  obEl().innerHTML = `<div class="phase"><h2>${esc(title)}</h2><div class="spin"></div><p>${esc(sub)}</p></div>`;
+}
+
+function showLoginWait(){
+  obEl().innerHTML = `<div class="phase">
+    <h2>Log in to your product</h2><div class="spin"></div>
+    <p>A browser window just opened. <b>Log in the way you always do</b> — your password stays in that window, never here.
+       When you’re in, <b>close the window</b> and I’ll continue automatically.</p>
+    <button class="btn" id="ob-manual" style="display:none;margin-top:16px">I’m logged in — continue</button>
+  </div>`;
+  const b = document.getElementById('ob-manual');
+  if (b) b.onclick = ()=>{ if (window.__loginContinue) window.__loginContinue(); };
+}
+
+function showProgress(resuming){
+  obEl().innerHTML = `<div class="prog">
+    <h2>${resuming?'Capture in progress':'Capturing your product'}</h2>
+    <p style="color:var(--dim)">Read-only — it follows links, never clicks, submits, or types on your product. It lands one page at a time.
+       You can close this tab; the capture keeps running and you’ll see progress again when you reopen.</p>
+    <div class="counters">
+      <div class="kpi blue"><div class="n" id="c-cap">0</div><div class="l">pages captured</div></div>
+      <div class="kpi purple"><div class="n" id="c-tpl">0</div><div class="l">templates collapsed</div></div>
+      <div class="kpi amber"><div class="n" id="c-skip">0</div><div class="l">skipped</div></div>
+      <div class="kpi"><div class="n" id="c-nav">—</div><div class="l">nav pages found</div></div>
     </div>
-    <div class="grid2 secgap">
-      <div class="card">
-        <h3 style="margin-top:0">Navigation — the product's own IA <span class="ai" title="descriptions are model-written">ai</span></h3>
-        <table class="digest">${O.nav.map(n=>`<tr>
-          <td style="white-space:nowrap"><b>${esc(short(n.label,26))}</b><br><span class="r">${esc(n.route)}</span></td>
-          <td>${esc(n.desc||'')} <a href="pages/${esc(n.slug)}/page.md" target="_blank" style="white-space:nowrap">doc</a></td></tr>`).join('')}
-        </table>
-      </div>
-      <div>
-        <div class="card">
-          <h3 style="margin-top:0">Capture health</h3>
-          ${health.length? health.join('') : '<div class="hrow"><span class="chip ok">clean</span><span>nothing skipped, nothing failed</span></div>'}
-        </div>
-        <div class="card" style="margin-top:12px">
-          <h3 style="margin-top:0">Recent captures</h3>
-          ${O.recent.map(r=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px;color:var(--dim)">${esc((r.at||'').slice(0,10))}</span><span>${esc(short(r.label,40))}</span></div>`).join('')}
-        </div>
-        ${O.notes.length?`<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Designer notes</h3>
-          ${O.notes.map(n=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px">${esc(n.slug)}</span><span>${esc(n.notes)}</span></div>`).join('')}</div>`:''}
-      </div>
-    </div>
-    <h3 class="secgap">Layout templates — one unlocked page stands for many <span class="ai">ai</span></h3>
-    <div class="tplcards">
-      ${O.templates.map(t=>`<a class="tplcard" href="pages/${esc(t.slug)}/page.md" target="_blank" style="color:inherit;text-decoration:none">
-        <img src="${esc(t.screenshot)}" loading="lazy" alt="">
-        <div class="b"><div class="p">${esc(t.pattern)}</div><div class="sf">1 captured of ${t.standsFor}</div>
-        <div style="font-size:12px;color:var(--dim);margin-top:4px">${esc(short(t.desc||'',90))}</div></div></a>`).join('')}
-    </div>`;
+    <div class="oblog" id="ob-log"></div>
+  </div>`;
+}
+
+function resetCounters(){ capCount=0; skipCount=0; navCount=0; tplCount=0; updateCounters(); }
+function updateCounters(){ const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set('c-cap',capCount); set('c-tpl',tplCount); set('c-skip',skipCount); set('c-nav', navCount||'—'); }
+function feed(line){
+  const el=document.getElementById('ob-log'); if(el){ el.textContent += line+'\n'; el.scrollTop=el.scrollHeight; }
+  let m;
+  if ((m=line.match(/Nav discovery[^:]*:\s*(\d+)\s*candidate/i))) navCount=+m[1];
+  if (/✓ \(/.test(line)) capCount++;
+  if (/skipped \(/.test(line)) skipCount++;
+  if (/capturing 1 of|⧉ \//.test(line)) tplCount++;
+  updateCounters();
+}
+
+async function startFlow(){
+  const url = document.getElementById('w-url').value.trim();
+  const errEl = document.getElementById('w-err');
+  if (!/^https?:\/\//i.test(url)) { errEl.textContent = 'Enter a URL that starts with http:// or https://'; return; }
+  errEl.textContent=''; OB.url=url;
+  const r = await api('/api/onboard', { url, loggedIn:OB.loggedIn, productType:OB.productType });
+  if (!r.ok) { errEl.textContent = 'Could not save: ' + (r.error||''); return; }
+  try {
+    if (OB.loggedIn) { await runLoginPageCapture(); await runLogin(); }
+    await runMainCapture();
+  } catch (e) { toast('Onboarding error: ' + e.message); }
+}
+
+async function waitCaptureDone(){
+  for (;;){ const s = await fetch('/api/capture/log?since=0').then(x=>x.json()).catch(()=>null);
+    if (s && !s.running) return s; await sleep(700); }
+}
+
+async function runLoginPageCapture(){
+  showPhase('Capturing your sign-in page', 'A throwaway browser grabs the page a signed-out visitor sees — before you log in. It never touches your session and disappears once you’re in. This is the only chance to capture it.');
+  const r = await api('/api/capture/start', { mode:'login-page' });
+  if (r.ok) await waitCaptureDone();   // non-fatal if it can't: continue to login
+}
+
+function runLogin(){
+  return new Promise(async (resolve)=>{
+    let resolved=false; const fin=()=>{ if(resolved) return; resolved=true; resolve(); };
+    window.__loginContinue = fin;
+    showLoginWait();
+    await api('/api/login/start', { url:OB.url });
+    const started = Date.now();
+    const tick = async ()=>{
+      if (resolved) return;
+      const s = await fetch('/api/login/status').then(x=>x.json()).catch(()=>null);
+      if (s && s.started && !s.running) return fin();
+      if (Date.now()-started > 60000){ const b=document.getElementById('ob-manual'); if(b) b.style.display='inline-block'; }
+      setTimeout(tick, 1500);
+    };
+    tick();
+  });
+}
+
+async function runMainCapture(){
+  const r = await api('/api/capture/start', { mode:'full' });
+  showProgress(false);
+  if (!r.ok){
+    const s = await fetch('/api/status').then(x=>x.json()).catch(()=>null);
+    if (!(s && s.capture && s.capture.running)){
+      obEl().innerHTML = `<div class="ob"><h2>Couldn’t start the capture</h2>
+        <p class="sub">${esc(r.error||'unknown error')}</p>
+        <button class="btn primary big" id="ob-retry">Back to setup</button></div>`;
+      document.getElementById('ob-retry').onclick=()=>showWizard(OB); return;
+    }
+  }
+  attachStream();
+}
+
+// SSE primary, polling fallback (PRD risk mitigation). `since` counts lines already shown so a
+// mid-stream SSE drop resumes cleanly from the server's ring buffer.
+function attachStream(){
+  resetCounters();
+  let done=false, since=0;
+  const finish = (info)=>{ if(done) return; done=true; onCaptureDone(info||{}); };
+  const startPoll = async ()=>{
+    for(;;){ if(done) return;
+      const s = await fetch('/api/capture/log?since='+since).then(x=>x.json()).catch(()=>null);
+      if (s){ (s.lines||[]).forEach(feed); since = s.next; if(!s.running) return finish({code:s.code}); }
+      await sleep(800);
+    }
+  };
+  if (typeof EventSource === 'undefined') return startPoll();
+  let es;
+  try { es = new EventSource('/api/capture/events'); }
+  catch(_){ return startPoll(); }
+  es.addEventListener('line', e=>{ feed(e.data); since++; });
+  es.addEventListener('done', e=>{ let info={}; try{ info=JSON.parse(e.data); }catch(_){} try{es.close();}catch(_){} finish(info); });
+  es.onerror = ()=>{ if(done) return; try{es.close();}catch(_){} startPoll(); };
+}
+
+function onCaptureDone(info){
+  const logText = (document.getElementById('ob-log')||{}).textContent || '';
+  if (info && info.code && info.code !== 0 && capCount === 0){
+    obEl().innerHTML = `<div class="prog"><h2>Capture didn’t complete</h2>
+      <p style="color:var(--dim)">It stopped before saving any pages — usually a login that didn’t take, or a site that blocked the browser. The full log is below.</p>
+      <div class="oblog" id="ob-log2" style="height:38vh"></div>
+      <button class="btn primary big" id="ob-retry">Back to setup</button></div>`;
+    document.getElementById('ob-log2').textContent = logText;
+    document.getElementById('ob-retry').onclick=()=>showWizard(OB);
+    return;
+  }
+  let host='your product'; try { host = new URL(OB.url || (STATUS&&STATUS.product&&STATUS.product.url) || '').host || host; } catch(_){}
+  obEl().innerHTML = `<div class="ob">
+    <h2>Captured ${capCount} page${capCount===1?'':'s'} of ${esc(host)} ✓</h2>
+    <p class="sub">${tplCount?`${tplCount} repeating layout${tplCount===1?'':'s'} collapsed to one example each. `:''}${skipCount?`${skipCount} skipped (the Overview tab says why). `:''}Your product is now design context your AI tools can read.</p>
+    <div class="ok-note"><b>One more step — the page guides.</b><br>
+      Ask your AI assistant to <b>“describe the library”</b> — it writes the one-line guide and screen doc for every captured page, grounded in what was actually captured.</div>
+    <button class="btn primary big" id="ob-open">Open the library</button>
+  </div>`;
+  document.getElementById('ob-open').onclick = ()=>{ location.href='/'; };
+}
+
+// ═════════════════════════ BOOT ══════════════════════════════════════════════
+(async function boot(){
+  try { STATUS = await (await fetch('/api/status')).json(); serverMode = true; } catch(_){ serverMode = false; }
+  if (serverMode && STATUS.capture && STATUS.capture.running){ mountOnboard(); showProgress(true); attachStream(); return; } // kill-resilience resume
+  if (serverMode && STATUS.firstRun){ mountOnboard(); showWizard(); return; }
+  if (DASH) initDashboard();
+  else document.getElementById('pane-overview').innerHTML =
+    '<div class="card" style="max-width:520px;margin:8vh auto">No library captured yet. Run <code>tools/start.sh</code> and follow the on-screen setup.</div>';
 })();
 
-// ═════════════════════════ TOKENS TAB ════════════════════════════════════════
-(function renderTokens(){
-  const T = DASH.tokens, el = document.getElementById('pane-tokens');
-  const lum = h => { const n = parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255)); };
-  const sw = c => `<div class="sw"><div class="c" style="background:${esc(c.value)};${lum(c.value)>235?'border-bottom:1px solid var(--line);':''}"></div>
-    <div class="i"><b>${esc(c.value)}</b>×${c.count.toLocaleString()} · ${c.pages}p${c.alpha?' · α':''}</div></div>`;
-  const spacing = T.spacing, radius = T.radius;
-  el.innerHTML = `
-    <div class="provenance">Everything below is <code>method: heuristic</code> — values <b>observed</b> on the captured pages, aggregated and clustered by statistics.
-      They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
-      (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
-    <h3>Color — ${T.colors.top.length} recurring values</h3>
-    <div class="swatches">${T.colors.top.map(sw).join('')}</div>
-    <div class="grid2 secgap">
-      <div class="card">
-        <h3 style="margin-top:0">Type ramp — size / weight / family</h3>
-        ${T.typography.ramp.map(t=>`<div class="typerow">
-          <span class="sample" style="font-size:${Math.min(t.size,34)}px;font-weight:${esc(t.weight)};line-height:1.1">Ag</span>
-          <span class="m">${esc(t.value)}</span><span class="m">×${t.count.toLocaleString()} · ${t.pages}p</span></div>`).join('')}
-        <div class="m" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:8px">samples rendered in a system font; family names are as observed</div>
-      </div>
-      <div>
-        <div class="card">
-          <h3 style="margin-top:0">Spacing ladder ${spacing.baseUnit?`— base unit <span style="color:var(--accent);font-family:var(--mono)">${spacing.baseUnit}px</span> (${Math.round(spacing.baseUnitShare*100)}% of values fit)`:''}</h3>
-          ${spacing.steps.slice(0,16).map(s=>`<div class="bar"><div class="rect" style="width:${Math.min(s.px*3,280)}px"></div><span class="m">${esc(s.value)} ×${s.count.toLocaleString()} · ${s.pages}p</span></div>`).join('')}
-        </div>
-        <div class="card" style="margin-top:12px">
-          <h3 style="margin-top:0">Corner radius ${radius.baseUnit?`— base ${radius.baseUnit}px`:''}</h3>
-          <div class="radrow">${radius.steps.slice(0,8).map(r=>`<div class="rad"><div class="sq" style="border-radius:${Math.min(r.px,26)}px"></div><div class="m">${esc(r.value)}<br>×${r.count.toLocaleString()}</div></div>`).join('')}</div>
-        </div>
-      </div>
-    </div>
-    <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
-    <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>`;
-})();
+// ═════════════════════════ DASHBOARD (map · overview · tokens) ════════════════
+// Everything below runs only when a captured library exists.
+function initDashboard(){
+  // ── tabs ──
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t.dataset.tab));
+    if (t.dataset.tab==='map'){ resize(); if (!window.__fitted){ fit(); window.__fitted=true; } }
+  });
 
-draw();
+  // ═════════ MAP TAB (coverage skill tree) ═════════
+  const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+  let W, H, DPR = devicePixelRatio || 1;
+  function resize(){ const r = canvas.parentElement.getBoundingClientRect(); W = r.width; H = r.height;
+    canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; }
+  addEventListener('resize', resize); resize();
+
+  const nodes = [], byId = {};
+  DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
+  DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
+  const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]);
+  const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
+  edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
+  document.getElementById('title').innerHTML = esc(DATA.product) + ' <span class="mono">design context</span>';
+  document.title = DATA.product + ' — design context';
+  const lockedTotal = DATA.frontier.reduce((s,f)=>s+(f.count||1),0);
+  document.getElementById('n-cap').textContent = DATA.nodes.length;
+  document.getElementById('n-fro').textContent = lockedTotal;
+
+  const root = nodes.find(n=>!n.locked && n.route==='/') || nodes.find(n=>!n.locked) || nodes[0];
+  const children = {}; nodes.forEach(n=>children[n.id]=[]);
+  const inbound = {}; nodes.forEach(n=>inbound[n.id]=[]);
+  edges.forEach(e=>inbound[e.b].push(e.a));
+  nodes.forEach(n=>{
+    if (n===root) return;
+    let p = null;
+    if (n.locked) p = inbound[n.id].find(a=>byId[a] && !byId[a].locked) || root.id;
+    else if (adj[root.id].has(n.id)) p = root.id;
+    else p = inbound[n.id].find(a=>byId[a] && !byId[a].locked && a!==n.id) || root.id;
+    n.parent = p; children[p].push(n.id);
+  });
+  function leaves(id){ const c = children[id]; return c.length ? c.reduce((s,k)=>s+leaves(k),0) : 1; }
+  const weight = (id) => byId[id].locked ? 0.35 : 1 + 0.15*Math.min(leaves(id), 8);
+  const RING = [0, 250, 450, 610];
+  function placeLockedFan(parent, kids){
+    const span = Math.min(parent.span || Math.PI/3, Math.PI/2.8);
+    const step = 0.09, perRow = Math.max(3, Math.floor(span/step));
+    const pr = Math.hypot(parent.x, parent.y) || 1;
+    kids.forEach((k,i)=>{
+      const row = Math.floor(i/perRow), left = kids.length - row*perRow, cnt = Math.min(left, perRow);
+      const a = parent.angle + (i%perRow - (cnt-1)/2)*step;
+      const r = pr + 120 + row*58;
+      const kn = byId[k]; kn.x = Math.cos(a)*r; kn.y = Math.sin(a)*r; kn.angle = a; kn.depth = parent.depth+1; kn.span = step;
+    });
+  }
+  function place(id, a0, a1, depth){
+    const n = byId[id];
+    const mid = (a0+a1)/2, r = RING[Math.min(depth, RING.length-1)];
+    n.x = Math.cos(mid)*r; n.y = Math.sin(mid)*r; n.angle = mid; n.depth = depth; n.span = a1-a0;
+    const cap = children[id].filter(k=>!byId[k].locked), locked = children[id].filter(k=>byId[k].locked);
+    if (cap.length){
+      const total = cap.reduce((s,k)=>s+weight(k),0); let a = a0;
+      cap.forEach((k,idx)=>{ const span = (a1-a0)*weight(k)/total; byId[k].lblAlt = idx%2; place(k, a, a+span, depth+1); a += span; });
+    }
+    if (locked.length) placeLockedFan(n, locked);
+  }
+  root.x = 0; root.y = 0; root.depth = 0; root.angle = -Math.PI/2; root.span = 2*Math.PI;
+  { const kids = children[root.id];
+    const cap = kids.filter(k=>!byId[k].locked), locked = kids.filter(k=>byId[k].locked);
+    const total = kids.reduce((s,k)=>s+weight(k),0); let a = -Math.PI/2;
+    cap.concat(locked).forEach((k,idx)=>{ byId[k].lblAlt = idx%2; const span = 2*Math.PI*weight(k)/total;
+      if (byId[k].locked){ const kn=byId[k]; const mid=a+span/2; kn.x=Math.cos(mid)*(RING[1]+130); kn.y=Math.sin(mid)*(RING[1]+130); kn.angle=mid; kn.depth=1; kn.span=span; }
+      else place(k, a, a+span, 1);
+      a += span; }); }
+
+  let tx=0, ty=0, scale=1, minScale=0.2;
+  function fit(){
+    const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
+    const bw = Math.max(...xs)-Math.min(...xs)+300, bh = Math.max(...ys)-Math.min(...ys)+300;
+    scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
+    tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
+  }
+  document.getElementById('fitbtn').onclick = fit; // first fit happens on first Map-tab open (pane starts hidden)
+  function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
+  function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
+
+  const selected = new Set();
+  let activeNode=null, hoverNode=null, dragNode=null;
+  const isNeighbor = (n) => { const f = hoverNode||activeNode; if (!f) return true; return n===f || adj[f.id].has(n.id); };
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
+  function drawLabel(x,y,text,color,size){
+    ctx.font = `${size}px ${'system-ui'}`; const w = ctx.measureText(text).width;
+    ctx.fillStyle='rgba(248,250,252,.92)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
+    ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
+  }
+  function draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
+    const focus = hoverNode||activeNode;
+    nodes.forEach(n=>{ if (n===root || !n.parent) return; const p = byId[n.parent];
+      const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
+      ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
+      const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
+      ctx.strokeStyle = dimmed ? 'rgba(102,112,133,.06)' : n.locked ? 'rgba(102,112,133,.20)' : 'rgba(79,70,229,.22)';
+      ctx.lineWidth = 1.2;
+      const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
+      ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    });
+    if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
+      const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
+      ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
+      ctx.strokeStyle='rgba(79,70,229,.55)'; ctx.lineWidth=1.6;
+      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
+    nodes.forEach(n=>{
+      const [x,y]=toScreen(n.x,n.y);
+      const dimmed = focus && !isNeighbor(n);
+      ctx.globalAlpha = dimmed ? 0.22 : 1;
+      if (n.locked){
+        const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
+        ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
+        ctx.fillStyle='rgba(152,162,179,.15)'; ctx.fill();
+        ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#B45309' : '#98A2B3'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
+        if (n.kind==='frontier-group'){ ctx.fillStyle='#667085'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
+        if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
+          drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#667085', Math.max(9.5,10*Math.min(scale,1)));
+      } else {
+        const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
+        ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
+        ctx.fillStyle = n.kind==='template' ? '#7C3AED' : '#4F46E5';
+        if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
+        ctx.fill(); ctx.shadowBlur=0;
+        ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=2; ctx.stroke();
+        if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#15803D'; ctx.fill(); }
+        drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#98A2B3':'#101828', Math.max(10,11*Math.min(scale,1)));
+        if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#7C3AED', 9.5);
+      }
+      ctx.globalAlpha = 1;
+    });
+    requestAnimationFrame(draw);
+  }
+
+  let panning=false, px0=0, py0=0, moved=false;
+  function nodeAt(px,py){ const [wx,wy]=toWorld(px,py);
+    let best=null, bd=1e9;
+    nodes.forEach(n=>{ const dx=n.x-wx, dy=n.y-wy; const d=dx*dx+dy*dy; const hit=Math.pow(16/Math.min(scale,1)+4,2);
+      if (d<hit && d<bd){ best=n; bd=d; } });
+    return best; }
+  canvas.addEventListener('mousedown', e=>{ const n=nodeAt(e.clientX,e.clientY-52);
+    if (n){ dragNode=n; } else { panning=true; } px0=e.clientX; py0=e.clientY; moved=false; canvas.style.cursor='grabbing'; });
+  addEventListener('mousemove', e=>{ if (!document.getElementById('pane-map').classList.contains('active')) return;
+    const dx=e.clientX-px0, dy=e.clientY-py0;
+    if (dragNode){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; dragNode.x += dx/scale; dragNode.y += dy/scale; px0=e.clientX; py0=e.clientY; }
+    else if (panning){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; tx += dx/scale; ty += dy/scale; px0=e.clientX; py0=e.clientY; }
+    else { hoverNode = nodeAt(e.clientX,e.clientY-52) || null; canvas.style.cursor = hoverNode?'pointer':'grab'; }});
+  addEventListener('mouseup', ()=>{ if (dragNode && !moved) openPanel(dragNode);
+    dragNode=null; panning=false; canvas.style.cursor='grab'; });
+  canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f = e.deltaY<0?1.12:0.89;
+    const [wx,wy]=toWorld(e.clientX,e.clientY-52); scale=Math.min(Math.max(scale*f,minScale),3);
+    const [wx2,wy2]=toWorld(e.clientX,e.clientY-52); tx+=wx2-wx; ty+=wy2-wy; }, {passive:false});
+
+  function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
+    if (n.locked){
+      const urls = n.urls || [n.url];
+      el.innerHTML = `<h2>Locked — not downloaded yet</h2>
+        <div class="route">${esc(n.pattern||'')}</div>
+        <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
+        ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
+        <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
+        ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
+          <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
+        <div style="margin-top:10px"><button class="btn" id="selall">Select all shown</button></div>`;
+      el.querySelectorAll('input[data-u]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.u):selected.delete(cb.dataset.u); n.someSelected=[...selected].some(u=>urls.includes(u)); syncCapBtn(); });
+      el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
+    } else {
+      const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
+      el.innerHTML = `<h2>${esc(n.label||n.id)}</h2>
+        <div class="route">${esc(n.route)}</div>
+        ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt="screenshot of ${esc(n.label||n.id)}"></a>`:''}
+        <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
+        <div class="desc">${esc(n.desc||'')} <span class="ai" title="model-written orientation, not extracted fact">ai</span></div>
+        <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
+        ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
+        <h3>States</h3>
+        ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
+        <div id="stateform" style="margin-top:8px">
+          <input id="st-name" placeholder="state name (e.g. empty, error)" aria-label="state name">
+          <input id="st-url" placeholder="URL that shows this state" aria-label="state url">
+          <button class="btn primary" id="st-add">Add &amp; download state</button>
+          <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
+        </div>`;
+      el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
+        if(!name||!url) return toast('Give the state a name and a URL');
+        if (serverMode){ toast('Capturing state — watch the browser window…', true);
+          const r = await api('/api/state',{slug:n.id,name,url}); r.ok ? location.reload() : toast('Failed: '+r.error); }
+        else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
+    }
+    document.getElementById('panel').classList.add('open');
+  }
+  window.closePanel = function(){ document.getElementById('panel').classList.remove('open'); activeNode=null; };
+
+  const capbtn = document.getElementById('capbtn');
+  function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
+    capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
+  capbtn.onclick = async ()=>{
+    const urls=[...selected];
+    if (serverMode){ capbtn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
+      const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); capbtn.disabled=false; } }
+    else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
+      try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
+      catch(_){ prompt('Run this in the terminal:', cmd); } }
+  };
+
+  // server chrome: live-unlock affordances + re-run entry, only when the server is up
+  const sp=document.getElementById('server-pill');
+  if (serverMode){ sp.textContent='live · can unlock'; sp.classList.add('on');
+    const rb=document.getElementById('recapbtn'); rb.style.display='block';
+    rb.onclick=()=>{ mountOnboard(); showWizard(STATUS && STATUS.product); }; }
+  else sp.textContent='static view';
+  syncCapBtn();
+
+  // ═════════ OVERVIEW TAB ═════════
+  (function renderOverview(){
+    const O = DASH.overview, el = document.getElementById('pane-overview');
+    const covered = DATA.nodes.length, coverage = Math.round(100*covered/(covered+lockedTotal));
+    const tplCountO = O.templates.length, standsFor = O.standsForTotal;
+    const health = [];
+    O.health.skipped.forEach(s=>health.push(`<div class="hrow"><span class="chip warn">${esc(s.reason)}</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span></div>`));
+    O.health.failed.forEach(s=>health.push(`<div class="hrow"><span class="chip bad">failed</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span><span class="pill">${esc(s.error||'')}</span></div>`));
+    O.health.actions.forEach(a=>health.push(`<div class="hrow"><span class="chip warn">action</span><span>dismissed a cookie banner via “${esc(a.buttonText)}” — the one sanctioned click, logged</span></div>`));
+    if (O.health.capped) health.push(`<div class="hrow"><span class="chip warn">cap</span><span>${O.health.capped} nav candidates beyond the cap stayed on the frontier</span></div>`);
+    el.innerHTML = `
+      <div class="kpis">
+        <div class="kpi blue"><div class="n">${covered}</div><div class="l">pages unlocked</div></div>
+        <div class="kpi purple"><div class="n">~${standsFor}</div><div class="l">pages represented (templates)</div></div>
+        <div class="kpi amber"><div class="n">${lockedTotal}</div><div class="l">discovered, locked</div></div>
+        <div class="kpi blue"><div class="n">${coverage}%</div><div class="l">of known surface unlocked</div></div>
+        <div class="kpi green"><div class="n">${O.statesTotal}</div><div class="l">states captured</div></div>
+        <div class="kpi purple"><div class="n">${tplCountO}</div><div class="l">layout templates found</div></div>
+      </div>
+      <div class="grid2 secgap">
+        <div class="card">
+          <h3 style="margin-top:0">Navigation — the product's own IA <span class="ai" title="descriptions are model-written">ai</span></h3>
+          <table class="digest">${O.nav.map(n=>`<tr>
+            <td style="white-space:nowrap"><b>${esc(short(n.label,26))}</b><br><span class="r">${esc(n.route)}</span></td>
+            <td>${esc(n.desc||'')} <a href="pages/${esc(n.slug)}/page.md" target="_blank" style="white-space:nowrap">doc</a></td></tr>`).join('')}
+          </table>
+        </div>
+        <div>
+          <div class="card">
+            <h3 style="margin-top:0">Capture health</h3>
+            ${health.length? health.join('') : '<div class="hrow"><span class="chip ok">clean</span><span>nothing skipped, nothing failed</span></div>'}
+          </div>
+          <div class="card" style="margin-top:12px">
+            <h3 style="margin-top:0">Recent captures</h3>
+            ${O.recent.map(r=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px;color:var(--dim)">${esc((r.at||'').slice(0,10))}</span><span>${esc(short(r.label,40))}</span></div>`).join('')}
+          </div>
+          ${O.notes.length?`<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Designer notes</h3>
+            ${O.notes.map(n=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px">${esc(n.slug)}</span><span>${esc(n.notes)}</span></div>`).join('')}</div>`:''}
+        </div>
+      </div>
+      <h3 class="secgap">Layout templates — one unlocked page stands for many <span class="ai">ai</span></h3>
+      <div class="tplcards">
+        ${O.templates.map(t=>`<a class="tplcard" href="pages/${esc(t.slug)}/page.md" target="_blank" style="color:inherit;text-decoration:none">
+          <img src="${esc(t.screenshot)}" loading="lazy" alt="">
+          <div class="b"><div class="p">${esc(t.pattern)}</div><div class="sf">1 captured of ${t.standsFor}</div>
+          <div style="font-size:12px;color:var(--dim);margin-top:4px">${esc(short(t.desc||'',90))}</div></div></a>`).join('')}
+      </div>`;
+  })();
+
+  // ═════════ TOKENS TAB ═════════
+  (function renderTokens(){
+    const T = DASH.tokens, el = document.getElementById('pane-tokens');
+    const lum = h => { const n = parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255)); };
+    const sw = c => `<div class="sw"><div class="c" style="background:${esc(c.value)};${lum(c.value)>235?'border-bottom:1px solid var(--line);':''}"></div>
+      <div class="i"><b>${esc(c.value)}</b>×${c.count.toLocaleString()} · ${c.pages}p${c.alpha?' · α':''}</div></div>`;
+    const spacing = T.spacing, radius = T.radius;
+    el.innerHTML = `
+      <div class="provenance">Everything below is <code>method: heuristic</code> — values <b>observed</b> on the captured pages, aggregated and clustered by statistics.
+        They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
+        (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
+      <h3>Color — ${T.colors.top.length} recurring values</h3>
+      <div class="swatches">${T.colors.top.map(sw).join('')}</div>
+      <div class="grid2 secgap">
+        <div class="card">
+          <h3 style="margin-top:0">Type ramp — size / weight / family</h3>
+          ${T.typography.ramp.map(t=>`<div class="typerow">
+            <span class="sample" style="font-size:${Math.min(t.size,34)}px;font-weight:${esc(t.weight)};line-height:1.1">Ag</span>
+            <span class="m">${esc(t.value)}</span><span class="m">×${t.count.toLocaleString()} · ${t.pages}p</span></div>`).join('')}
+          <div class="m" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:8px">samples rendered in a system font; family names are as observed</div>
+        </div>
+        <div>
+          <div class="card">
+            <h3 style="margin-top:0">Spacing ladder ${spacing.baseUnit?`— base unit <span style="color:var(--accent);font-family:var(--mono)">${spacing.baseUnit}px</span> (${Math.round(spacing.baseUnitShare*100)}% of values fit)`:''}</h3>
+            ${spacing.steps.slice(0,16).map(s=>`<div class="bar"><div class="rect" style="width:${Math.min(s.px*3,280)}px"></div><span class="m">${esc(s.value)} ×${s.count.toLocaleString()} · ${s.pages}p</span></div>`).join('')}
+          </div>
+          <div class="card" style="margin-top:12px">
+            <h3 style="margin-top:0">Corner radius ${radius.baseUnit?`— base ${radius.baseUnit}px`:''}</h3>
+            <div class="radrow">${radius.steps.slice(0,8).map(r=>`<div class="rad"><div class="sq" style="border-radius:${Math.min(r.px,26)}px"></div><div class="m">${esc(r.value)}<br>×${r.count.toLocaleString()}</div></div>`).join('')}</div>
+          </div>
+        </div>
+      </div>
+      <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
+      <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>`;
+  })();
+
+  draw();
+}
 </script>
 </body>
 </html>

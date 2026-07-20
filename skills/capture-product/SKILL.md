@@ -7,7 +7,13 @@ description: Point the kit at the designer's product and capture its navigation 
 
 Produce a design-context library for the designer's product: `ia/sitemap.json` (their nav, mapped) + one folder per page (screenshot, editable HTML, verbatim copy, style tally, meta). Read-only, deterministic, provenance-stamped.
 
-## 1. Kickoff — two questions, one at a time
+## 0. Prefer the dashboard — it runs onboarding for you
+
+The best first-run path is **not** this conversation: tell the designer to run **`tools/start.sh`** (or offer to run it) and follow the dashboard. It asks the URL + sign-in + product-type once, opens the login window only if relevant, and shows the capture live — no terminal, no questions here. Point them there first. Use the steps below when the host has no browser, the designer prefers chatting, or you're iterating on an already-captured library.
+
+**If `design-context/product.json` exists, the questions in §1 are already answered** — read it (`url`, `loggedIn`, `productType`, `presets`) and do **not** re-ask. Pass it straight through: `node tools/capture.js --config design-context/product.json`. Only ask what's missing.
+
+## 1. Kickoff — two questions, one at a time (skip any already in product.json)
 
 1. **The product's URL** — "the address you land on after logging in works best."
 2. **Logged-in or public?** — "should I capture the product as *you* see it (logged in), or the public view?" Ask this **per product**, even when a saved session exists — the profile may be logged into other products but not this one, and a logged-out capture of an account-shaped product is mostly login redirects. If they want logged-in → do §3 login **before** starting any capture.

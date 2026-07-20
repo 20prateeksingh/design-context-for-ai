@@ -35,16 +35,32 @@ const args = process.argv.slice(2);
 const getArg = (f, d) => { const i = args.indexOf(f); return i !== -1 ? args[i + 1] : d; };
 const hasFlag = (f) => args.includes(f);
 
-const START_URL = getArg('--url', null);
+// --config: read url/presets(depth,cap)/loggedIn from design-context/product.json (the wizard writes
+// this; the capture-product skill reads the same file). Explicit CLI flags always win over config.
+const CONFIG_PATH = getArg('--config', null);
+let CFG = {};
+if (CONFIG_PATH) {
+  const p = path.isAbsolute(CONFIG_PATH) ? CONFIG_PATH : path.join(__dirname, '..', CONFIG_PATH);
+  try { CFG = JSON.parse(fs.readFileSync(p, 'utf8')); }
+  catch (e) { console.error(`⚠  could not read --config ${CONFIG_PATH}: ${e.message.split('\n')[0]}`); }
+}
+const CFG_PRESETS = CFG.presets || {};
+
+// --login-page: capture the signed-out surface of --url into pages/login/ (PRD §2·4a). Always ephemeral.
+const LOGIN_PAGE = hasFlag('--login-page');
+const START_URL = getArg('--url', null) || CFG.url || null;
 const ONLY_URLS = getArg('--urls', null);   // selective capture: comma-separated URLs from the map's frontier
 const STATE = getArg('--state', null);      // state capture: <pageSlug>:<stateName>, with --url = the state's URL
-if (!START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>'); process.exit(1); }
+if (!START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
 
 const PROFILE = getArg('--profile', 'default');
-const DEPTH = parseInt(getArg('--depth', '1'), 10);
-const CAP = parseInt(getArg('--cap', '25'), 10);
+const DEPTH = parseInt(getArg('--depth', String(CFG_PRESETS.depth != null ? CFG_PRESETS.depth : 1)), 10);
+const CAP = parseInt(getArg('--cap', String(CFG_PRESETS.cap != null ? CFG_PRESETS.cap : 25)), 10);
 const HEADLESS = hasFlag('--headless');
 const NO_DISMISS = hasFlag('--no-dismiss');
+// logged-out (ephemeral, no persistent profile) when: explicit flag, login-page mode, or product.json
+// says loggedIn:false. Otherwise logged-in (rides the persistent profile from login.js) — the default.
+const LOGGED_OUT = hasFlag('--logged-out') || LOGIN_PAGE || CFG.loggedIn === false;
 const VIEWPORT = { width: 1440, height: 900 };
 
 const KIT_DIR = path.join(__dirname, '..');
@@ -344,7 +360,8 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
   await dismissBanner(page, actionLog);
 
   const finalUrl = page.url();
-  if (/\/(login|signin|sign-in|signup|auth)\b/i.test(new URL(finalUrl).pathname) && !/login|signin/i.test(new URL(url).pathname)) {
+  // In --login-page mode the login route IS the target — capture it; skip the auth-redirect guard.
+  if (!meta.loginPage && /\/(login|signin|sign-in|signup|auth)\b/i.test(new URL(finalUrl).pathname) && !/login|signin/i.test(new URL(url).pathname)) {
     return { status: 'auth-redirect', finalUrl };
   }
   const bad = await classifyBadPage(page);
@@ -386,6 +403,7 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
     linksOut: [...new Set(outLinks)].slice(0, 200),
     capturedAt: new Date().toISOString(), viewport: VIEWPORT,
     source: 'scrape', method: 'dom', contentHash: contentHash(html),
+    ...(meta.loginPage ? { capturedLoggedOut: true, note: 'signed-out surface captured before login existed' } : {}),
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(metaOut, null, 2), 'utf8');
   return { status: 'ok', slug, meta: metaOut, sizeKb: Math.round(html.length / 1024) };
@@ -393,27 +411,59 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 (async () => {
-  if (!fs.existsSync(PROFILE_DIR)) {
-    console.error(`\n❌  No browser profile at profiles/${PROFILE}.\n   Run first: node tools/login.js --url ${START_URL}\n`);
-    process.exit(1);
+  // ── Login-page mode (PRD §2·4a): ephemeral, logged-out, one page → pages/login/ ──
+  // Runs BEFORE login.js, so no persistent profile exists yet — uses a throwaway context that
+  // never touches (or locks) the designer's profile. The signed-out surface is uncapturable once
+  // logged in (the route redirects into the app), so it must be grabbed first.
+  if (LOGIN_PAGE) {
+    const OUT_DIR = path.join(KIT_DIR, 'design-context');
+    fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
+    console.log(`\n🚀 Login-page capture (logged-out, ephemeral) — ${START_URL}\n`);
+    const browser = await chromium.launch({ headless: HEADLESS });
+    const context = await browser.newContext({ viewport: VIEWPORT });
+    const page = await context.newPage();
+    const actionLog = [];
+    process.stdout.write(`⤷ login page … `);
+    try {
+      const r = await capturePage(page, context, START_URL, { slug: 'login', label: 'Login', loginPage: true }, OUT_DIR, actionLog);
+      console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB) — captured logged-out` : `skipped (${r.status})`);
+    } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
+    await context.close(); await browser.close();
+    // Refresh the consumption layer only if a prior full capture exists (fresh workspace has none yet;
+    // the login page gets folded in when the main capture rebuilds the index).
+    if (fs.existsSync(path.join(OUT_DIR, 'ia', 'sitemap.json'))) {
+      try { require('./build-index.js').buildIndex(OUT_DIR); console.log('📇  index refreshed'); }
+      catch (e) { console.log(`⚠  build-index skipped: ${e.message.split('\n')[0]}`); }
+    }
+    return;
   }
 
-  console.log(STATE ? `\n🚀 State capture (read-only)\n`
+  // ── Context: persistent profile (logged-in) OR ephemeral (logged-out) ──
+  let browser = null, context;
+  const banner = STATE ? `\n🚀 State capture (read-only)\n`
     : ONLY_URLS ? `\n🚀 Selective capture (read-only)\n`
-    : `\n🚀 One-click capture — ${START_URL}  (depth ${DEPTH}, cap ${CAP}, read-only)\n`);
-  let context;
-  try {
-    context = await chromium.launchPersistentContext(PROFILE_DIR, {
-      headless: HEADLESS, viewport: VIEWPORT,
-    });
-  } catch (e) {
-    if (/existing browser session|already in use/i.test(e.message)) {
-      console.error(`\n❌  The capture browser profile is still open in another window`);
-      console.error(`   (usually the login window from login.js). Close that browser window`);
-      console.error(`   and re-run this capture — your login is already saved.\n`);
+    : `\n🚀 One-click capture${LOGGED_OUT ? ' (logged-out)' : ''} — ${START_URL}  (depth ${DEPTH}, cap ${CAP}, read-only)\n`;
+  if (LOGGED_OUT) {
+    console.log(banner);
+    browser = await chromium.launch({ headless: HEADLESS });
+    context = await browser.newContext({ viewport: VIEWPORT });
+  } else {
+    if (!fs.existsSync(PROFILE_DIR)) {
+      console.error(`\n❌  No browser profile at profiles/${PROFILE}.\n   Run first: node tools/login.js --url ${START_URL}\n`);
       process.exit(1);
     }
-    throw e;
+    console.log(banner);
+    try {
+      context = await chromium.launchPersistentContext(PROFILE_DIR, { headless: HEADLESS, viewport: VIEWPORT });
+    } catch (e) {
+      if (/existing browser session|already in use/i.test(e.message)) {
+        console.error(`\n❌  The capture browser profile is still open in another window`);
+        console.error(`   (usually the login window from login.js). Close that browser window`);
+        console.error(`   and re-run this capture — your login is already saved.\n`);
+        process.exit(1);
+      }
+      throw e;
+    }
   }
   const page = context.pages()[0] || await context.newPage();
   const actionLog = [];
@@ -446,7 +496,7 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
         } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
       }
     }
-    await context.close();
+    await context.close(); if (browser) await browser.close();
     try {
       const { buildIndex } = require('./build-index.js');
       const r = buildIndex(OUT_DIR);
@@ -462,9 +512,11 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
   const landingUrl = page.url();
   const origin = new URL(landingUrl).origin;
   if (origin !== new URL(START_URL).origin) console.log(`   ↪ redirected — capturing against ${origin}`);
-  if (/\/(login|signin|sign-in|auth)\b/i.test(new URL(landingUrl).pathname)) {
+  // Logged-in mode: landing on a login page means the saved session expired — bail with guidance.
+  // Logged-out mode captures whatever greets a signed-out visitor, so don't bail there.
+  if (!LOGGED_OUT && /\/(login|signin|sign-in|auth)\b/i.test(new URL(landingUrl).pathname)) {
     console.error(`\n❌  Landed on a login page — the saved session has expired.\n   Run: node tools/login.js --url ${START_URL}  (log in, close the window), then re-run capture.\n`);
-    await context.close(); process.exit(1);
+    await context.close(); if (browser) await browser.close(); process.exit(1);
   }
 
   const PRODUCT = getArg('--product', stripWww(new URL(origin).hostname).split('.')[0]);
@@ -587,7 +639,7 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
     }
   }
 
-  await context.close();
+  await context.close(); if (browser) await browser.close();
 
   // 5. Assemble sitemap + manifest
   const sitemap = {

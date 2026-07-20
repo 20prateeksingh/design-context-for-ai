@@ -7,17 +7,22 @@ Built for designers. You don't write code — you talk to your AI assistant and 
 ## Start here
 
 1. **Copy this repo's contents** into a folder named after your product (e.g. `acme-dashboard/`). One workspace = one product.
-2. **Open Claude Code** (or your AI agent) in that folder and say **"capture my product."** It will ask for your product's URL and whether to capture logged-in, open a browser window for you to log in (your password stays in the browser — never in the AI or any file), then capture your product's pages read-only.
-3. When it's done, run `node tools/map.js` and open **http://localhost:4173** — your product as an interactive map: every captured page a node, every *discovered-but-not-downloaded* page greyed out on the frontier. Click a grey node to download it; click a captured page to see its screenshot and add **state URLs** (empty, error, filtered…). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
-4. Say **"wireframe on ‹page›"** to start designing on a captured page.
+2. **Run `tools/start.sh`** (double-click it, or run it in a terminal — or just ask your AI assistant to run it). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand.
+3. **Follow the dashboard.** It asks three things — your product's URL, whether you sign in to use it, and what kind of product it is — then captures. If you sign in, it opens a browser window for you to log in (**your password stays in that window, never in the AI or any file**) and continues on its own when you close it. You watch the capture happen live; you never touch the terminal.
+4. When it's done, the dashboard becomes your product as an interactive **map** (Overview · Map · Tokens): every captured page a node, every *discovered-but-not-downloaded* page greyed out on the frontier. Click a grey node to download it; click a captured page to add **state URLs** (empty, error, filtered…). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
+5. Ask your AI assistant to **"describe the library"** (it writes a guide for each page), then **"wireframe on ‹page›"** to start designing on a captured page.
 
-Prefer the terminal?
+Prefer the terminal, or driving it via your AI agent?
 
 ```bash
+tools/start.sh                                        # deps + server + dashboard (the easy path)
+# or, step by step:
 tools/setup.sh                                        # one-time: install dependencies + browser
-node tools/login.js --url https://app.example.com     # log in once, close the window
+node tools/login.js --url https://app.example.com     # log in once, close the window (only if you sign in)
 node tools/capture.js --url https://app.example.com   # capture → design-context/
 ```
+
+_Windows: `start.sh` is macOS/Linux; on Windows run the three step-by-step commands above in order._
 
 ## What you end up with
 

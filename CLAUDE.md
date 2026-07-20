@@ -14,7 +14,7 @@ This folder is a designer's standalone workspace for ONE product. You are helpin
 └── wireframes/<page>/            ← design work built ON the library (never inside it)
 ```
 
-**First run:** if `design-context/` is empty, the only sensible move is `skills/capture-product/` — offer it. Don't discuss a product you haven't captured.
+**First run:** if `design-context/` is empty, the best move is the **dashboard's onboarding** — tell the designer to run `tools/start.sh` (or offer to run it), then follow the dashboard: it asks URL + sign-in + product-type, triggers login only if relevant, and shows the capture live — no terminal questions. `skills/capture-product/` is the chat-driven equivalent for hosts without a browser or when the designer prefers chatting. Either way, the wizard writes `design-context/product.json` and the skill reads the same file — the two front doors can't drift. Don't discuss a product you haven't captured.
 
 ## How to consume the library (you and any other AI agent)
 
@@ -32,7 +32,7 @@ Start at `design-context/registry.json` — every page keyed by slug with route,
 
 ## Typical session
 
-- Empty `design-context/`, or "capture my product" / "set this up" → `skills/capture-product/SKILL.md` (includes the describe step that fills each page's "What this page is").
+- Empty `design-context/`, or "capture my product" / "set this up" → prefer `tools/start.sh` → the dashboard runs onboarding; else `skills/capture-product/SKILL.md` (includes the describe step that fills each page's "What this page is"). The dashboard hands off to the describe step on its completion screen.
 - "wireframe on ‹page›" / "redesign ‹page›" → `skills/wireframe-on-snapshot/SKILL.md`
 - "re-capture" / "the product changed" → run capture again (safe: refreshes in place, `contentHash` shows what changed; descriptions survive), then re-check descriptions whose page hash changed.
 - "show me the map" / "what haven't we captured?" → `node tools/map.js` → http://localhost:4173 — the coverage map: captured pages + the frontier (discovered, not downloaded). The designer selects frontier pages there (or you run `node tools/capture.js --urls "<u1>,<u2>"`); states are added on a page's panel (or `--state <slug>:<name> --url <stateUrl>`). `design-context/annotations.json` is designer-owned (notes + state URLs) — you may append to it, never prune it.
