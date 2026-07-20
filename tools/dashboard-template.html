@@ -149,6 +149,7 @@
                                       padding:10px 12px; font:inherit; color:var(--txt); }
   .ob input:focus, .ob select:focus { border-color:var(--primary); outline:none; }
   .hint { font-size:12px; color:var(--dim); margin-top:6px; }
+  .ob code { font-family:var(--mono); font-size:11.5px; background:#EEF1F6; border-radius:4px; padding:0 4px; }
   .seg { display:flex; gap:8px; }
   .segbtn { flex:1; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; font-weight:550; color:var(--txt); }
   .segbtn.on { border-color:var(--primary); background:rgba(79,70,229,.06); color:var(--primary-strong); }
@@ -223,12 +224,12 @@ function toast(msg, sticky){ const t=document.getElementById('toast'); t.textCon
 // State lives on the server (product.json + the capture job); this view drives it.
 const OB = { url:'', loggedIn:true, productType:'saas' };
 const TYPES = [
-  { k:'saas',      label:'SaaS / web app',          loginDefault:true,  copy:'App screens + one example of each repeating page. Some flows (wizards, modals) need a later guided pass.' },
-  { k:'ecommerce', label:'E-commerce / marketplace', loginDefault:false, copy:'Thousands of product pages share one layout — we capture one of each kind and count the rest.' },
-  { k:'content',   label:'Content / media',          loginDefault:false, copy:'Article/video pages collapse to templates; live widgets freeze as captured.' },
-  { k:'docs',      label:'Docs / knowledge base',    loginDefault:false, copy:'Mostly one page template — expect a big “stands for N” number.' },
-  { k:'marketing', label:'Marketing site',           loginDefault:false, copy:'Usually captures completely in one pass.' },
-  { k:'notsure',   label:'Not sure',                 loginDefault:false, copy:'We’ll use balanced defaults — you can refine later from the map.' },
+  { k:'saas',      label:'SaaS / web app',          copy:'App screens + one example of each repeating page. Some flows (wizards, modals) need a later guided pass.' },
+  { k:'ecommerce', label:'E-commerce / marketplace', copy:'Thousands of product pages share one layout — we capture one of each kind and count the rest.' },
+  { k:'content',   label:'Content / media',          copy:'Article/video pages collapse to templates; live widgets freeze as captured.' },
+  { k:'docs',      label:'Docs / knowledge base',    copy:'Mostly one page template — expect a big “stands for N” number.' },
+  { k:'marketing', label:'Marketing site',           copy:'Usually captures completely in one pass.' },
+  { k:'notsure',   label:'Not sure',                 copy:'We’ll use balanced defaults — you can refine later from the map.' },
 ];
 let capCount=0, skipCount=0, navCount=0, tplCount=0;
 
@@ -248,28 +249,39 @@ function showWizard(prefill){
   obEl().innerHTML = `<div class="ob">
     <h2>Set up your design context</h2>
     <p class="sub">Point the kit at the product you design for. Three answers, then watch it capture — you won’t touch the terminal.</p>
-    <label class="fld"><span>Product URL</span>
-      <input type="text" id="w-url" value="${esc(OB.url)}" placeholder="https://app.example.com" autocomplete="off" spellcheck="false"></label>
-    <div class="hint">The address of the product you design for — the page you land on after signing in works best.</div>
     <div class="fld"><span>Do you sign in to use it?</span>
       <div class="seg" id="w-seg">
         <button type="button" class="segbtn" data-v="yes">Yes, I sign in</button>
         <button type="button" class="segbtn" data-v="no">No, it’s public</button>
       </div></div>
+    <label class="fld"><span id="w-url-label">Product URL</span>
+      <input type="text" id="w-url" value="${esc(OB.url)}" placeholder="https://app.example.com" autocomplete="off" spellcheck="false"></label>
+    <div class="hint" id="w-url-hint"></div>
     <label class="fld"><span>What kind of product is it?</span>
       <select id="w-type">${TYPES.map(t=>`<option value="${t.k}">${esc(t.label)}</option>`).join('')}</select></label>
     <div class="expect" id="w-expect"></div>
     <div class="err" id="w-err"></div>
     <button class="btn primary big" id="w-start">Start capture</button>
   </div>`;
+  // Frame the URL question by the sign-in answer: signed-in products want the address you land on
+  // AFTER login (that's what triggers the login redirect and IS the real app), not a marketing homepage.
+  const paintUrl = ()=>{
+    const lbl = document.getElementById('w-url-label'), hint = document.getElementById('w-url-hint');
+    if (OB.loggedIn){
+      lbl.textContent = 'The address you sign in to';
+      hint.innerHTML = 'Use the page you land on <b>after</b> signing in — e.g. <code>app.example.com</code> or <code>example.com/dashboard</code>. A plain homepage (like <code>github.com</code>) often won’t reach your login; the app URL will.';
+    } else {
+      lbl.textContent = 'Product URL';
+      hint.textContent = 'The address of the product you design for.';
+    }
+  };
   const seg = document.getElementById('w-seg');
   const paintSeg = ()=>seg.querySelectorAll('.segbtn').forEach(b=>b.classList.toggle('on', (b.dataset.v==='yes')===OB.loggedIn));
-  seg.querySelectorAll('.segbtn').forEach(b=>b.onclick=()=>{ OB.loggedIn = b.dataset.v==='yes'; paintSeg(); });
-  paintSeg();
+  seg.querySelectorAll('.segbtn').forEach(b=>b.onclick=()=>{ OB.loggedIn = b.dataset.v==='yes'; paintSeg(); paintUrl(); });
+  paintSeg(); paintUrl();
   const sel = document.getElementById('w-type'); sel.value = OB.productType;
   const paintExpect = ()=>{ const t = TYPES.find(x=>x.k===sel.value)||TYPES[0]; document.getElementById('w-expect').textContent = t.copy; };
-  sel.onchange = ()=>{ OB.productType = sel.value; const t = TYPES.find(x=>x.k===OB.productType);
-    if (t && !prefill) { OB.loggedIn = t.loginDefault; paintSeg(); } paintExpect(); };
+  sel.onchange = ()=>{ OB.productType = sel.value; paintExpect(); };  // type no longer overrides the sign-in answer
   paintExpect();
   document.getElementById('w-start').onclick = startFlow;
 }
