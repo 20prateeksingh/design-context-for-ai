@@ -18,6 +18,7 @@
  *     [--profile default]     profile created by login.js
  *     [--depth 1|2]           1 = nav pages only (default); 2 = + one representative per template group
  *     [--cap 25]              max pages captured (logged when hit)
+ *     [--logged-out]          public capture, ephemeral context — no profile needed
  *     [--headless]            run without a visible window (default: visible)
  *     [--no-dismiss]          never auto-dismiss cookie banners
  *
@@ -443,13 +444,23 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
   const banner = STATE ? `\n🚀 State capture (read-only)\n`
     : ONLY_URLS ? `\n🚀 Selective capture (read-only)\n`
     : `\n🚀 One-click capture${LOGGED_OUT ? ' (logged-out)' : ''} — ${START_URL}  (depth ${DEPTH}, cap ${CAP}, read-only)\n`;
-  if (LOGGED_OUT) {
+  // First target URL, for messages — START_URL is null in --urls mode, so never interpolate it raw.
+  const firstTarget = START_URL || (ONLY_URLS ? ONLY_URLS.split(',')[0].trim() : '<product URL>');
+  // A selective pull (--urls/--state) with no profile and no loggedIn signal from product.json is
+  // treated as a public pull: capture ephemerally instead of hard-failing. A wrong guess stays loud,
+  // never silent — auth-gated pages get skipped as `auth-redirect` and named in the summary.
+  const publicFallback = !LOGGED_OUT && (ONLY_URLS || STATE) && CFG.loggedIn !== true && !fs.existsSync(PROFILE_DIR);
+  if (LOGGED_OUT || publicFallback) {
     console.log(banner);
+    if (publicFallback) {
+      console.log(`   ℹ no browser profile — capturing logged-out (fine for public pages).`);
+      console.log(`     If these pages need your login: node tools/login.js --url ${firstTarget}  then re-run.`);
+    }
     browser = await chromium.launch({ headless: HEADLESS });
     context = await browser.newContext({ viewport: VIEWPORT });
   } else {
     if (!fs.existsSync(PROFILE_DIR)) {
-      console.error(`\n❌  No browser profile at profiles/${PROFILE}.\n   Run first: node tools/login.js --url ${START_URL}\n`);
+      console.error(`\n❌  No browser profile at profiles/${PROFILE} — logged-in capture needs one.\n   Run first: node tools/login.js --url ${firstTarget}\n   Capturing a public site? Re-run with --logged-out — no profile needed.\n`);
       process.exit(1);
     }
     console.log(banner);
@@ -500,7 +511,9 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
     try {
       const { buildIndex } = require('./build-index.js');
       const r = buildIndex(OUT_DIR);
-      console.log(`📇  Index + map rebuilt (${r.pages} pages)`);
+      const pending = r.pages - r.described;
+      console.log(`📇  Index + map rebuilt (${r.pages} pages — ${r.described} described, ${pending} pending)`);
+      if (ONLY_URLS && pending) console.log(`⚠  ${pending} page(s) have no "What this page is" yet — run the describe step (skills/capture-product §5) so they aren't blank in INDEX.md`);
     } catch (e) { console.log(`⚠  build-index failed: ${e.message.split('\n')[0]}`); }
     return;
   }
