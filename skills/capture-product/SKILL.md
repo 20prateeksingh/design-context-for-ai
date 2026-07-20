@@ -15,8 +15,12 @@ The best first-run path is **not** this conversation: tell the designer to run *
 
 ## 1. Kickoff — two questions, one at a time (skip any already in product.json)
 
-1. **The product's URL** — "the address you land on after logging in works best."
-2. **Logged-in or public?** — "should I capture the product as *you* see it (logged in), or the public view?" Ask this **per product**, even when a saved session exists — the profile may be logged into other products but not this one, and a logged-out capture of an account-shaped product is mostly login redirects. If they want logged-in → do §3 login **before** starting any capture.
+Ask **sign-in first** — it decides how you ask for the URL.
+
+1. **Logged-in or public?** — "should I capture the product as *you* see it (logged in), or the public view?" Ask this **per product**, even when a saved session exists — the profile may be logged into other products but not this one, and a logged-out capture of an account-shaped product is mostly login redirects. If they want logged-in → do §3 login **before** starting any capture.
+2. **The product's URL** — framed by the answer:
+   - **Logged-in:** ask for *the address they land on after signing in* (e.g. `app.example.com` or `example.com/dashboard`), not a marketing homepage. A plain homepage like `github.com` often won't reach the login — the app URL does, and it's the surface the capture (and the pre-login `pages/login/` capture) should target.
+   - **Public:** just the product URL.
 
 Defaults you apply silently: depth 1, cap 25, visible browser. Offer depth 2 only in plain terms if their product is list-heavy: "want me to also grab one example of each repeating page type — like one invoice detail, one listing?"
 
