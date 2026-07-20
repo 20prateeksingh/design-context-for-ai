@@ -170,6 +170,29 @@
   .oblog { background:#0E1220; color:#D7DCE8; font-family:var(--mono); font-size:12px; line-height:1.5; border-radius:10px;
            padding:12px 14px; height:44vh; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
   .ok-note { background:rgba(21,128,61,.06); border:1px solid #BBE3C8; border-radius:10px; padding:14px 16px; margin-top:16px; font-size:14px; }
+
+  /* ── prompt chips ("prompts are the UI") + Use-it tab ── */
+  .pchip { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; background:var(--primary);
+           color:#fff; border:0; border-radius:8px; padding:7px 12px; margin:0 8px 8px 0; transition:background .2s; text-align:left; }
+  .pchip:hover { background:var(--primary-strong); }
+  .pchip svg { width:13px; height:13px; flex:none; }
+  .pchip.ghost { background:#F5F7FA; color:var(--txt); border:1px solid var(--line); }
+  .pchip.ghost:hover { background:#fff; border-color:var(--primary); }
+  .chiprow { display:flex; flex-wrap:wrap; align-items:center; }
+  .useit { max-width:820px; margin:0 auto; }
+  .useit h2 { font-size:20px; font-weight:680; margin-bottom:4px; }
+  .useit .lead { color:var(--dim); margin-bottom:18px; }
+  .mode { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+  .mode .badge { display:inline-block; font-size:10.5px; font-family:var(--mono); color:var(--primary-strong); background:rgba(79,70,229,.08); border-radius:20px; padding:2px 9px; margin-bottom:8px; }
+  .mode h3 { font-size:15px; margin:0 0 4px; text-transform:none; letter-spacing:0; color:var(--txt); font-weight:650; }
+  .mode p { font-size:13px; color:var(--dim); margin-bottom:10px; }
+  .mono-cmd { font-family:var(--mono); font-size:12px; background:#0E1220; color:#D7DCE8; border-radius:8px; padding:10px 12px;
+              margin:4px 0; overflow-x:auto; white-space:pre; line-height:1.7; }
+  .sensitivity { border:1px solid #F0D399; background:rgba(180,83,9,.06); border-radius:10px; padding:12px 14px; font-size:13px; color:#7A4A08; margin-bottom:16px; }
+  .sensitivity code { font-family:var(--mono); background:rgba(180,83,9,.12); border-radius:4px; padding:0 4px; }
+  .bundle-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .bundle-row select { background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; color:var(--txt); max-width:100%; }
+  .mode code { font-family:var(--mono); font-size:12px; background:#EEF1F6; border-radius:4px; padding:0 4px; }
 </style>
 </head>
 <body>
@@ -179,6 +202,7 @@
     <button class="tab active" data-tab="overview" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Overview</button>
     <button class="tab" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
     <button class="tab" data-tab="tokens" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><circle cx="5.5" cy="6" r="1" fill="currentColor"/><circle cx="10.5" cy="6" r="1" fill="currentColor"/><circle cx="5.8" cy="10" r="1" fill="currentColor"/><path d="M14.2 8c0 1.8-1.4 2-2.6 2s-2 .8-1.2 2.2c.6 1-.2 2-1.4 2"/></svg>Tokens</button>
+    <button class="tab" data-tab="useit" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2" width="13" height="9" rx="2"/><path d="M5 11v2.6L8.2 11"/></svg>Use it</button>
   </div>
   <span class="spacer"></span>
   <span class="pill"><b id="n-cap">0</b> unlocked</span>
@@ -201,6 +225,7 @@
 
 <section class="pane scrollpane active" id="pane-overview"></section>
 <section class="pane scrollpane" id="pane-tokens"></section>
+<section class="pane scrollpane" id="pane-useit"></section>
 <section class="pane" id="pane-onboard"></section>
 
 <div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
@@ -218,6 +243,27 @@ function api(p,body){ return fetch(p,{method:'POST',headers:{'content-type':'app
   .then(r=>r.json()).catch(e=>({ok:false,error:String(e)})); }
 function toast(msg, sticky){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); if(!sticky) t._h=setTimeout(()=>t.style.display='none', 6000); }
+
+// ═════════════════════════ PROMPTS (the UI) ══════════════════════════════════
+// Canonical wordings — the single source of truth is prds/use-it-layer.md Appendix A.
+// Change one, review both. Copied text is PLAIN markdown; real workspace paths baked in.
+const PROMPTS = {
+  describeLibrary: () => "Open this folder's design context. Read `design-context/registry.json`, then for every page whose `page.md` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per `skills/capture-product/SKILL.md` §5 — grounded only in that page's `content.md`, `screenshot.png`, and `meta.json`. Never invent features; never edit anything outside the markers. Then run `node tools/build-index.js`.",
+  wireframe: (slug) => "Read `design-context/pages/" + slug + "/page.md` and look at its `screenshot.png`. I want to explore: ‹describe your change›. Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` (never edit `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with `node tools/shot.js`.",
+  whatsMissing: () => "Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`. Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why. Don't capture anything yet — recommend.",
+  addState: () => "I can reach a page state via URL. Run `node tools/capture.js --state <slug>:<state-name> --url \"<the url>\"` and confirm it landed under `design-context/pages/<slug>/states/`.",
+  auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
+  recaptureCheck: () => "The product may have changed. Re-run `node tools/capture.js --config design-context/product.json`, then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
+  bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/INDEX.md` to learn this product, and ask me what I want to work on.",
+};
+const COPY_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.4 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.4"/></svg>';
+function pchip(label, text, ghost){ return `<button type="button" class="pchip${ghost?' ghost':''}" data-prompt="${esc(text)}">${COPY_SVG}${esc(label)}</button>`; }
+function copyPrompt(text){ if(!text) return;
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+    .then(()=>toast('Copied — paste it to your AI.'))
+    .catch(()=>{ try{ prompt('Copy this prompt:', text); }catch(_){} }); }
+// one delegated handler for every chip, anywhere (works during onboarding completion too)
+document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-prompt]'); if (b) copyPrompt(b.getAttribute('data-prompt')); });
 
 // ═════════════════════════ ONBOARDING ════════════════════════════════════════
 // wizard → (login-page capture → login window) → live capture → completion.
@@ -408,7 +454,7 @@ function attachStream(){
   es.onerror = ()=>{ if(done) return; try{es.close();}catch(_){} startPoll(); };
 }
 
-function onCaptureDone(info){
+async function onCaptureDone(info){
   const logText = (document.getElementById('ob-log')||{}).textContent || '';
   if (info && info.code && info.code !== 0 && capCount === 0){
     obEl().innerHTML = `<div class="prog"><h2>Capture didn’t complete</h2>
@@ -420,14 +466,26 @@ function onCaptureDone(info){
     return;
   }
   let host='your product'; try { host = new URL(OB.url || (STATUS&&STATUS.product&&STATUS.product.url) || '').host || host; } catch(_){}
+  // a real page slug for the wireframe starter (registry.json now exists — build-index ran at capture end)
+  let firstSlug='<slug>';
+  try { const reg = await fetch('/registry.json').then(r=>r.json()); const ks = Object.keys(reg.pages||{}); if (ks.length) firstSlug = ks[0]; } catch(_){}
   obEl().innerHTML = `<div class="ob">
     <h2>Captured ${capCount} page${capCount===1?'':'s'} of ${esc(host)} ✓</h2>
-    <p class="sub">${tplCount?`${tplCount} repeating layout${tplCount===1?'':'s'} collapsed to one example each. `:''}${skipCount?`${skipCount} skipped (the Overview tab says why). `:''}Your product is now design context your AI tools can read.</p>
-    <div class="ok-note"><b>One more step — the page guides.</b><br>
-      Ask your AI assistant to <b>“describe the library”</b> — it writes the one-line guide and screen doc for every captured page, grounded in what was actually captured.</div>
-    <button class="btn primary big" id="ob-open">Open the library</button>
+    <p class="sub">${tplCount?`${tplCount} repeating layout${tplCount===1?'':'s'} collapsed to one example each. `:''}${skipCount?`${skipCount} skipped (the Overview tab says why). `:''}Your product is now design context your AI tools can read. Three moves to start:</p>
+    <div class="ok-note" style="padding:16px">
+      <div style="margin-bottom:6px"><b>1 · Describe your pages</b> — an AI writes a guide for each captured page.</div>
+      <div class="chiprow" style="margin-bottom:14px">${pchip('Copy the describe prompt', PROMPTS.describeLibrary())}</div>
+      <div style="margin-bottom:6px"><b>2 · Explore the map</b> — grey nodes are pages found but not downloaded; click to unlock.</div>
+      <div class="chiprow" style="margin-bottom:14px"><button class="pchip ghost" id="ob-map">Open the map</button></div>
+      <div style="margin-bottom:6px"><b>3 · First wireframe</b> — design on a copy of a real captured page.</div>
+      <div class="chiprow">${pchip('Copy the wireframe prompt', PROMPTS.wireframe(firstSlug), true)}</div>
+    </div>
+    <button class="btn primary big" id="ob-open">Go to dashboard</button>
   </div>`;
-  document.getElementById('ob-open').onclick = ()=>{ location.href='/'; };
+  // NB: the completion screen is served at path "/", so changing only the hash won't reload —
+  // set the hash then reload() so boot() re-runs and initDashboard honors #map.
+  document.getElementById('ob-map').onclick = ()=>{ location.hash='map'; location.reload(); };
+  document.getElementById('ob-open').onclick = ()=>{ location.hash=''; location.reload(); };
 }
 
 // ═════════════════════════ BOOT ══════════════════════════════════════════════
@@ -607,6 +665,7 @@ function initDashboard(){
         <div class="route">${esc(n.pattern||'')}</div>
         <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
         ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
+        <div class="chiprow" style="margin:10px 0">${pchip("Ask your AI what's worth unlocking", PROMPTS.whatsMissing(), true)}</div>
         <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
         ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
           <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
@@ -621,6 +680,7 @@ function initDashboard(){
         <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
         <div class="desc">${esc(n.desc||'')} <span class="ai" title="model-written orientation, not extracted fact">ai</span></div>
         <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
+        <div class="chiprow" style="margin-top:12px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : ''}</div>
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
         ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
@@ -671,6 +731,10 @@ function initDashboard(){
     O.health.actions.forEach(a=>health.push(`<div class="hrow"><span class="chip warn">action</span><span>dismissed a cookie banner via “${esc(a.buttonText)}” — the one sanctioned click, logged</span></div>`));
     if (O.health.capped) health.push(`<div class="hrow"><span class="chip warn">cap</span><span>${O.health.capped} nav candidates beyond the cap stayed on the frontier</span></div>`);
     el.innerHTML = `
+      <div class="chiprow" style="margin-bottom:14px">
+        ${DASH.pendingDescriptions ? pchip('Describe the library ('+DASH.pendingDescriptions+' pending)', PROMPTS.describeLibrary()) : ''}
+        ${pchip("What's missing?", PROMPTS.whatsMissing(), true)}
+      </div>
       <div class="kpis">
         <div class="kpi blue"><div class="n">${covered}</div><div class="l">pages unlocked</div></div>
         <div class="kpi purple"><div class="n">~${standsFor}</div><div class="l">pages represented (templates)</div></div>
@@ -717,6 +781,7 @@ function initDashboard(){
       <div class="i"><b>${esc(c.value)}</b>×${c.count.toLocaleString()} · ${c.pages}p${c.alpha?' · α':''}</div></div>`;
     const spacing = T.spacing, radius = T.radius;
     el.innerHTML = `
+      <div class="chiprow" style="margin-bottom:12px">${pchip('Audit the visual language', PROMPTS.auditTokens())}</div>
       <div class="provenance">Everything below is <code>method: heuristic</code> — values <b>observed</b> on the captured pages, aggregated and clustered by statistics.
         They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
         (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
@@ -744,6 +809,96 @@ function initDashboard(){
       <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
       <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>`;
   })();
+
+  // ═════════ USE-IT TAB ═════════
+  (function renderUseIt(){
+    const el = document.getElementById('pane-useit');
+    const wsPath = (serverMode && STATUS && STATUS.workspacePath) ? STATUS.workspacePath : null;
+    const firstSlug = (DATA.nodes.find(n=>n.kind!=='template') || DATA.nodes[0] || {}).id || '<slug>';
+    const cdCmd = wsPath ? `cd "${wsPath}" && claude` : 'Open your AI coding tool in this workspace folder.';
+    const pageOpts = DATA.nodes.map(n=>`<option value="${esc(n.id)}">${esc(short(n.label||n.id,44))}</option>`).join('');
+
+    // Assemble a self-contained context bundle for a chat-only AI (no file access), client-side.
+    async function buildBundle(slug){
+      const M=DATA, O=DASH.overview, T=DASH.tokens, L=[];
+      L.push(`# Design context — ${M.product}`);
+      L.push(`Origin: ${M.origin} · captured ${(M.generatedAt||'').slice(0,10)} · ${M.nodes.length} pages captured, ~${O.standsForTotal} represented.`);
+      L.push('', "## Pages (the product's own navigation)");
+      O.nav.forEach(n=>L.push(`- **${n.label||n.slug}** (\`${n.route}\`)${n.desc?` — ${n.desc}`:''}`));
+      if (O.templates.length){ L.push('', '## Repeating layouts (one example stands for many)');
+        O.templates.forEach(t=>L.push(`- \`${t.pattern}\` — 1 of ${t.standsFor}${t.desc?` — ${t.desc}`:''}`)); }
+      L.push('', '## Observed design tokens (method: heuristic — how it looks today, not authored tokens)');
+      const cols=(T.colors&&T.colors.top||[]).slice(0,10).map(c=>c.value).join(', '); if(cols) L.push(`- Colors: ${cols}`);
+      const ty=(T.typography&&T.typography.ramp||[]).slice(0,5).map(t=>t.value).join(' · '); if(ty) L.push(`- Type: ${ty}`);
+      if(T.spacing&&T.spacing.baseUnit) L.push(`- Spacing base unit: ${T.spacing.baseUnit}px`);
+      let omittedDoc=false;
+      if (slug){
+        if (serverMode){ try { const md=await fetch(`pages/${slug}/page.md`).then(r=>r.text());
+            L.push('', `## Full screen doc — ${slug}`, md.trim()); } catch(_){ omittedDoc=true; } }
+        else omittedDoc=true;
+      }
+      L.push('', '---',
+        'You are helping a designer. The above is a captured snapshot of a real product: everything was extracted from the live site, except page descriptions (labeled method: ai — model-written orientation). Do not invent pages, routes, or features not listed here; build on what exists. Ask the designer which page to work on.');
+      let text=L.join('\n'), capped=false; const CAP=15000;
+      if (text.length>CAP){ text=text.slice(0,CAP)+'\n\n[bundle truncated at 15k chars]'; capped=true; }
+      let note = 'Bundle copied — product, pages, templates, and tokens included.';
+      if (slug && omittedDoc) note = "Bundle copied. The chosen page's full doc was omitted — it needs the live server (you're viewing a static file).";
+      else if (slug) note = 'Bundle copied — includes the full screen doc for ' + slug + '.';
+      if (capped) note += ' Truncated to ~15k chars.';
+      return { text, note };
+    }
+
+    el.innerHTML = `<div class="useit">
+      <h2>Use it — what to do with your design context</h2>
+      <p class="lead">Prompts are the interface. Each button copies a ready-to-paste instruction with this workspace's real file paths already filled in.</p>
+      <div class="sensitivity">Captured logged-in? The library holds your <b>real account data</b> (orders, addresses). Share the folder or bundles accordingly — and <code>profiles/</code> (your live browser session) must never leave this machine.</div>
+      <div class="mode">
+        <span class="badge">recommended</span>
+        <h3>With Claude Code</h3>
+        <p>Open Claude Code in this folder — it reads this workspace's instructions automatically and knows every page here.</p>
+        <div class="mono-cmd">${esc(cdCmd)}</div>
+        <div class="chiprow" style="margin-top:10px">
+          ${pchip('Describe the pages', PROMPTS.describeLibrary())}
+          ${pchip('First wireframe', PROMPTS.wireframe(firstSlug), true)}
+          ${pchip('Add a state', PROMPTS.addState(), true)}
+          ${pchip("What's missing?", PROMPTS.whatsMissing(), true)}
+          ${pchip('Re-capture check', PROMPTS.recaptureCheck(), true)}
+        </div>
+      </div>
+      <div class="mode">
+        <h3>With another AI coding tool</h3>
+        <p>Cursor, Windsurf, and similar read files too. Point them at <code>AGENTS.md</code>, then paste this to get started.</p>
+        <div class="chiprow">${pchip('Bootstrap prompt', PROMPTS.bootstrap())}</div>
+      </div>
+      <div class="mode">
+        <h3>With a chat-only AI</h3>
+        <p>No file access (claude.ai, ChatGPT in the browser)? Copy a self-contained context bundle, paste it in, then ask your question.</p>
+        <div class="bundle-row">
+          <button class="pchip" id="bundle-btn">Copy context bundle</button>
+          <select id="bundle-page"><option value="">— optionally include one page's full doc —</option>${pageOpts}</select>
+        </div>
+        <div class="hint" id="bundle-note" style="margin-top:8px"></div>
+      </div>
+      <div class="mode">
+        <h3>Terminal / by hand</h3>
+        <p>The whole kit is five commands:</p>
+        <div class="mono-cmd">tools/start.sh                                    # deps + server + this dashboard
+node tools/capture.js --urls "&lt;url1&gt;,&lt;url2&gt;"         # download specific frontier pages
+node tools/capture.js --state &lt;slug&gt;:&lt;name&gt; --url "&lt;url&gt;"  # capture a page state
+node tools/build-index.js                         # rebuild the consumption layer
+node tools/shot.js &lt;file.html&gt; [out.png] [--full]   # preview any local HTML</div>
+        <p style="margin-top:10px">Any <code>pages/&lt;slug&gt;/page.html</code> opens in your browser and is editable — it's your design baseline.</p>
+      </div>
+    </div>`;
+    const btn = document.getElementById('bundle-btn');
+    btn.onclick = async ()=>{ btn.disabled=true;
+      const sel = document.getElementById('bundle-page').value;
+      const { text, note } = await buildBundle(sel);
+      copyPrompt(text); document.getElementById('bundle-note').textContent = note; btn.disabled=false; };
+  })();
+
+  // deep links from the completion screen (Explore the map → #map)
+  { const h = (location.hash||'').replace('#',''); if (h==='map' || h==='useit'){ const tb=document.querySelector('.tab[data-tab="'+h+'"]'); if (tb) tb.click(); } }
 
   draw();
 }

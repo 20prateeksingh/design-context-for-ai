@@ -24,6 +24,17 @@ node tools/capture.js --url https://app.example.com   # capture → design-conte
 
 _Windows: `start.sh` is macOS/Linux; on Windows run the three step-by-step commands above in order._
 
+## After capture — use it
+
+The dashboard's **Use it** tab turns the library into next moves — every button copies a ready-to-paste prompt with your real file paths already in it. In short:
+
+- **With Claude Code (recommended):** open Claude Code in this folder (`cd <your-workspace> && claude`) — it reads this workspace's instructions and knows every page. Ask it to *describe the pages*, *wireframe on a page*, or *what's missing?*
+- **With another AI coding tool** (Cursor, Windsurf): point it at `AGENTS.md`, then tell it to read `design-context/INDEX.md`.
+- **With a chat-only AI** (claude.ai, ChatGPT): use the Use-it tab's **Copy context bundle** button — it assembles a self-contained summary you paste in, no file access needed.
+- **By hand:** any `design-context/pages/<slug>/page.html` opens in your browser and is an editable design baseline.
+
+> Captured logged-in? The library holds your real account data — share the folder or a bundle accordingly, and never share `profiles/`.
+
 ## What you end up with
 
 ```

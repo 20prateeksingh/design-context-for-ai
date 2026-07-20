@@ -279,7 +279,7 @@ function buildIndex(libDir) {
         desc: p.description ? p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null,
         screenshot: `pages/${slug}/screenshot.png`, pageHtml: `pages/${slug}/page.html`, pageMd: `pages/${slug}/page.md`,
         capturedAt: m.capturedAt, standsFor: m.template ? m.collapsed + 1 : null,
-        states: p.states, notes: p.notes,
+        states: p.states, notes: p.notes, descPending: !p.description,
       }; }),
       frontier,
       edges: [
@@ -290,7 +290,7 @@ function buildIndex(libDir) {
     const overview = {
       health: { skipped: manifest.skipped || [], failed: manifest.failed || [], actions: manifest.actions || [], capped: manifest.capped || 0 },
       nav: ordered.filter(s => !pages[s].meta.template).map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title, route: pages[s].meta.route,
-        desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
+        desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null, descPending: !pages[s].description })),
       templates: ordered.filter(s => pages[s].meta.template).map(s => ({ slug: s, pattern: pages[s].meta.pattern, standsFor: pages[s].meta.collapsed + 1,
         screenshot: `pages/${s}/screenshot.png`, desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
       recent: ordered.map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title || s, at: pages[s].meta.capturedAt }))
@@ -299,7 +299,9 @@ function buildIndex(libDir) {
       notes: ordered.filter(s => pages[s].notes).map(s => ({ slug: s, notes: pages[s].notes })),
       standsForTotal: ordered.reduce((n, s) => n + (pages[s].meta.template ? pages[s].meta.collapsed + 1 : 1), 0),
     };
-    const dash = { map: mapData, overview, tokens: { ...tokens, raw: undefined } }; // raw stays in tokens.json, not the page
+    const dash = { map: mapData, overview, tokens: { ...tokens, raw: undefined }, // raw stays in tokens.json, not the page
+      workspaceName: path.basename(path.dirname(libDir)),
+      pendingDescriptions: ordered.filter(s => !pages[s].description).length };
     const html = fs.readFileSync(tplPath, 'utf8')
       .replace('/*__DASHDATA__*/null', JSON.stringify(dash).replace(/</g, '\\u003c'));
     fs.writeFileSync(path.join(libDir, 'dashboard.html'), html, 'utf8');

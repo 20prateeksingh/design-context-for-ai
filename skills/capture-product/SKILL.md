@@ -77,6 +77,7 @@ Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer la
 - Anything skipped/failed/capped, with reasons, per manifest. Never hide gaps.
 - Show 1–2 `screenshot.png`s so they see it worked.
 - Point them at `INDEX.md` as the browsable map of everything captured — and tell them their AI tools should start at `registry.json`.
+- Point them at the dashboard's **Use it** tab (`tools/start.sh` → http://localhost:4173 → Use it) — it hands them the next moves as one-click, paste-ready prompts (describe, wireframe, what's-missing, audit tokens, context bundle for chat-only AIs). It's the designer-facing home for everything below.
 
 Then offer the map: "run `node tools/map.js` and open http://localhost:4173 — your product as a map; grey nodes are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
 

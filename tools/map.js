@@ -135,6 +135,7 @@ const server = http.createServer((req, res) => {
     if (url === '/api/ping') return json(res, 200, { ok: true });
     if (url === '/api/status') return json(res, 200, {
       ok: true, firstRun: isFirstRun(), product: readProduct(),
+      workspacePath: KIT,  // absolute path of THIS workspace root — served live only, never baked into dashboard.html
       capture: { running: !!(capJob && capJob.running), mode: capJob ? capJob.mode : null, done: !!(capJob && !capJob.running) },
       login: { running: !!(loginJob && loginJob.running), done: !!(loginJob && !loginJob.running), started: !!loginJob },
     });
