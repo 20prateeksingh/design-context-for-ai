@@ -68,6 +68,8 @@ The screen-doc shape (mirrors a mature product-context format):
 
 Everything in this section is labeled `method: ai` — orientation and interpretation, never ground truth. Documenting *performed* actions and unreached states is the guided pass's job, not yours.
 
+While describing, if a page's title is junk or opaque for a human skimming the dashboard (a truncated `<title>`, a generic "Details", a duplicate), you may propose a cleaner **`displayLabel`** for it — add `{"pages": {"<slug>": {"displayLabel": "Orders"}}}` to `design-context/annotations.json` (designer-owned; merge, never prune). build-index prefers it everywhere in the UI; ground truth (`meta.json` title) is never touched. Propose, don't force — the designer owns that file.
+
 ## 6. The win summary — read the files, then translate
 
 Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer language:

@@ -238,6 +238,7 @@
               border-radius:12px; box-shadow:0 12px 34px rgba(16,24,40,.16); padding:14px 16px; z-index:40; display:none; }
   #readypop.open { display:block; }
   #readypop h4 { font-size:13px; margin-bottom:2px; }
+  #readypop .rnext { font-size:12px; font-weight:600; color:var(--primary-strong); background:rgba(79,70,229,.08); border-radius:6px; padding:5px 8px; margin:6px 0 8px; }
   #readypop .pnote { font-size:11px; color:var(--dim); margin-bottom:10px; }
   .rcomp { margin:9px 0; }
   .rcomp .rlab { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
@@ -283,8 +284,10 @@
   .railh { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); font-weight:650; margin-bottom:12px; }
   .led { position:relative; padding-left:22px; }
   .led:before { content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background:var(--line); }
-  .ent { position:relative; border:1px solid var(--line); border-radius:10px; padding:11px 13px; margin-bottom:10px; background:var(--card); }
-  .ent:before { content:""; position:absolute; left:-21px; top:15px; width:9px; height:9px; border-radius:50%; background:var(--dim); border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); }
+  .ent { position:relative; border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--card); }
+  .ent:before { content:""; position:absolute; left:-21px; top:16px; width:9px; height:9px; border-radius:50%; background:var(--dim); border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); }
+  .ent.hero { padding:14px; }
+  .ent.hero:before { top:18px; }
   .ent .emeta { font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
   .ent .etitle { font-size:12px; font-weight:600; color:var(--txt); display:block; margin-bottom:2px; }
   .ent .edetail { font-size:11px; color:var(--dim); }
@@ -348,6 +351,72 @@
   .create .kick { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--dim); display:block; margin-bottom:4px; }
   .create h3 { font-size:15px; margin-bottom:4px; text-transform:none; letter-spacing:0; color:var(--txt); }
   .create p { font-size:12px; color:var(--dim); max-width:620px; }
+
+  /* ── v2.1: first-paint trust ── */
+  .skel { position:relative; overflow:hidden; background:#EEF1F6; }
+  .skel::after { content:""; position:absolute; inset:0; transform:translateX(-100%);
+                 background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent); animation:shimmer 1.3s infinite; }
+  @keyframes shimmer { 100% { transform:translateX(100%); } }
+  @media (prefers-reduced-motion: reduce){ .skel::after { animation:none; } }
+  img.fade { opacity:0; transition:opacity .3s ease; }
+  img.fade.in { opacity:1; }
+  .imgwrap { position:relative; display:block; }
+  .imgwrap > .fadeimg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top; border-radius:inherit; }
+  .pshot { display:block; width:100%; height:170px; border:1px solid var(--line); border-radius:8px; margin:10px 0; }
+  .mono-logo { display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--primary-strong);
+               background:rgba(79,70,229,.10); text-transform:uppercase; }
+
+  /* ── v2.1: peek hover card (portal to body, never clipped) ── */
+  #peek { position:fixed; z-index:60; width:252px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          box-shadow:0 12px 34px rgba(16,24,40,.18); padding:0; pointer-events:none; display:none; overflow:hidden; }
+  #peek.open { display:block; }
+  #peek .pk-shot { width:100%; height:120px; object-fit:cover; object-position:top; display:block; background:#EEF1F6; border-bottom:1px solid var(--line); }
+  #peek .pk-b { padding:9px 11px; }
+  #peek .pk-nm { font-size:12.5px; font-weight:650; }
+  #peek .pk-rt { font-family:var(--mono); font-size:10px; color:var(--dim); word-break:break-all; margin:2px 0 5px; }
+  #peek .pk-desc { font-size:11.5px; color:var(--dim); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #peek .pk-desc.dorm { font-style:italic; color:#98A2B3; }
+  #peek .pk-foot { font-size:10.5px; color:var(--dim); margin-top:7px; display:flex; justify-content:space-between; gap:8px; }
+  #peek .pk-hint { color:var(--primary-strong); font-weight:600; white-space:nowrap; }
+
+  /* ── v2.1: return affordance (page doc) ── */
+  .retbar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .retbtn { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; background:#F5F7FA;
+            border:1px solid var(--line); border-radius:8px; padding:6px 12px; color:var(--txt); }
+  .retbtn:hover { border-color:var(--primary); }
+
+  /* ── v2.1: F3 scroll architecture ── */
+  #pane-home.scrollpane, #pane-page.scrollpane { scroll-padding-top:20px; }
+  .homecols { align-items:flex-start; }
+  .rail { position:sticky; top:0; align-self:flex-start; max-height:calc(100vh - 92px); overflow-y:auto; padding-right:2px; }
+  .dcols { align-items:flex-start; }
+  .dright { position:sticky; top:0; align-self:flex-start; max-height:calc(100vh - 92px); overflow-y:auto; padding-right:2px; }
+  .dleft .shotwrap { position:relative; border-radius:10px; overflow:hidden; }
+  .dleft .shotwrap.skel { min-height:320px; }
+  .dleft .dshot { width:100%; display:block; border:1px solid var(--line); border-radius:10px; }
+  .dleft .dshot.capped { max-height:70vh; object-fit:cover; object-position:top; }
+  .stt-shot { display:block; width:150px; height:92px; border:1px solid var(--line); border-radius:6px; margin-bottom:4px; }
+  .shot-expand { margin-top:6px; font-size:12px; background:none; border:0; color:var(--primary-strong); cursor:pointer; text-decoration:underline; }
+  @media (max-width:1080px){ .rail, .dright { position:static; max-height:none; overflow:visible; } }
+
+  /* ── v2.1: F2 map — zoom controls, regions, arc ── */
+  #mapworld { transform-origin:0 0; }
+  .mapregion { position:absolute; z-index:0; border-radius:44% 56% 52% 48% / 50%; background:rgba(79,70,229,.045);
+               border:1px solid rgba(79,70,229,.10); transition:background .15s,border-color .15s; pointer-events:auto; }
+  .mapregion.hot { background:rgba(79,70,229,.11); border-color:rgba(79,70,229,.35); }
+  #maplabels { position:absolute; inset:0; z-index:5; pointer-events:none; }
+  #maplabels .mapnlbl, #maplabels .maprlbl, #maplabels .maphomelbl, #maplabels .mapghostlbl, #maplabels .maparclbl { position:absolute; transform:none; }
+  .mapghostlbl { transform:translate(-50%,0); text-align:center; font-size:9px; color:#8A909C; white-space:nowrap; }
+  .mapghostlbl small { display:block; color:#AEB4C0; font-size:8px; }
+  .maparclbl { transform:translate(-50%,-50%); font-size:10px; color:#9AA0AC; text-transform:uppercase; letter-spacing:.6px;
+               background:rgba(252,253,254,.85); padding:1px 7px; border-radius:10px; white-space:nowrap; }
+  #mapzoom { position:absolute; right:16px; bottom:14px; z-index:7; display:flex; gap:4px; background:rgba(255,255,255,.97);
+             border:1px solid var(--line); border-radius:8px; padding:3px; }
+  #mapzoom button { width:26px; height:26px; border:0; background:none; color:var(--dim); font-size:15px; border-radius:6px; }
+  #mapzoom button:hover { background:#EEF1F6; color:var(--txt); }
+  #mapzoom .zlbl { min-width:34px; text-align:center; font-size:10px; color:var(--dim); align-self:center; font-family:var(--mono); }
+  .mapnode.mono-disc { background:rgba(79,70,229,.10) !important; }
+  .mapnode.mono-disc.tpl { background:rgba(124,58,237,.12) !important; }
 </style>
 </head>
 <body>
@@ -368,12 +437,15 @@
 </div>
 
 <section class="pane" id="pane-map">
-  <svg id="maplines"></svg>
   <div id="mapworld"></div>
   <div class="mapfog" id="mapfog"></div>
+  <svg id="maplines"></svg>
+  <div id="maplabels"></div>
+  <div class="mapdistrict" id="mapdcard" style="display:none"></div>
   <div id="mapnote"></div>
   <div id="mapstats"></div>
   <div id="maplegend"></div>
+  <div id="mapzoom"><button id="zoutbtn" aria-label="zoom out">−</button><span class="zlbl" id="zlbl">100%</span><button id="zinbtn" aria-label="zoom in">+</button><button id="zfitbtn" aria-label="reset to fit" title="reset">⤢</button></div>
 </section>
 
 <section class="pane scrollpane active" id="pane-home"></section>
@@ -384,6 +456,7 @@
 <section class="pane" id="pane-onboard"></section>
 
 <div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
+<div id="peek" role="tooltip" aria-hidden="true"></div>
 <div id="toast" role="status"></div>
 
 <script>
@@ -674,9 +747,44 @@ function initDashboard(){
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ location.hash = t.dataset.tab; });
   { const jp=document.getElementById('journalpill'); if(jp) jp.onclick=()=>{ location.hash='journal'; }; }
 
-  // ═════════ MAP TAB — M22 orbital under fog ═════════
+  // ── v2.1 shared infra: display labels · skeletons/thumbnails · monogram · peek · provenance/camera ──
+  const dlabel = n => (n && (n.displayLabel || n.label || n.id)) || '';
+  let pageOrigin = 'home';                     // provenance for the page-doc return affordance (F1)
+  let mapView = { zoom:1, panX:0, panY:0 };    // persisted map camera (F1 restore · F2 zoom/pan)
+  let mapReopen = null;                        // node id whose panel to reopen on return to map
+
+  // thumbnail: skeleton wrapper + fade-in on decode; monogram on error for logos (F5)
+  function img2(src, cls, alt){ return src
+    ? `<span class="${cls} skel imgwrap"><img class="fadeimg fade" data-src="${esc(src)}" alt="${esc(alt||'')}"></span>`
+    : `<span class="${cls} skel"></span>`; }
+  function wireThumbs(root){ (root||document).querySelectorAll('img.fade[data-src]:not([data-wired])').forEach(img=>{
+    img.setAttribute('data-wired','1'); const wrap=img.parentNode;
+    const done=()=>{ img.classList.add('in'); if(wrap&&wrap.classList) wrap.classList.remove('skel'); };
+    img.onload=done; img.onerror=()=>{ if(wrap&&wrap.classList) wrap.classList.remove('skel'); img.remove(); };
+    img.src=img.getAttribute('data-src'); if(img.complete && img.naturalWidth) done(); }); }
+  function monogram(cls, name){ return `<span class="${cls} mono-logo">${esc(((name||DATA.product||'?').trim()[0]||'?'))}</span>`; }
+
+  // peek (F1): one component for atlas + map. #peek is a body-level portal (fixed), never clipped.
+  const peekEl = document.getElementById('peek'); let peekHideT=null;
+  function showPeek(n, cx, cy){ if(!n){ return; } clearTimeout(peekHideT);
+    peekEl.innerHTML = n.locked
+      ? `<div class="pk-b"><div class="pk-nm">${esc(short(n.pattern||n.label||'locked',40))}</div>
+          <div class="pk-rt">${esc(n.pattern||'')}</div><div class="pk-desc dorm">not downloaded yet</div>
+          <div class="pk-foot"><span>linked from ${n.inboundCount||n.count||1} pages</span><span class="pk-hint">click to unlock</span></div></div>`
+      : `${img2(n.screenshot,'pk-shot')}
+          <div class="pk-b"><div class="pk-nm">${esc(dlabel(n))}</div><div class="pk-rt">${esc(n.route||'')}</div>
+          <div class="pk-desc${n.descPending?' dorm':''}">${n.descPending?'caption dormant, waiting for your AI':esc(short(n.desc||'',120))}</div>
+          <div class="pk-foot"><span>linked from ${n.inboundCount||0} pages</span><span class="pk-hint">click to inspect</span></div></div>`;
+    peekEl.classList.add('open'); peekEl.setAttribute('aria-hidden','false'); wireThumbs(peekEl); positionPeek(cx,cy); }
+  function positionPeek(cx, cy){ const w=peekEl.offsetWidth||252, h=peekEl.offsetHeight||170;
+    let x=cx+16, y=cy+16; if(x+w>innerWidth-8) x=cx-w-16; if(x<8) x=8;
+    if(y+h>innerHeight-8) y=Math.max(8, cy-h-16); if(y<8) y=8; peekEl.style.left=x+'px'; peekEl.style.top=y+'px'; }
+  function hidePeek(){ clearTimeout(peekHideT); peekHideT=setTimeout(()=>{ peekEl.classList.remove('open'); peekEl.setAttribute('aria-hidden','true'); }, 60); }
+
+  // ═════════ MAP TAB — M22 orbital under fog (v2.1: zero-overlap · zoom · regions) ═════════
   // Honesty invariant: every spatial encoding is MEASURED — ring = clicks-from-home (clickDepth),
-  // node size = inbound links (observed), bearing = the page's nav section. Only the fog is decorative.
+  // node size = inbound links (observed), bearing = the page's nav section. Only fog is decorative.
+  // Zero-overlap: discs relaxed deterministically; labels placed by a measured screen-space collision pass.
   const nodes = [], byId = {};
   DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
   DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
@@ -689,99 +797,206 @@ function initDashboard(){
   const root = nodes.find(n=>!n.locked && (n.id===DATA.rootSlug || n.route==='/')) || nodes.find(n=>!n.locked) || nodes[0];
 
   const selected = new Set(); let activeNode = null;
-  const world = document.getElementById('mapworld'), fogEl = document.getElementById('mapfog'), linesEl = document.getElementById('maplines');
+  const world=document.getElementById('mapworld'), fogEl=document.getElementById('mapfog'), linesEl=document.getElementById('maplines'),
+        labelsEl=document.getElementById('maplabels'), dcardEl=document.getElementById('mapdcard');
   const capNodes = nodes.filter(n=>!n.locked && n!==root);
   const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...DATA.frontier.map(f=>f.inboundCount||0));
   const secList0 = (DATA.sections||[]).filter(s=>s!=='Home');
   const secList = secList0.length ? secList0 : ['Other'];
   const bearing = {}; secList.forEach((s,i)=> bearing[s] = -Math.PI/2 + (i/secList.length)*2*Math.PI);
   const bearingOf = (s)=> bearing[s]!=null ? bearing[s] : 0;
-  const pos = {}; // id -> {x,y}
 
-  function layoutMap(){
-    const pane = document.getElementById('pane-map'); const r = pane.getBoundingClientRect();
-    const W = r.width, H = r.height; if (!W || !H) return;
-    const cx = W/2, cy = H/2, minD = Math.min(W,H);
-    const maxD = Math.max(1, ...capNodes.map(n=> n.clickDepth==null ? 1 : n.clickDepth));
-    const R1 = minD*0.26, Rmax = minD*0.42;
-    const ringR = (d)=> maxD<=1 ? R1 : R1 + (d-1)*(Rmax-R1)/(maxD-1);
-    const nullR = minD*0.47, ghostR = minD*0.55;
-    // captured nodes: group by section+depth, spread within the sector wedge (wider for dense sections),
-    // and stagger radius in 3 lanes to de-cluster — no physics. Radius jitter stays under a ring gap so
-    // ring membership (the honest clicks-from-home encoding) is never blurred.
-    const groups = {}; capNodes.forEach(n=>{ const k=(n.section||'Other')+'|'+(n.clickDepth==null?'x':n.clickDepth); (groups[k]=groups[k]||[]).push(n); });
-    const gap = 2*Math.PI/secList.length;
-    const jitter = maxD<=1 ? minD*0.055 : Math.min(minD*0.03, 0.25*(Rmax-R1)/(maxD-1));
+  // ---- layout state (world coords, home at 0,0) ----
+  let VW=0, VH=0, minD=0, maxDepth=1, ringR1=0, ringRmax=0, nullR=0, ghostR=0;
+  const P = {};                 // id -> {x,y,r,node,ghost}
+  let ghostShown=[], deepCount=0, unreachCount=0, regions=[], hotRegion=null;
+  const ringRadius = (d)=> maxDepth<=1 ? ringR1 : ringR1 + (d-1)*(ringRmax-ringR1)/(maxDepth-1);
+  const sizeOf = (n)=> Math.round(16 + 46*Math.min(1,(n.inboundCount||0)/maxIn));
+
+  function computeLayout(){
+    const pane=document.getElementById('pane-map'); const r=pane.getBoundingClientRect();
+    VW=r.width; VH=r.height; if(!VW||!VH) return; minD=Math.min(VW,VH);
+    for(const k in P) delete P[k];
+    const homeD=Math.max(58, minD*0.10); P[root.id]={x:0,y:0,r:homeD/2, node:root};
+    maxDepth=Math.max(1, ...capNodes.map(n=> n.clickDepth==null?1:n.clickDepth));
+    ringR1=minD*0.22; ringRmax=minD*0.40; nullR=minD*0.45; ghostR=minD*0.56;
+    const groups={}; capNodes.forEach(n=>{ const k=(n.section||'Other')+'|'+(n.clickDepth==null?'x':n.clickDepth); (groups[k]=groups[k]||[]).push(n); });
+    const gap=2*Math.PI/secList.length;
     Object.values(groups).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
-      const w = gap*Math.min(0.9, 0.32 + 0.10*g.length);
-      g.forEach((n,i)=>{ const b=bearingOf(n.section); const off = g.length>1 ? (i-(g.length-1)/2)*(w/g.length) : 0;
-        const lane = (i%3)-1;
-        n._a = b+off; n._r = (n.clickDepth==null ? nullR : ringR(n.clickDepth)) + lane*jitter; n._crowded = g.length>6; }); });
-    // ghosts: top-K by inbound, placed in the fog at their section bearing
-    const ghosts = DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
-    const shown = ghosts.slice(0, Math.min(ghosts.length,14));
-    const gg = {}; shown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
-    Object.values(gg).forEach(g=>{ g.forEach((f,i)=>{ const b=bearingOf(f.section); f._a = b + (i-(g.length-1)/2)*0.16; f._r = ghostR + (i%2)*minD*0.045; }); });
+      const w=gap*Math.min(0.92, 0.34+0.10*g.length);
+      g.forEach((n,i)=>{ const b=bearingOf(n.section); const off=g.length>1?(i-(g.length-1)/2)*(w/g.length):0;
+        const rad=n.clickDepth==null?nullR:ringRadius(n.clickDepth);
+        P[n.id]={x:Math.cos(b+off)*rad, y:Math.sin(b+off)*rad, r:sizeOf(n)/2, node:n}; }); });
+    const ghosts=DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
+    ghostShown=ghosts.slice(0, Math.min(ghosts.length,14));
+    const gg={}; ghostShown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
+    Object.values(gg).forEach(g=>g.forEach((f,i)=>{ const b=bearingOf(f.section)+(i-(g.length-1)/2)*0.18; const rad=ghostR+(i%2)*minD*0.05;
+      P[f.id]={x:Math.cos(b)*rad, y:Math.sin(b)*rad, r:(Math.round(12+18*Math.min(1,(f.inboundCount||1)/maxIn)))/2, node:f, ghost:true}; }));
+    deepCount=Math.max(0, lockedTotal - ghostShown.reduce((s,f)=>s+(f.count||1),0));
+    unreachCount=capNodes.filter(n=>n.clickDepth==null).length;
+    relaxDiscs();
+    computeRegions();
+  }
+  // deterministic relaxation — seeded from the radial layout, home fixed; guarantees disc gaps
+  function relaxDiscs(){
+    const ids=Object.keys(P).filter(id=>id!==root.id);
+    const GAP=10, hr=P[root.id].r;
+    for(let iter=0; iter<1500; iter++){ let worst=0;
+      for(let i=0;i<ids.length;i++){ for(let j=i+1;j<ids.length;j++){
+        const a=P[ids[i]], b=P[ids[j]]; let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
+        if(d<0.001){ dx=Math.cos(i*1.7); dy=Math.sin(i*1.7); d=0.001; }   // break exact coincidence deterministically
+        const need=a.r+b.r+GAP; if(d<need){ const push=(need-d)/2, ux=dx/d, uy=dy/d;
+          a.x-=ux*push; a.y-=uy*push; b.x+=ux*push; b.y+=uy*push; worst=Math.max(worst,need-d); } } }
+      for(const id of ids){ const p=P[id]; const d=Math.hypot(p.x,p.y)||0.001; const need=p.r+hr+10;
+        if(d<need){ p.x+=p.x/d*(need-d); p.y+=p.y/d*(need-d); } }
+      if(worst<0.25) break;
+    }
+  }
+  // districts → regions (rounded bbox behind member nodes); 1-page sections merge into "Everything else"
+  function computeRegions(){
+    regions=[];
+    const bySec={}; capNodes.forEach(n=>{ const s=n.section||'Other'; (bySec[s]=bySec[s]||[]).push(n); });
+    const small=[];
+    for(const [name,arr] of Object.entries(bySec)){ if(arr.length<=1){ small.push(...arr); continue; } regions.push(makeRegion(name, arr)); }
+    if(small.length) regions.push(makeRegion('Everything else', small, small.length));
+  }
+  function makeRegion(name, arr, smallCount){
+    let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9; const pad=30;
+    arr.forEach(n=>{ const p=P[n.id]; if(!p) return; minx=Math.min(minx,p.x-p.r); miny=Math.min(miny,p.y-p.r); maxx=Math.max(maxx,p.x+p.r); maxy=Math.max(maxy,p.y+p.r); });
+    const dist=(DATA.districts||[]).find(d=>d.name===name);
+    const explored = smallCount!=null ? smallCount : (dist?dist.explored:arr.length);
+    const fog = smallCount!=null ? 0 : (dist?dist.fog:0);
+    const states = arr.filter(n=>(n.states||[]).some(s=>s.captured)).length;
+    return { name, x:minx-pad, y:miny-pad, w:(maxx-minx)+pad*2, h:(maxy-miny)+pad*2, cx:(minx+maxx)/2, cy:(miny+maxy)/2, explored, fog, states, merged:smallCount!=null };
+  }
 
-    let html = '';
-    for (let d=1; d<=maxD; d++){ const rr=ringR(d);
-      html += `<div class="mapring" style="left:${cx}px;top:${cy}px;width:${rr*2}px;height:${rr*2}px"></div>`;
-      html += `<div class="maprlbl" style="left:${cx+rr}px;top:${cy}px">${d} click${d===1?'':'s'}</div>`; }
-    // home (the sun — carries the logo/screenshot)
-    const homeD = Math.max(58, minD*0.10);
-    html += `<button class="mapnode" data-mapid="${esc(root.id)}" title="${esc(root.label||root.id)}" style="left:${cx}px;top:${cy}px;width:${homeD}px;height:${homeD}px;border-width:3px;border-color:var(--primary-strong);${root.screenshot?`background-image:url('${esc(root.screenshot)}')`:''}"></button>`;
-    html += `<div class="maphomelbl" style="left:${cx}px;top:${cy+homeD/2+6}px">${esc(root.label||root.id)}<small>${root.inboundCount||0} links in · ${(root.linksTo||[]).length} out</small></div>`;
-    pos[root.id] = {x:cx,y:cy};
-    // captured nodes
-    capNodes.forEach(n=>{ const x=cx+Math.cos(n._a)*n._r, y=cy+Math.sin(n._a)*n._r; pos[n.id]={x,y};
-      const sz = Math.round(16 + 46*Math.min(1,(n.inboundCount||0)/maxIn));
-      const hasStates = (n.states||[]).some(s=>s.captured);
-      html += `<button class="mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}" data-mapid="${esc(n.id)}" title="${esc(n.label||n.id)} — from ${n.inboundCount||0}" style="left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;${n.screenshot?`background-image:url('${esc(n.screenshot)}')`:''}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`;
-      if (!n._crowded) html += `<div class="mapnlbl" style="left:${x}px;top:${y+sz/2+3}px">${esc(short(n.label||n.id,18))}<br><small>from ${n.inboundCount||0}${n.clickDepth==null?' · not linked from home':''}</small></div>`; });
-    // ghosts in the fog, sized by inbound-from-captured
-    shown.forEach(f=>{ const x=cx+Math.cos(f._a)*f._r, y=cy+Math.sin(f._a)*f._r; pos[f.id]={x,y};
-      const gs = Math.round(12 + 18*Math.min(1,(f.inboundCount||1)/maxIn));
-      html += `<button class="mapghost" data-mapid="${esc(f.id)}" style="left:${x}px;top:${y}px"><span class="gc" style="width:${gs}px;height:${gs}px"></span><b>${esc(short(f.pattern||f.label||'',16))}</b><small>from ${f.inboundCount||f.count||1}</small></button>`; });
-    // deep-fog label for the template-covered overflow
-    const shownLocked = shown.reduce((s,f)=>s+(f.count||1),0); const deep = Math.max(0, lockedTotal-shownLocked);
-    if (deep>0) html += `<div style="position:absolute;left:${Math.min(W-90,cx+minD*0.44)}px;top:${Math.max(60,cy-minD*0.30)}px;transform:translate(-50%,-50%);z-index:6;text-align:center;font-size:10.5px;color:#AEB4C0;text-transform:uppercase;letter-spacing:1px">deep fog<span style="display:block;text-transform:none;letter-spacing:0;font-size:9px;margin-top:3px">…${deep} more pages —<br>the templates already stand for most</span></div>`;
-    // district summary cards (functional read) — top sections by explored, floating above the fog.
-    // stacked on the edge matching each section's bearing side, so they never occlude the orbits.
-    const dcards=(DATA.districts||[]).slice().sort((a,b)=>b.explored-a.explored).slice(0,6);
-    let rN=0, lN=0;
-    dcards.forEach(dst=>{ const b=bearingOf(dst.name); const right=Math.cos(b)>=0;
-      const dx = right ? W-118 : 118, dy = 185 + (right?rN++:lN++)*92;
-      const tot=dst.explored+dst.fog, pct=tot?Math.round(100*dst.explored/tot):0;
-      html += `<div class="mapdistrict" style="left:${dx}px;top:${dy}px;transform:translate(-50%,0)"><h4>${esc(dst.name)}</h4>
-        <p>${dst.explored} explored · ${dst.fog} in the fog${dst.states?` · ${dst.states} ${dst.states===1?'page has':'pages have'} states`:''}</p>
-        <div class="bar"><i style="width:${pct}%"></i></div></div>`; });
-    world.innerHTML = html;
-
-    // fog: clear over the explored orbits, thick past them (pure CSS radial-gradient — the only decorative encoding)
-    const clear=minD*0.46, mid=minD*0.55, opaque=minD*0.68;
-    fogEl.style.background = `radial-gradient(circle at ${cx}px ${cy}px, rgba(240,243,247,0) ${clear}px, rgba(223,229,239,.60) ${mid}px, rgba(216,223,235,.93) ${opaque}px, rgba(214,221,233,1) ${opaque+60}px)`;
-    linesEl.setAttribute('viewBox',`0 0 ${W} ${H}`); linesEl.setAttribute('width',W); linesEl.setAttribute('height',H); linesEl.innerHTML='';
-    // overlays
-    const explored = capNodes.length+1, known = explored+lockedTotal;
-    const pct = known ? 100*explored/known : 0;
-    document.getElementById('mapstats').innerHTML = `<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home · every unlock pushes the fog back`;
-    document.getElementById('mapnote').textContent = 'rings = how many clicks from home · hover a page for its real links · every unlock pushes the fog back';
-    document.getElementById('maplegend').innerHTML =
+  // ---- camera ----
+  const toScreen = (p)=> [VW/2 + p.x*mapView.zoom + mapView.panX, VH/2 + p.y*mapView.zoom + mapView.panY];
+  function renderWorld(){
+    let html='';
+    regions.forEach((rg,i)=>{ html+=`<div class="mapregion" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
+    for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
+    // discs
+    const disc=(id)=>{ const p=P[id]; if(!p) return ''; const n=p.node; const px=Math.round(p.x), py=Math.round(p.y), dia=Math.round(p.r*2);
+      if(p.ghost){ return `<button class="mapghost" data-mapid="${esc(n.id)}" title="${esc(n.pattern||n.label||'')}" style="left:${px}px;top:${py}px;transform:translate(-50%,-50%)"><span class="gc" style="width:${dia}px;height:${dia}px"></span></button>`; }
+      const isHome=n===root; const small=dia<30 && !isHome; const hasStates=(n.states||[]).some(s=>s.captured);
+      const bg = (!small && n.screenshot) ? `background-image:url('${esc(n.screenshot)}')` : '';
+      const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${small?' mono-disc':''}`;
+      return `<button class="${cls}" data-mapid="${esc(n.id)}" title="${esc(dlabel(n))} — from ${n.inboundCount||0}" style="left:${px}px;top:${py}px;transform:translate(-50%,-50%);width:${dia}px;height:${dia}px;${isHome?'border-width:3px;border-color:var(--primary-strong);':''}${bg}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`; };
+    html+=disc(root.id);
+    capNodes.forEach(n=>html+=disc(n.id));
+    ghostShown.forEach(f=>html+=disc(f.id));
+    world.innerHTML=html;
+    world.querySelectorAll('.mapregion').forEach(el=>{ const rg=regions[+el.dataset.region];
+      el.addEventListener('mouseenter', ()=>showRegion(rg, el)); el.addEventListener('mouseleave', hideRegion); });
+  }
+  function applyMapView(){
+    world.style.transform=`translate(${(VW/2+mapView.panX)}px, ${(VH/2+mapView.panY)}px) scale(${mapView.zoom})`;
+    // fog: screen-space, centered on home, radii scaled with zoom so it tracks the orbits
+    const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY, z=mapView.zoom;
+    const clear=minD*0.46*z, mid=minD*0.55*z, opaque=minD*0.68*z;
+    fogEl.style.background=`radial-gradient(circle at ${cx}px ${cy}px, rgba(240,243,247,0) ${clear}px, rgba(223,229,239,.6) ${mid}px, rgba(216,223,235,.93) ${opaque}px, rgba(214,221,233,1) ${opaque+60}px)`;
+    const zl=document.getElementById('zlbl'); if(zl) zl.textContent=Math.round(mapView.zoom*100)+'%';
+    placeLabels();
+    if(hoverId) drawLinks(hoverId);
+    if(hotRegion) positionCard(hotRegion.rg, hotRegion.el);
+  }
+  const ovl=(a,b)=>{ const ox=Math.min(a.right,b.right)-Math.max(a.left,b.left), oy=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top); return ox>4 && oy>4; };
+  function placeLabels(){
+    labelsEl.innerHTML='';
+    const z=mapView.zoom, level = z<0.9?'far': z<1.7?'mid':'near';
+    const paneRect=document.getElementById('pane-map').getBoundingClientRect();
+    const committed=[];
+    world.querySelectorAll('.mapnode, .mapghost .gc').forEach(el=>{ const r=el.getBoundingClientRect();
+      committed.push({left:r.left-paneRect.left, top:r.top-paneRect.top, right:r.right-paneRect.left, bottom:r.bottom-paneRect.top}); });
+    const specs=[];
+    { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(dlabel(root))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
+    for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d)*z; const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY;
+      specs.push({pri:1, ring:true, cx, cy, rr, cls:'maprlbl', html:`${d} click${d===1?'':'s'}`}); }
+    if(unreachCount>0){ const [ax,ay]=toScreen({x:Math.cos(2.0)*nullR, y:Math.sin(2.0)*nullR}); specs.push({pri:1, ax, ay, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} pages`}); }
+    if(deepCount>0){ const [dx,dy]=toScreen({x:Math.cos(-0.55)*ghostR*1.16, y:Math.sin(-0.55)*ghostR*1.16}); specs.push({pri:1, ax:dx, ay:dy, center:true, cls:'maparclbl', html:`deep fog<small>…${deepCount} more — templates stand for most</small>`}); }
+    let set=[];
+    if(level==='near') set=capNodes.slice();
+    else if(level==='mid'){ const bySec={}; capNodes.forEach(n=>{(bySec[n.section||'Other']=bySec[n.section||'Other']||[]).push(n)});
+      Object.values(bySec).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)); set.push(...g.slice(0,2)); }); }
+    set.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
+    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}<br><small>from ${n.inboundCount||0}</small>`}); });
+    if(level==='near') ghostShown.forEach(f=>{ const [sx,sy]=toScreen(P[f.id]); specs.push({pri:3, ax:sx, ay:sy, dr:P[f.id].r*z, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}); });
+    specs.sort((a,b)=>a.pri-b.pri);
+    const els=specs.map(s=>{ const e=document.createElement('div'); e.className=s.cls; e.style.visibility='hidden'; e.innerHTML=s.html; labelsEl.appendChild(e); return e; });
+    const placed=[...committed];
+    specs.forEach((s,i)=>{ const e=els[i]; const w=e.offsetWidth, h=e.offsetHeight; let cands=[];
+      if(s.ring){ for(const a of [0,-0.35,0.35,-0.7,0.7,Math.PI]) cands.push([s.cx+Math.cos(a)*s.rr - w/2, s.cy+Math.sin(a)*s.rr - h/2]); }
+      else if(s.center){ cands=[[s.ax-w/2, s.ay-h/2]]; }
+      else { const dr=s.dr||0; cands=[[s.ax-w/2, s.ay+dr+3],[s.ax-w/2, s.ay-dr-3-h],[s.ax+dr+4, s.ay-h/2],[s.ax-dr-4-w, s.ay-h/2],[s.ax-w/2, s.ay+dr+18],[s.ax-w/2, s.ay+dr+34]]; }
+      let ok=false;
+      for(const [lx,ly] of cands){ const box={left:lx,top:ly,right:lx+w,bottom:ly+h};
+        if(box.left<2||box.top<2||box.right>VW-2||box.bottom>VH-2) continue;
+        if(placed.some(p=>ovl(p,box))) continue;
+        e.style.left=lx+'px'; e.style.top=ly+'px'; e.style.visibility='visible'; placed.push(box); ok=true; break; }
+      if(!ok) e.remove();
+    });
+    // safety net — guarantee 0 overlaps at rest: forward pass keeps higher-priority labels, hides any later clash
+    { const paneR=document.getElementById('pane-map').getBoundingClientRect(); const kept=[];
+      [...labelsEl.children].forEach(e=>{ if(e.style.visibility==='hidden') return; const r=e.getBoundingClientRect();
+        const box={left:r.left-paneR.left,top:r.top-paneR.top,right:r.right-paneR.left,bottom:r.bottom-paneR.top};
+        if(committed.some(d=>ovl(d,box)) || kept.some(k=>ovl(k,box))) e.style.visibility='hidden'; else kept.push(box); }); }
+    // overlays text
+    const explored=capNodes.length+1, known=explored+lockedTotal, pct=known?100*explored/known:0;
+    document.getElementById('mapstats').innerHTML=`<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home · every unlock pushes the fog back`;
+    document.getElementById('mapnote').textContent='rings = how many clicks from home · hover a page for its real links · drag to pan, scroll to zoom';
+    document.getElementById('maplegend').innerHTML=
       `<span class="lg"><i style="width:14px;height:14px;border:2.5px solid var(--primary);border-radius:50%"></i>explored — size = how linked-to</span>
        <span class="lg"><i style="width:11px;height:11px;border:2px solid #C9CDD6;border-radius:50%"></i>explored, dormant caption</span>
-       <span class="lg"><i style="width:11px;height:11px;border:2px dashed #AEB4C0;border-radius:50%"></i>ghost in the fog — locked</span>`;
+       <span class="lg"><i style="width:11px;height:11px;border:2px dashed #AEB4C0;border-radius:50%"></i>ghost in the fog — locked</span>
+       <span class="lg" style="border-top:1px solid var(--line);padding-top:5px">hover a region for its district</span>`;
   }
-  function resize(){ layoutMap(); }
-  function fit(){ layoutMap(); }
-  addEventListener('resize', ()=>{ if (document.getElementById('pane-map').classList.contains('active')) layoutMap(); });
 
-  // hover → draw the page's REAL links (out + in); click → detail panel (panel-first, VAL F4)
-  function drawLinks(id){ const n=byId[id]; if(!n||!pos[id]){ linesEl.innerHTML=''; return; }
-    const seg=(a,b,out)=>{ const pa=pos[a],pb=pos[b]; if(!pa||!pb) return ''; return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="${out?'rgba(79,70,229,.55)':'rgba(102,112,133,.4)'}" stroke-width="1.4"/>`; };
+  // ---- regions (hover → highlight + card anchored to territory) ----
+  function positionCard(rg, el){ const [sx,sy]=toScreen({x:rg.cx, y:rg.y}); let x=sx, y=sy-8;
+    dcardEl.style.left='0'; dcardEl.style.top='0'; const w=dcardEl.offsetWidth||170, h=dcardEl.offsetHeight||64;
+    x=Math.max(w/2+6, Math.min(VW-w/2-6, x)); y=Math.max(60, Math.min(VH-h-10, y-h));
+    dcardEl.style.left=x+'px'; dcardEl.style.top=y+'px'; dcardEl.style.transform='translate(-50%,0)'; }
+  function showRegion(rg, el){ hotRegion={rg,el}; el.classList.add('hot');
+    dcardEl.innerHTML=`<h4>${esc(rg.name)}</h4><p>${rg.explored} explored${rg.fog?` · ${rg.fog} in the fog`:''}${rg.states?` · ${rg.states} ${rg.states===1?'page has':'pages have'} states`:''}</p>
+      <div class="bar"><i style="width:${rg.explored+rg.fog?Math.round(100*rg.explored/(rg.explored+rg.fog)):100}%"></i></div>`;
+    dcardEl.style.display='block'; positionCard(rg, el); }
+  function hideRegion(){ if(hotRegion&&hotRegion.el) hotRegion.el.classList.remove('hot'); hotRegion=null; dcardEl.style.display='none'; }
+
+  // ---- hover links + peek + click ----
+  let hoverId=null;
+  function drawLinks(id){ const n=byId[id]; if(!n||!P[id]){ linesEl.innerHTML=''; return; }
+    const seg=(a,b,out)=>{ const A=P[a],B=P[b]; if(!A||!B) return ''; const [x1,y1]=toScreen(A),[x2,y2]=toScreen(B);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${out?'rgba(79,70,229,.55)':'rgba(102,112,133,.4)'}" stroke-width="1.4"/>`; };
     let s=''; (n.linksTo||[]).forEach(t=>s+=seg(id,t,true)); (n.linkedFrom||[]).forEach(t=>s+=seg(t,id,false)); linesEl.innerHTML=s; }
-  world.addEventListener('mouseover', e=>{ const b=e.target.closest('[data-mapid]'); if(b) drawLinks(b.getAttribute('data-mapid')); });
-  world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b) linesEl.innerHTML=''; });
-  world.addEventListener('click', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) openPanel(n); } });
+  world.addEventListener('mouseover', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n){ hoverId=n.id; drawLinks(n.id); showPeek(n, e.clientX, e.clientY); } } });
+  world.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
+  world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ hoverId=null; linesEl.innerHTML=''; hidePeek(); } });
+  world.addEventListener('click', e=>{ if(mapDragged) return; const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) openPanel(n); } });
+
+  // ---- zoom + pan ----
+  const clampZoom=z=>Math.max(0.45, Math.min(3, z));
+  function zoomAt(cx, cy, factor){ const z0=mapView.zoom, z1=clampZoom(z0*factor);
+    // keep the world point under (cx,cy) fixed
+    const wx=(cx - (VW/2+mapView.panX))/z0, wy=(cy - (VH/2+mapView.panY))/z0;
+    mapView.zoom=z1; mapView.panX = cx - VW/2 - wx*z1; mapView.panY = cy - VH/2 - wy*z1; applyMapView(); }
+  const mapPane=document.getElementById('pane-map');
+  mapPane.addEventListener('wheel', e=>{ if(!mapPane.classList.contains('active')) return; e.preventDefault();
+    const r=mapPane.getBoundingClientRect(); zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:0.893); }, {passive:false});
+  let panning=false, sx0=0, sy0=0, mapDragged=false;
+  mapPane.addEventListener('mousedown', e=>{ if(e.target.closest('#mapzoom')) return; panning=true; mapDragged=false; sx0=e.clientX; sy0=e.clientY; world.style.cursor='grabbing'; });
+  addEventListener('mousemove', e=>{ if(!panning) return; const dx=e.clientX-sx0, dy=e.clientY-sy0; if(Math.abs(dx)+Math.abs(dy)>3) mapDragged=true;
+    mapView.panX+=dx; mapView.panY+=dy; sx0=e.clientX; sy0=e.clientY; applyMapView(); });
+  addEventListener('mouseup', ()=>{ if(panning){ panning=false; world.style.cursor=''; setTimeout(()=>mapDragged=false, 0); } });
+  mapPane.addEventListener('dblclick', e=>{ if(e.target.closest('[data-mapid]')||e.target.closest('#mapzoom')) return; resetView(); });
+  document.getElementById('zinbtn').onclick=()=>zoomAt(VW/2, VH/2, 1.2);
+  document.getElementById('zoutbtn').onclick=()=>zoomAt(VW/2, VH/2, 0.83);
+  document.getElementById('zfitbtn').onclick=resetView;
+  function resetView(){ mapView.zoom=1; mapView.panX=0; mapView.panY=0; applyMapView(); }
+
+  function resize(){ computeLayout(); renderWorld(); applyMapView(); }
+  function fit(){ resize(); }
+  addEventListener('resize', ()=>{ if(document.getElementById('pane-map').classList.contains('active')) resize(); });
 
   function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
     if (n.locked){
@@ -799,12 +1014,14 @@ function initDashboard(){
       el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
     } else {
       const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
-      el.innerHTML = `<h2>${esc(n.label||n.id)}</h2>
+      const depthTxt = n.clickDepth==null ? 'not linked from home' : `${n.clickDepth} click${n.clickDepth===1?'':'s'} from home`;
+      el.innerHTML = `<h2>${esc(dlabel(n))}</h2>
         <div class="route">${esc(n.route)}</div>
-        ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt="screenshot of ${esc(n.label||n.id)}"></a>`:''}
-        <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
+        ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank" aria-label="open full screenshot">${img2(n.screenshot,'pshot')}</a>`:''}
+        <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages`:''} · linked from ${n.inboundCount||0} · ${depthTxt}</div>
         <div class="desc">${n.descPending?'<span class="meta">— caption dormant, waiting for your AI</span>':esc(n.desc||'')} ${n.descPending?'':'<span class="ai" title="model-written orientation, not extracted fact">ai</span>'}</div>
-        <div class="chiprow" style="margin-top:12px"><button class="pchip ghost" data-goto="page/${esc(n.id)}">Open the full page doc</button>${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : ''}</div>
+        <button class="btn primary" id="pnl-expand" style="width:100%;margin-top:12px">Expand ↗ Open the full page doc</button>
+        <div class="chiprow" style="margin-top:10px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : pchip('Ask about this page', PROMPTS.askQuestion(), true)}</div>
         <div class="links" style="margin-top:8px;font-size:12px"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> · <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
@@ -815,6 +1032,8 @@ function initDashboard(){
           <button class="btn primary" id="st-add">Add &amp; download state</button>
           <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
         </div>`;
+      wireThumbs(el);
+      el.querySelector('#pnl-expand').onclick=()=>openFullDoc(n.id);
       el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
         if(!name||!url) return toast('Give the state a name and a URL');
         if (serverMode){ toast('Capturing state — watch the browser window…', true);
@@ -824,6 +1043,10 @@ function initDashboard(){
     document.getElementById('panel').classList.add('open');
   }
   window.closePanel = function(){ document.getElementById('panel').classList.remove('open'); activeNode=null; };
+  // F1: expand → full doc, recording provenance (and the map node to reopen on return)
+  function openFullDoc(slug){ const onMap = document.getElementById('pane-map').classList.contains('active');
+    pageOrigin = onMap ? 'map' : 'home'; if (onMap) mapReopen = slug;
+    window.closePanel(); location.hash = 'page/' + slug; }
 
   const capbtn = document.getElementById('capbtn');
   function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
@@ -855,7 +1078,12 @@ function initDashboard(){
     chip.classList.toggle('quiet', full);
     // OPEN WORDING (flagged): ship "100% context ready" — the "context complete" alternative is a P3 call (PRD §2, ux-copy open q)
     lab.textContent = R.score + '% context ready';
+    // F5: lead the popover with the top missing component ("next +N%: ‹label›")
+    const gaps = R.components.filter(c=>c.earned < c.max).sort((a,b)=>(b.max-b.earned)-(a.max-a.earned));
+    const top = gaps[0];
+    const whisper = (!full && top) ? `<div class="rnext">next +${Math.round(top.max-top.earned)}%: ${esc(top.label.toLowerCase())}</div>` : '';
     pop.innerHTML = `<h4>Context readiness — ${R.score}%</h4>
+      ${whisper}
       <div class="pnote">A composite of how ready this library is as AI context — not surface coverage. <span class="ai" title="heuristic v1 weighting">heuristic</span></div>
       ${R.components.map(c=>`<div class="rcomp"><div class="rlab"><span>${esc(c.label)}</span><b>${c.earned} / ${c.max}</b></div>
         <div class="rbar"><i style="width:${Math.round(100*c.earned/Math.max(c.max,1))}%"></i></div>
@@ -918,17 +1146,25 @@ function initDashboard(){
     const ghostsShown = DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)).slice(0,2);
     const ghostShownCount = ghostsShown.reduce((s,f)=>s+(f.count||1),0);
     const overflowN = Math.max(0, lockedTotal - ghostShownCount);
-    const cardHtml = (n)=>`<button class="pg" data-goto="page/${esc(n.id)}">
+    // atlas cards no longer navigate (F1): hover = peek, click = panel; data-card holds the slug
+    const cardHtml = (n)=>`<button class="pg" data-card="${esc(n.id)}">
         ${n.kind==='template'?`<span class="count">stands for ${n.standsFor}</span>`:''}
-        ${n.screenshot?`<img class="shot" src="${esc(n.screenshot)}" loading="lazy" alt="">`:'<span class="shot hatch"></span>'}
-        <span class="m"><span class="nm">${esc(n.label||n.id)}</span><span class="rt">${esc(n.route||'')}</span>
+        ${img2(n.screenshot,'shot')}
+        <span class="m"><span class="nm">${esc(dlabel(n))}</span><span class="rt">${esc(n.route||'')}</span>
         <span class="cap${n.descPending?' dorm':''}">${n.descPending?'— caption dormant, waiting for your AI':esc(n.desc||'')}</span></span></button>`;
     const ghostHtml = (f)=>`<button class="pg locked" data-goto="map"><span class="shot">not downloaded yet</span>
         <span class="m"><span class="nm">${esc(f.pattern||f.label||'locked')}</span><span class="rt">linked from ${f.inboundCount||f.count||1} pages</span>
         <span class="unlock">Unlock</span></span></button>`;
     const overflow = overflowN>0 ? `<button class="pg locked" data-goto="map"><span class="shot">…and ${overflowN} more on the map</span>
         <span class="m"><span class="nm">Everything else</span><span class="rt">the map holds them</span><span class="unlock">Open the map</span></span></button>` : '';
-    const logo = I.logo ? `<img class="logo" src="${esc(I.logo)}" alt="">` : `<span class="logo hatch"></span>`;
+    const logo = I.logo ? `<img class="logo" src="${esc(I.logo)}" alt="">` : monogram('logo', I.name);
+    // adaptive filter chips (F5): pre-AI foregrounds Described; post-AI drops the redundant Described=All and adds Without states
+    const filters = [`<button class="filt on" data-filt="all">All ${nodes.length}</button>`,
+      `<button class="filt" data-filt="templates">Templates ${templates.length}</button>`];
+    if (pend>0) filters.push(`<button class="filt" data-filt="described">Described ${described.length}</button>`);
+    filters.push(`<button class="filt" data-filt="states">With states ${withStates.length}</button>`);
+    if (pend===0) filters.push(`<button class="filt" data-filt="without">Without states ${nodes.length-withStates.length}</button>`);
+    filters.push(`<button class="filt" data-goto="map">Locked ${lockedTotal}</button>`);
     document.getElementById('pane-home').innerHTML = `<div class="home">
       <div class="ident">${logo}
         <div class="who"><b>${esc(subtitle)}</b>
@@ -942,28 +1178,33 @@ function initDashboard(){
       </div>
       <div class="homecols">
         <div class="gridwrap">
-          <div class="filters">
-            <button class="filt on" data-filt="all">All ${nodes.length}</button>
-            <button class="filt" data-filt="templates">Templates ${templates.length}</button>
-            <button class="filt" data-filt="described">Described ${described.length}</button>
-            <button class="filt" data-filt="states">With states ${withStates.length}</button>
-            <button class="filt" data-goto="map">Locked ${lockedTotal}</button>
-          </div>
+          <div class="filters">${filters.join('')}</div>
           <div class="atlas" id="atlas">${nodes.map(cardHtml).join('')}${ghostsShown.map(ghostHtml).join('')}${overflow}</div>
         </div>
         ${ledgerRail()}
       </div>
     </div>`;
     const atlas=document.getElementById('atlas');
+    wireThumbs(atlas);
+    // F1 ladder on the atlas: hover/focus = peek, click = in-context panel
+    atlas.addEventListener('mouseover', e=>{ const c=e.target.closest('.pg[data-card]'); if(c){ const n=byId[c.dataset.card]; if(n) showPeek(n, e.clientX, e.clientY); } });
+    atlas.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
+    atlas.addEventListener('mouseout', e=>{ if(e.target.closest('.pg[data-card]')) hidePeek(); });
+    atlas.querySelectorAll('.pg[data-card]').forEach(c=>{
+      c.onclick=()=>{ const n=byId[c.dataset.card]; if(n) openPanel(n); };
+      c.addEventListener('focus', ()=>{ const n=byId[c.dataset.card]; const r=c.getBoundingClientRect(); if(n) showPeek(n, r.right-40, r.top); });
+      c.addEventListener('blur', hidePeek);
+    });
     document.querySelectorAll('#pane-home .filt[data-filt]').forEach(b=>b.onclick=()=>{
       document.querySelectorAll('#pane-home .filt[data-filt]').forEach(x=>x.classList.toggle('on', x===b));
       const f=b.dataset.filt;
-      atlas.querySelectorAll('.pg').forEach(c=>{ const g=c.getAttribute('data-goto')||'';
+      atlas.querySelectorAll('.pg').forEach(c=>{
         if(c.classList.contains('locked')){ c.style.display = f==='all'?'':'none'; return; }
-        const n=byId[g.replace('page/','')]; let show=true;
+        const n=byId[c.dataset.card]; let show=true;
         if(f==='templates') show=n&&n.kind==='template';
         else if(f==='described') show=n&&!n.descPending;
         else if(f==='states') show=n&&(n.states||[]).some(s=>s.captured);
+        else if(f==='without') show=n&&!(n.states||[]).some(s=>s.captured);
         c.style.display=show?'':'none'; });
     });
   }
@@ -996,22 +1237,26 @@ function initDashboard(){
     const known=['empty','error','filtered','filled','sorted']; const missing=known.filter(k=>!states.some(s=>(s.name||'').includes(k)));
     const leadsTo=(n.linksTo||[]).slice(0,8), reachedFrom=(n.linkedFrom||[]).slice(0,8);
     const moreFrom=Math.max(0,(n.linkedFrom||[]).length-reachedFrom.length);
-    const chip=(id)=>`<button class="lc" data-goto="page/${esc(id)}">${esc(byId[id]?(byId[id].label||id):id)}</button>`;
+    const chip=(id)=>`<button class="lc" data-goto="page/${esc(id)}">${esc(byId[id]?dlabel(byId[id]):id)}</button>`;
     const hist=[];
     DASH.events.forEach(e=>{ if(e.link&&e.link.page===slug) hist.push({t:e.title,at:e.at,actor:e.actor}); });
     if(!n.descPending) hist.push({t:'Described', at:null, actor:'your AI'});
     hist.push({t:'Captured', at:n.capturedAt, actor:'the kit'});
     hist.sort((a,b)=>((b.at||'') < (a.at||'') ? -1 : (b.at||'')>(a.at||'')?1:0));
+    // F1 return affordance — provenance-aware (arrived from map vs home vs a cold deep-link)
+    const backTo = pageOrigin==='map' ? 'map' : 'home';
+    const backLabel = pageOrigin==='map' ? '← Back to map' : '← Back to home';
     el.innerHTML=`<div class="pgdoc">
-      <div class="crumb"><button class="lnk" data-goto="home">Home</button> / ${esc(n.section||'')} / ${esc(n.label||n.id)}</div>
-      <div class="dhd"><h1>${esc(n.label||n.id)}</h1><span class="rt">${esc(n.route||'')} · captured ${fmtDate(n.capturedAt)} · current</span>
+      <div class="retbar"><button class="retbtn" id="pg-back">${backLabel}</button>
+        <span class="crumb" style="margin:0"><button class="lnk" data-goto="home">Home</button> / ${esc(n.section||'')} / ${esc(dlabel(n))}</span></div>
+      <div class="dhd"><h1>${esc(dlabel(n))}</h1><span class="rt">${esc(n.route||'')} · captured ${fmtDate(n.capturedAt)} · current</span>
         <div class="acts">${pchip('Wireframe on this page',PROMPTS.wireframe(slug))}${pchip('Ask about this page',PROMPTS.askQuestion(),true)}<a class="pchip ghost" href="${esc(n.pageHtml)}" target="_blank">Open real HTML</a></div></div>
       <div class="dcols">
         <div class="dleft">
-          ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img class="dshot" src="${esc(n.screenshot)}" alt=""></a>`:'<span class="dshot hatch" style="height:400px"></span>'}
+          ${n.screenshot?`<div class="shotwrap skel"><a href="${esc(n.screenshot)}" target="_blank"><img class="dshot capped fade" data-src="${esc(n.screenshot)}" alt=""></a></div><button class="shot-expand" id="shot-exp">expand full length</button>`:'<span class="dshot hatch" style="height:400px;display:block"></span>'}
           <h3>States</h3>
           <div class="strip">
-            ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured&&n.screenshot?`<img src="pages/${esc(slug)}/states/${esc(s.name)}/screenshot.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">`:'<span class="ph"></span>'}${esc(s.name)}</span>`).join(''):''}
+            ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured?img2('pages/'+esc(slug)+'/states/'+esc(s.name)+'/screenshot.png','stt-shot'):'<span class="ph"></span>'}${esc(s.name)}</span>`).join(''):''}
             <span class="stt add"><span class="ph">+ add a state by URL</span>${esc(missing.slice(0,3).join(' · ')||'more')}</span>
           </div>
         </div>
@@ -1032,14 +1277,22 @@ function initDashboard(){
         </div>
       </div>
     </div>`;
+    wireThumbs(el);
+    const bk=el.querySelector('#pg-back'); if(bk) bk.onclick=()=>{ location.hash = backTo; };
+    const exp=el.querySelector('#shot-exp'); if(exp) exp.onclick=()=>{ const s=el.querySelector('.dshot'); if(!s) return;
+      const capped=s.classList.toggle('capped'); exp.textContent = capped?'expand full length':'collapse'; };
   }
 
   // ═════════ ROUTING ═════════
   function showPane(name){
     document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+name));
-    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
+    // F1 provenance: on the page doc, keep the tab we arrived from lit (map/home); direct deep-link → home
+    const activeTab = name==='page' ? (pageOrigin==='map'?'map':'home') : name;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===activeTab));
     const jp=document.getElementById('journalpill'); if(jp) jp.classList.toggle('on', name==='journal');
-    if(name==='map'){ resize(); if(!window.__fitted){ fit(); window.__fitted=true; } }
+    if(name==='map'){ resize(); if(!window.__fitted){ fit(); window.__fitted=true; }
+      // F1 restore: reopen the panel we expanded from + reapply camera on return
+      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; applyMapView(); if(nn) openPanel(nn); } }
     const sp=document.querySelector('.pane.active.scrollpane'); if(sp) sp.scrollTop=0;
   }
   function route(){

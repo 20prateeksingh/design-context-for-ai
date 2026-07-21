@@ -213,6 +213,7 @@ function buildIndex(libDir) {
   for (const [slug, p] of Object.entries(pages)) {
     const ann = (annotations.pages || {})[slug] || {};
     p.notes = ann.notes || null;
+    p.displayLabelRaw = (typeof ann.displayLabel === 'string' && ann.displayLabel.trim()) ? ann.displayLabel.trim() : null; // designer-owned override (F4)
     const states = [];
     const stDir = path.join(pagesDir, slug, 'states');
     if (fs.existsSync(stDir)) for (const name of fs.readdirSync(stDir)) {
@@ -293,6 +294,19 @@ function buildIndex(libDir) {
   const depths = computeDepths(pages, rootSlug);
   const tokens = aggregateTokens(pagesDir, ordered);
 
+  // display labels (F4): designer override (annotations.displayLabel) wins verbatim; otherwise the
+  // usual label; on collision between two auto-labels, append the distinguishing route → deterministic.
+  const baseLabelOf = (s) => { const m = pages[s].meta; return pages[s].displayLabelRaw || m.navLabel || templateLabel(m) || m.title || s; };
+  const labelCounts = {};
+  for (const s of ordered) { const b = baseLabelOf(s); labelCounts[b] = (labelCounts[b] || 0) + 1; }
+  const displayLabel = {}; const usedLabels = {};
+  for (const s of ordered) { const b = baseLabelOf(s);
+    let cand = (pages[s].displayLabelRaw || labelCounts[b] === 1) ? b : `${b} (${pages[s].meta.route})`;
+    // final uniqueness guard — if route also collides (near-identical template pages) append a counter
+    if (usedLabels[cand]) { let i = 2, base = cand; while (usedLabels[`${base} · ${i}`]) i++; cand = `${base} · ${i}`; }
+    usedLabels[cand] = true; displayLabel[s] = cand; }
+  const displayLabelOf = (s) => displayLabel[s] || s;
+
   const capturedCount = ordered.length;
   const describedCount = ordered.filter(s => pages[s].description).length;
   const tplCountD = ordered.filter(s => pages[s].meta.template).length;
@@ -341,7 +355,7 @@ function buildIndex(libDir) {
 
   // events[] — the journal feed, assembled from EMBEDDED/stable metadata only (never page.md mtime,
   // which build-index itself rewrites every run; never Date.now). Deterministic ordering.
-  const pageLabelOf = (s) => pages[s] ? (pages[s].meta.navLabel || templateLabel(pages[s].meta) || pages[s].meta.title || s) : s;
+  const pageLabelOf = (s) => pages[s] ? displayLabelOf(s) : s;
   const events = [];
   const capAt = manifest.capturedAt;
   const dudSkip = (manifest.skipped || []).length, failCount = (manifest.failed || []).length;
@@ -435,7 +449,7 @@ function buildIndex(libDir) {
     generated: 'build-index.js — derived view; ground truth lives in pages/*/meta.json',
     howToConsume: 'Start at INDEX.md (human) or here (machine). Each page: pages/<slug>/ with page.md (digest), screenshot.png, page.html (editable baseline), content.md (verbatim copy), computed-tokens.json, meta.json. description.method=ai means model-written orientation prose, not extracted fact.',
     pages: Object.fromEntries(ordered.map(slug => { const p = pages[slug]; const m = p.meta; return [slug, {
-      route: m.route, url: m.finalUrl, label: m.navLabel || templateLabel(m) || null, title: m.title || null,
+      route: m.route, url: m.finalUrl, label: m.navLabel || templateLabel(m) || null, displayLabel: displayLabelOf(slug), title: m.title || null,
       template: m.template ? { pattern: m.pattern, standsFor: m.collapsed + 1 } : null,
       files: { pageMd: `pages/${slug}/page.md`, screenshot: `pages/${slug}/screenshot.png`, html: `pages/${slug}/page.html`, content: `pages/${slug}/content.md`, tokens: `pages/${slug}/computed-tokens.json`, meta: `pages/${slug}/meta.json` },
       linksTo: p.linksTo, linkedFrom: p.linkedFrom, contentHash: m.contentHash,
@@ -465,7 +479,7 @@ function buildIndex(libDir) {
       rootSlug, sections: sectionsOrder, districts,
       nodes: ordered.map(slug => { const p = pages[slug]; const m = p.meta; return {
         id: slug, kind: m.template ? 'template' : 'page',
-        label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), route: m.route,
+        label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), displayLabel: displayLabelOf(slug), route: m.route,
         desc: p.description ? p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null,
         screenshot: `pages/${slug}/screenshot.png`, pageHtml: `pages/${slug}/page.html`, pageMd: `pages/${slug}/page.md`,
         capturedAt: m.capturedAt, standsFor: m.template ? m.collapsed + 1 : null,
