@@ -282,6 +282,11 @@ function buildIndex(libDir) {
   };
   fs.writeFileSync(path.join(libDir, 'registry.json'), JSON.stringify(registry, null, 2), 'utf8');
 
+  // Hygiene lint over the just-written library (optional — never breaks a build if the module is absent).
+  // Especially catches what guided (human-driven) capture can introduce: dupes, orphans, dead states.
+  let hygiene = null;
+  try { hygiene = require('./hygiene.js').runHygiene(libDir); } catch (_) {}
+
   // 4b. tokens.json + dashboard.html — Map · Overview · Design Tokens (self-contained; live via tools/map.js)
   const tokens = aggregateTokens(pagesDir, ordered);
   fs.writeFileSync(path.join(libDir, 'tokens.json'), JSON.stringify(tokens, null, 2), 'utf8');
@@ -314,6 +319,7 @@ function buildIndex(libDir) {
       statesTotal: ordered.reduce((n, s) => n + pages[s].states.filter(x => x.captured).length, 0),
       notes: ordered.filter(s => pages[s].notes).map(s => ({ slug: s, notes: pages[s].notes })),
       standsForTotal: ordered.reduce((n, s) => n + (pages[s].meta.template ? pages[s].meta.collapsed + 1 : 1), 0),
+      hygiene,
     };
     const dash = { map: mapData, overview, tokens: { ...tokens, raw: undefined }, // raw stays in tokens.json, not the page
       workspaceName: path.basename(path.dirname(libDir)),
@@ -352,7 +358,7 @@ function buildIndex(libDir) {
   ].join('\n');
   fs.writeFileSync(path.join(libDir, 'INDEX.md'), index, 'utf8');
 
-  return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal };
+  return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene };
 }
 
 module.exports = { buildIndex };
@@ -361,4 +367,5 @@ if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');
   const r = buildIndex(libDir);
   console.log(`✅  INDEX.md + registry.json + ${r.pages} page.md files (${r.described} described, ${r.pages - r.described} pending)`);
+  try { if (r.hygiene) console.log(require('./hygiene.js').formatHygiene(r.hygiene)); } catch (_) {}
 }
