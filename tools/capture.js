@@ -53,8 +53,7 @@ const START_URL = getArg('--url', null) || CFG.url || null;
 const ONLY_URLS = getArg('--urls', null);   // selective capture: comma-separated URLs from the map's frontier
 const STATE = getArg('--state', null);      // state capture: <pageSlug>:<stateName>, with --url = the state's URL
 const GUIDED = hasFlag('--guided');         // guided capture: headed browser, human drives, snapshot on the overlay button
-const GUIDED_PAGE = getArg('--page', null); // default page slug guided states attach to (overridable per-capture in the overlay)
-if (require.main === module && !START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --guided --url <startUrl> [--page <slug>]   (human drives; snapshot button-only states/modals)\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
+if (require.main === module && !START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --guided --url <startUrl>   (human drives; snapshot button-only states/modals)\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
 
 const PROFILE = getArg('--profile', 'default');
 const DEPTH = parseInt(getArg('--depth', String(CFG_PRESETS.depth != null ? CFG_PRESETS.depth : 1)), 10);
@@ -427,50 +426,74 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
 }
 
 // ── Guided-capture overlay (runs IN the page; injected on every document) ─────
-// The one piece of UI the tool draws: a corner chip the designer clicks to snapshot the
-// current state. The designer drives the product; this only records. Excluded from the
-// snapshot itself (the Node handler removes it before capture, remounts after).
-function guidedOverlayInjector(defaultPage) {
+// A simple bottom-center pill. It is URL-AWARE: on every navigation it asks Node whether the
+// current URL has been captured (calm ✓ + timestamp) or is new (loud ✦), and auto-derives the
+// page slug + reached-by note so the designer types nothing in the common case. The only optional
+// field is a state name for a button-only tab (the URL can't reveal which tab is active) — and even
+// that is auto-suggested from the active tab. The designer drives the product; this only records.
+// Excluded from the snapshot itself (the Node handler removes it before capture, remounts after).
+function guidedOverlayInjector() {
   if (window.top !== window) return; // top frame only
+  const slugify = (s) => (s || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  // Best-effort: read the active tab / current wizard step / modal heading so the state name is pre-filled.
+  function detectState() {
+    const first = (el) => el && el.innerText ? el.innerText.trim().split('\n')[0].trim() : '';
+    const dialog = document.querySelector('[role="dialog"],[aria-modal="true"],.modal,.drawer');
+    if (dialog) {
+      const step = dialog.querySelector('[aria-current="step"],[class*="step"][class*="active"],[class*="active"][class*="step"]');
+      return slugify(first(step) || first(dialog.querySelector('h1,h2,[role="heading"]')) || 'modal');
+    }
+    const selTab = document.querySelector('[role="tab"][aria-selected="true"]');
+    if (selTab) return slugify(first(selTab));
+    const active = Array.from(document.querySelectorAll('[role="tablist"] *,[class*="tab"] a,[class*="tab"] button,[role="tab"]'))
+      .find(el => /(^|[\s_-])(active|selected)([\s_-]|$)/i.test(el.className || ''));
+    return slugify(first(active));
+  }
   function build() {
     if (document.getElementById('__dck_overlay') || !document.body) return;
     const wrap = document.createElement('div');
     wrap.id = '__dck_overlay';
-    wrap.setAttribute('style', [
-      'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
-      'width:270px', 'background:#111', 'color:#fff', 'padding:12px 12px 10px',
-      'border-radius:10px', 'box-shadow:0 6px 24px rgba(0,0,0,.35)', 'opacity:.96',
-      'font:13px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif',
-    ].join(';'));
-    const field = 'width:100%;box-sizing:border-box;margin:4px 0;padding:6px 8px;border:1px solid #444;border-radius:6px;background:#1c1c1c;color:#fff;font:12px sans-serif';
+    wrap.setAttribute('style', 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:center;gap:10px;background:#111;color:#fff;padding:9px 10px 9px 14px;border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.42);font:13px/1.3 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:92vw');
     wrap.innerHTML =
-      '<div style="font-weight:600;margin-bottom:6px">📸 Guided Capture</div>' +
-      '<label style="font-size:11px;color:#aaa">Page slug</label>' +
-      '<input id="__dck_page" style="' + field + '" value="' + String(defaultPage || '').replace(/"/g, '&quot;') + '">' +
-      '<label style="font-size:11px;color:#aaa">State name</label>' +
-      '<input id="__dck_state" style="' + field + '" placeholder="e.g. fee-advance">' +
-      '<label style="font-size:11px;color:#aaa">Reached by (optional)</label>' +
-      '<input id="__dck_note" style="' + field + '" placeholder="e.g. Balances → Fee Advance tab">' +
-      '<button id="__dck_btn" style="width:100%;margin-top:8px;padding:7px;border:0;border-radius:6px;background:#2f6fed;color:#fff;font-weight:600;cursor:pointer">📸 Capture this state</button>' +
-      '<div id="__dck_status" style="font-size:11px;color:#9fd39f;margin-top:6px;min-height:14px"></div>';
+      '<span id="__dck_dot" style="width:9px;height:9px;border-radius:50%;background:#888;flex:none"></span>' +
+      '<span id="__dck_status" style="white-space:nowrap;max-width:44vw;overflow:hidden;text-overflow:ellipsis">…</span>' +
+      '<input id="__dck_state" placeholder="state name" style="display:none;width:140px;padding:6px 9px;border:1px solid #444;border-radius:999px;background:#1c1c1c;color:#fff;font:12px sans-serif">' +
+      '<button id="__dck_btn" style="flex:none;padding:7px 15px;border:0;border-radius:999px;background:#2f6fed;color:#fff;font-weight:600;cursor:pointer">📸 Capture</button>';
     document.body.appendChild(wrap);
-    const btn = wrap.querySelector('#__dck_btn');
-    const statusEl = wrap.querySelector('#__dck_status');
-    if (window.__dckLast) statusEl.textContent = window.__dckLast;
+    const dot = wrap.querySelector('#__dck_dot'), statusEl = wrap.querySelector('#__dck_status');
+    const stateInput = wrap.querySelector('#__dck_state'), btn = wrap.querySelector('#__dck_btn');
+    let cur = { slug: '', captured: false, at: null }, userEdited = false;
+    stateInput.addEventListener('input', () => { userEdited = true; });
+    async function refresh() {
+      let info; try { info = await window.__dckStatus(location.href); } catch { return; }
+      if (!info) return;
+      cur = info;
+      if (info.captured) {
+        dot.style.background = '#4ac36a'; statusEl.style.color = '#d4ecd9';
+        statusEl.textContent = `✓ "${info.slug}" captured ${info.at} — Capture adds a state`;
+        stateInput.style.display = '';
+        if (!userEdited) stateInput.value = detectState();
+      } else {
+        dot.style.background = '#ff5252'; statusEl.style.color = '#ffd5d5';
+        statusEl.textContent = `✦ NEW — "${info.slug}" has never been captured`;
+        stateInput.style.display = 'none';
+      }
+    }
     btn.addEventListener('click', async () => {
-      const pageSlug = wrap.querySelector('#__dck_page').value.trim();
-      const state = wrap.querySelector('#__dck_state').value.trim();
-      const note = wrap.querySelector('#__dck_note').value.trim();
-      if (!state) { statusEl.style.color = '#e6a'; statusEl.textContent = 'name the state first'; return; }
-      btn.disabled = true; statusEl.style.color = '#ccc'; statusEl.textContent = 'capturing…';
+      btn.disabled = true; statusEl.textContent = 'capturing…';
       try {
-        const r = await window.__dckCapture({ page: pageSlug, state, note });
-        // (the overlay is typically remounted by the handler; this is a fallback if it wasn't)
-        statusEl.style.color = r && r.ok ? '#9fd39f' : '#e6a';
-        statusEl.textContent = r && r.ok ? ('✓ saved "' + state + '"') : ('✗ ' + ((r && r.error) || 'failed'));
-      } catch (e) { statusEl.style.color = '#e6a'; statusEl.textContent = '✗ ' + (e.message || 'failed'); }
+        const r = await window.__dckCapture({ url: location.href, state: cur.captured ? (stateInput.value.trim() || detectState()) : '' });
+        statusEl.style.color = r && r.ok ? '#d4ecd9' : '#ffb3b3';
+        statusEl.textContent = r && r.ok ? `✓ saved ${r.label || 'capture'}` : `✗ ${(r && r.error) || 'failed'}`;
+        userEdited = false;
+        setTimeout(refresh, 1000);
+      } catch (e) { statusEl.style.color = '#ffb3b3'; statusEl.textContent = '✗ ' + (e.message || 'failed'); }
       btn.disabled = false;
     });
+    refresh();
+    let last = location.href;
+    setInterval(() => { if (location.href !== last) { last = location.href; userEdited = false; refresh(); } }, 700);
+    window.__dckRefresh = refresh;
   }
   window.__dckMount = () => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); build(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
@@ -516,15 +539,15 @@ if (require.main === module) (async () => {
   if (GUIDED) {
     const OUT_DIR = path.join(KIT_DIR, 'design-context');
     fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
-    if (!START_URL) { console.error('Usage: node capture.js --guided --url <startUrl> [--page <slug>] [--profile default]'); process.exit(1); }
+    if (!START_URL) { console.error('Usage: node capture.js --guided --url <startUrl> [--profile default]'); process.exit(1); }
     if (!fs.existsSync(PROFILE_DIR)) {
       console.error(`\n❌  Guided capture needs your logged-in profile.\n   Run first: node tools/login.js --url ${START_URL}\n`);
       process.exit(1);
     }
     console.log(`\n🚀 Guided capture — ${START_URL}`);
-    console.log(`   A browser opens on your logged-in session. Drive to each state you want`);
-    console.log(`   (click a tab, step through a wizard), then click "📸 Capture this state".`);
-    console.log(`   Close the window when you're done.\n`);
+    console.log(`   A browser opens on your logged-in session. A pill sits at the bottom:`);
+    console.log(`   it turns red on a URL never captured, green (with the time) on one already in`);
+    console.log(`   the library. Drive to any state and click 📸 Capture. Close the window when done.\n`);
     let gctx;
     try {
       gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
@@ -535,31 +558,48 @@ if (require.main === module) (async () => {
       }
       throw e;
     }
+    const formatWhen = (iso) => { try { return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch { return iso || ''; } };
+    // Seed the URL-awareness index from what's already captured (slug → when).
+    const capturedIndex = new Map();
+    { const pdir = path.join(OUT_DIR, 'pages');
+      if (fs.existsSync(pdir)) for (const s of fs.readdirSync(pdir)) {
+        const mp = path.join(pdir, s, 'meta.json');
+        if (fs.existsSync(mp)) { try { capturedIndex.set(s, formatWhen(JSON.parse(fs.readFileSync(mp, 'utf8')).capturedAt)); } catch (_) {} }
+      } }
     const captures = [];
+    // URL-awareness: the overlay asks this on every navigation → red (new) vs green (seen, + when).
+    await gctx.exposeBinding('__dckStatus', async (source, url) => {
+      const slug = slugFor(url, url);
+      return { slug, captured: capturedIndex.has(slug), at: capturedIndex.get(slug) || null };
+    });
     await gctx.exposeBinding('__dckCapture', async (source, payload) => {
       const pageObj = source.page;
-      const pslug = String(payload.page || GUIDED_PAGE || slugFor(pageObj.url(), pageObj.url())).trim();
+      const url = pageObj.url();
+      const slug = slugFor(url, url);                 // page slug auto-derived from the URL (no field to fill)
+      const isNew = !capturedIndex.has(slug);
       const sname = String(payload.state || '').trim();
-      if (!pslug) return { ok: false, error: 'page slug missing' };
-      if (!sname) return { ok: false, error: 'name the state first' };
-      const safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'state';
+      // New URL → capture as a PAGE. Already-captured URL → this is a variant, capture as a STATE (needs a name).
+      if (!isNew && !sname) return { ok: false, error: 'name the state (this URL is already captured)' };
+      const safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+      const label = isNew ? slug : `${slug} › ${sname}`;
+      const meta = isNew
+        ? { slug, label: null, method: 'guided', reachedBy: `guided capture — ${url}`, pattern: routePattern(url) }
+        : { slug, subdir: path.join(slug, 'states', safeName || 'state'), label: sname, method: 'guided', reachedBy: `${new URL(url).pathname} · state: ${sname}`, pattern: routePattern(url) };
       try {
         await pageObj.evaluate(() => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); }); // keep the overlay out of the snapshot
-        const r = await writeSnapshot(pageObj, gctx, pageObj.url(),
-          { slug: pslug, subdir: path.join(pslug, 'states', safeName), label: sname, method: 'guided', reachedBy: payload.note || null, pattern: routePattern(pageObj.url()) },
-          OUT_DIR);
-        const msg = r.status === 'ok' ? `✓ saved "${sname}" (${r.sizeKb} KB)` : `✗ ${r.status}`;
-        await pageObj.evaluate((m) => { window.__dckLast = m; if (window.__dckMount) window.__dckMount(); }, msg).catch(() => {});
-        if (r.status !== 'ok') { console.log(`  ✗ ${pslug} › ${sname}: ${r.status}`); return { ok: false, error: r.status }; }
-        captures.push({ page: pslug, state: sname, url: pageObj.url() });
-        console.log(`  ✓ ${pslug} › ${sname}  (${r.sizeKb} KB)`);
-        return { ok: true, sizeKb: r.sizeKb };
+        const r = await writeSnapshot(pageObj, gctx, url, meta, OUT_DIR);
+        // Update the index BEFORE remounting, so the remounted pill's status reflects this capture (green + now).
+        if (r.status === 'ok') { capturedIndex.set(slug, formatWhen(new Date().toISOString())); captures.push({ slug, state: sname || null, url }); }
+        await pageObj.evaluate(() => { if (window.__dckMount) window.__dckMount(); }).catch(() => {});
+        if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); return { ok: false, error: r.status }; }
+        console.log(`  ✓ ${label}  (${r.sizeKb} KB)`);
+        return { ok: true, label, sizeKb: r.sizeKb };
       } catch (e) {
-        console.log(`  ✗ ${pslug} › ${sname}: ${e.message.split('\n')[0]}`);
+        console.log(`  ✗ ${label}: ${e.message.split('\n')[0]}`);
         return { ok: false, error: e.message.split('\n')[0] };
       }
     });
-    await gctx.addInitScript(guidedOverlayInjector, GUIDED_PAGE || '');
+    await gctx.addInitScript(guidedOverlayInjector);
     const gp = gctx.pages()[0] || await gctx.newPage();
     await gp.goto(START_URL, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await new Promise((resolve) => gctx.on('close', resolve));
