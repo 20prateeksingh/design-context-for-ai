@@ -4,13 +4,15 @@ Turn the product you design for into **ready-made context for your AI tools** �
 
 Built for designers. You don't write code — you talk to your AI assistant and it drives the tools in here.
 
+**Fastest start with Claude Code:** open it and paste — *"Set up the design context kit from https://github.com/20prateeksingh/design-context-for-ai in a new folder."*
+
 ## Start here
 
 1. **Copy this repo's contents** into a folder named after your product (e.g. `acme-dashboard/`). One workspace = one product.
 2. **Run `tools/start.sh`** (double-click it, or run it in a terminal — or just ask your AI assistant to run it). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand.
 3. **Follow the dashboard.** It asks three things — your product's URL, whether you sign in to use it, and what kind of product it is — then captures. If you sign in, it opens a browser window for you to log in (**your password stays in that window, never in the AI or any file**) and continues on its own when you close it. You watch the capture happen live; you never touch the terminal.
-4. When it's done, the dashboard becomes your product as an interactive **map** (Overview · Map · Tokens): every captured page a node, every *discovered-but-not-downloaded* page greyed out on the frontier. Click a grey node to download it; click a captured page to add **state URLs** (empty, error, filtered…). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
-5. Ask your AI assistant to **"describe the library"** (it writes a guide for each page), then **"wireframe on ‹page›"** to start designing on a captured page.
+4. When it's done, the dashboard **Home** is your product as a **page atlas** — every captured page as a screenshot card — with a running **ledger** (the journal) down the side and a **context-readiness** score up top. Tabs: **Home · Map · Design language · Use it**, plus the **Journal**. The **Map** plots every page by real clicks-from-home, sized by how linked-to it is, with undownloaded pages as ghosts in the fog; click a ghost to download it, click a captured page for its full doc (screenshot, states, description, link graph, history). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
+5. The ledger's top **"next"** slot tells you the one move that matters — first it's **"Give your AI this toolkit"** (copy one prompt; your AI describes every page and the captions light up), then **"Make your first thing"** (wireframe a real page, or design something new in the product's own language from the **Use it** tab).
 
 Prefer the terminal, or driving it via your AI agent?
 

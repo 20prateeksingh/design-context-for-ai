@@ -45,21 +45,50 @@
               border-radius:8px; padding:6px 11px; display:none; transition:border-color .2s; }
   #recapbtn:hover { border-color:var(--primary); }
   /* onboarding: the tabs and their chrome don't exist yet — hide until the library does */
-  #shell.onboarding .tabs, #shell.onboarding .pill, #shell.onboarding #capbtn, #shell.onboarding #recapbtn { display:none; }
+  #shell.onboarding .tabs, #shell.onboarding .pill, #shell.onboarding .rchip, #shell.onboarding #capbtn, #shell.onboarding #recapbtn { display:none; }
+  #shell.onboarding #readypop { display:none; }
 
   /* ── tab panes ── */
   .pane { position:fixed; inset:52px 0 0 0; display:none; }
   .pane.active { display:block; }
   .scrollpane { overflow-y:auto; padding:22px clamp(16px,4vw,44px) 60px; }
 
-  /* ── map pane ── */
-  #canvas { position:absolute; inset:0; cursor:grab; }
-  #maplegend { position:absolute; bottom:12px; left:16px; font-size:11px; color:var(--dim); z-index:4; }
-  #maplegend span { margin-right:14px; }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
-  #fitbtn { position:absolute; bottom:12px; right:16px; z-index:4; display:flex; align-items:center; gap:6px;
-            font-size:12px; background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:5px 11px; }
-  #fitbtn svg { width:12px; height:12px; }
+  /* ── map pane: M22 orbital under fog ── */
+  #pane-map { background:#FCFDFE; overflow:hidden; }
+  #mapworld { position:absolute; inset:0; }
+  #maplines { position:absolute; inset:0; z-index:1; pointer-events:none; }
+  .mapring { position:absolute; border:1.5px dashed var(--line); border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; }
+  .maprlbl { position:absolute; transform:translate(-50%,-50%); font-size:9.5px; color:#C0C6D2; text-transform:uppercase; letter-spacing:.6px; background:#FCFDFE; padding:0 5px; pointer-events:none; z-index:2; }
+  .maphomelbl { position:absolute; transform:translate(-50%,0); text-align:center; font-size:12px; font-weight:650; color:var(--txt); z-index:3; pointer-events:none; white-space:nowrap; }
+  .maphomelbl small { display:block; font-weight:400; font-size:9.5px; color:var(--dim); }
+  .mapnode { position:absolute; transform:translate(-50%,-50%); border-radius:50%; border:2.5px solid var(--primary);
+             background:var(--card) center/cover no-repeat; z-index:3; padding:0; cursor:pointer; box-shadow:0 1px 3px rgba(16,24,40,.12); }
+  .mapnode:hover { box-shadow:0 0 0 4px rgba(79,70,229,.18); }
+  .mapnode.tpl { border-color:var(--tpl); }
+  .mapnode.dorm { border-color:#C9CDD6; }
+  .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--panel); }
+  .mapnlbl { position:absolute; transform:translate(-50%,0); text-align:center; font-size:10px; color:var(--txt); z-index:3; pointer-events:none;
+             background:rgba(252,253,254,.82); border-radius:4px; padding:0 3px; white-space:nowrap; }
+  .mapnlbl small { color:var(--dim); font-size:9px; }
+  .mapghost { position:absolute; transform:translate(-50%,-50%); z-index:5; text-align:center; cursor:pointer; background:none; border:0; padding:0; }
+  .mapghost .gc { display:block; margin:0 auto; border:2px dashed #AEB4C0; border-radius:50%; background:rgba(252,252,253,.7); }
+  .mapghost b { font-size:9.5px; color:#8A909C; display:block; margin-top:3px; font-weight:600; }
+  .mapghost small { font-size:8px; color:#AEB4C0; display:block; }
+  .mapfog { position:absolute; inset:0; z-index:4; pointer-events:none; }
+  .mapdistrict { position:absolute; transform:translate(-50%,-50%); z-index:6; background:rgba(255,255,255,.97); border:1px solid var(--line);
+                 border-radius:10px; padding:8px 12px; min-width:150px; box-shadow:0 2px 10px rgba(16,24,40,.07); pointer-events:none; }
+  .mapdistrict h4 { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); margin-bottom:2px; }
+  .mapdistrict p { font-size:9.5px; color:var(--dim); }
+  .mapdistrict .bar { height:4px; background:var(--bg); border:1px solid var(--line); border-radius:2px; margin-top:5px; overflow:hidden; }
+  .mapdistrict .bar i { display:block; height:100%; background:var(--dim); }
+  #mapnote { position:absolute; top:14px; left:16px; font-size:10.5px; color:var(--dim); font-style:italic; z-index:7; max-width:44%; }
+  #mapstats { position:absolute; left:16px; bottom:14px; background:rgba(255,255,255,.97); border:1px solid var(--line); border-radius:10px;
+              padding:9px 14px; font-size:11px; color:var(--dim); z-index:7; max-width:62%; }
+  #mapstats b { color:var(--txt); }
+  #maplegend { position:absolute; top:14px; right:16px; background:rgba(255,255,255,.97); border:1px solid var(--line); border-radius:10px;
+               padding:10px 12px; font-size:10.5px; color:var(--dim); display:flex; flex-direction:column; gap:6px; z-index:7; }
+  .lg { display:flex; gap:7px; align-items:center; }
+  .lg i { flex:none; display:inline-block; }
 
   /* ── detail panel (map) ── */
   #panel { position:fixed; top:52px; right:0; bottom:0; width:364px; background:var(--panel); border-left:1px solid var(--line);
@@ -193,39 +222,165 @@
   .bundle-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .bundle-row select { background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; color:var(--txt); max-width:100%; }
   .mode code { font-family:var(--mono); font-size:12px; background:#EEF1F6; border-radius:4px; padding:0 4px; }
+
+  /* ── dashboard v2 ── */
+  .hatch { background:repeating-linear-gradient(45deg,#EEF1F6,#EEF1F6 6px,#F8FAFC 6px,#F8FAFC 12px); }
+
+  /* readiness chip + breakdown popover */
+  .rchip { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--txt); background:var(--bg);
+           border:1px solid var(--line); border-radius:20px; padding:3px 12px 3px 5px; white-space:nowrap; }
+  .rchip:hover { border-color:var(--primary); }
+  .rring { width:20px; height:20px; border-radius:50%; flex:none; position:relative;
+           background:conic-gradient(var(--primary) calc(var(--pct,0)*1%), var(--line) 0); }
+  .rring::after { content:""; position:absolute; inset:3px; background:var(--panel); border-radius:50%; }
+  .rchip.quiet .rring { background:conic-gradient(var(--ok) calc(var(--pct,0)*1%), var(--line) 0); }
+  #readypop { position:absolute; top:48px; right:14px; width:308px; background:var(--panel); border:1px solid var(--line);
+              border-radius:12px; box-shadow:0 12px 34px rgba(16,24,40,.16); padding:14px 16px; z-index:40; display:none; }
+  #readypop.open { display:block; }
+  #readypop h4 { font-size:13px; margin-bottom:2px; }
+  #readypop .pnote { font-size:11px; color:var(--dim); margin-bottom:10px; }
+  .rcomp { margin:9px 0; }
+  .rcomp .rlab { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+  .rcomp .rlab b { font-family:var(--mono); color:var(--dim); font-weight:500; }
+  .rcomp .rbar { height:6px; background:var(--bg); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .rcomp .rbar i { display:block; height:100%; background:var(--primary); }
+  .rcomp .rdet { font-size:10.5px; color:var(--dim); margin-top:3px; }
+  .jpill.on { background:#EEF1F6; color:var(--txt); border-color:var(--primary); }
+
+  /* home: identity + atlas + ledger */
+  .ident { display:flex; gap:14px; align-items:center; margin-bottom:18px; }
+  .ident .logo { width:44px; height:44px; border:1px solid var(--line); border-radius:10px; flex:none; object-fit:contain; background:var(--card); }
+  .ident .who b { font-size:16px; }
+  .ident .who .desc { display:flex; align-items:baseline; gap:8px; font-size:12px; color:var(--dim); max-width:560px; margin-top:3px; }
+  .ident .facts { margin-left:auto; display:flex; gap:22px; text-align:right; flex-wrap:wrap; }
+  .ident .facts .fv { font-family:var(--mono); font-size:16px; font-weight:600; }
+  .ident .facts .fl { font-size:10px; color:var(--dim); }
+  .homecols { display:flex; gap:20px; align-items:flex-start; }
+  .gridwrap { flex:1; min-width:0; }
+  .rail { width:340px; flex:none; }
+  @media (max-width:1080px){ .homecols { flex-direction:column; } .rail { width:100%; } }
+  .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .filt { font-size:12px; color:var(--dim); background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:4px 11px; }
+  .filt.on { background:#EEF1F6; color:var(--txt); border-color:var(--primary); }
+  .atlas { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:13px; }
+  .pg { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--card); position:relative;
+        text-align:left; box-shadow:0 1px 2px rgba(16,24,40,.04); transition:border-color .15s; display:block; width:100%; color:inherit; }
+  .pg:hover { border-color:var(--primary); }
+  .pg .shot { height:116px; border-bottom:1px solid var(--line); display:block; object-fit:cover; object-position:top; width:100%; background:#F5F7FA; }
+  .pg .m { padding:9px 11px; }
+  .pg .nm { font-size:12.5px; font-weight:600; color:var(--txt); display:block; }
+  .pg .rt { font-family:var(--mono); font-size:10px; color:var(--dim); display:block; margin:2px 0 6px; word-break:break-all; }
+  .pg .cap { font-size:11.5px; color:var(--dim); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .pg .cap.dorm { color:#98A2B3; font-style:italic; }
+  .pg .count { position:absolute; top:8px; right:8px; font-size:10px; font-family:var(--mono); background:rgba(255,255,255,.94);
+               border:1px solid var(--line); border-radius:20px; padding:1px 8px; color:var(--tpl); }
+  .pg.locked { border-style:dashed; background:#FCFCFD; }
+  .pg.locked .shot { display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:11px; border-bottom:1px dashed var(--line); text-align:center; padding:0 10px; }
+  .pg.locked .nm { color:var(--dim); }
+  .pg.locked .unlock { display:inline-block; margin-top:4px; font-size:10.5px; color:var(--txt); border:1px solid var(--line); border-radius:20px; padding:2px 9px; }
+
+  /* ledger (shared: home rail + journal) */
+  .railh { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); font-weight:650; margin-bottom:12px; }
+  .led { position:relative; padding-left:22px; }
+  .led:before { content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background:var(--line); }
+  .ent { position:relative; border:1px solid var(--line); border-radius:10px; padding:11px 13px; margin-bottom:10px; background:var(--card); }
+  .ent:before { content:""; position:absolute; left:-21px; top:15px; width:9px; height:9px; border-radius:50%; background:var(--dim); border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); }
+  .ent .emeta { font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+  .ent .etitle { font-size:12px; font-weight:600; color:var(--txt); display:block; margin-bottom:2px; }
+  .ent .edetail { font-size:11px; color:var(--dim); }
+  .ent .elink { display:inline-block; margin-top:6px; font-size:11px; background:none; border:0; padding:0; color:var(--primary-strong); cursor:pointer; text-decoration:underline; }
+  .ent.hero { border:2px solid var(--primary); background:rgba(79,70,229,.04); padding:14px; }
+  .ent.hero:before { background:var(--panel); border:3px solid var(--primary); }
+  .ent.hero .etitle { font-size:14px; }
+  .ent.hero .edetail { font-size:12px; margin-bottom:10px; }
+  .ent.quiet { border-color:#BBE3C8; background:rgba(21,128,61,.05); }
+  .ent.quiet:before { border-color:var(--ok); }
+  .ent.future { border-style:dashed; background:#FCFCFD; }
+  .ent.future:before { background:var(--panel); border:2px dashed var(--line); }
+  .ent.future .etitle { color:var(--dim); }
+  .ent .thumbs { display:flex; gap:8px; margin-top:9px; }
+  .ent .thumbs img, .ent .thumbs i { width:64px; height:40px; border:1px solid var(--line); border-radius:4px; object-fit:cover; object-position:top; display:block; }
+  .railfoot { font-size:10.5px; color:var(--dim); padding:8px 0 0 22px; }
+
+  /* journal (full page) */
+  .jwrap { max-width:940px; margin:0 auto; }
+  .jhead { display:flex; align-items:flex-start; gap:14px; margin-bottom:20px; }
+  .jhead h1 { font-size:19px; }
+  .jhead p { font-size:12px; color:var(--dim); margin-top:3px; }
+  .jfilters { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .jday { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--dim); margin:4px 0 10px -22px; }
+
+  /* page doc */
+  .pgdoc { max-width:1120px; margin:0 auto; }
+  .crumb { font-size:12px; color:var(--dim); margin-bottom:14px; }
+  .crumb .lnk { background:none; border:0; padding:0; color:var(--primary-strong); cursor:pointer; }
+  .pgdoc .dhd { display:flex; align-items:baseline; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .pgdoc .dhd h1 { font-size:20px; }
+  .pgdoc .dhd .rt { font-family:var(--mono); font-size:12px; color:var(--dim); }
+  .pgdoc .dhd .acts { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .dcols { display:flex; gap:20px; align-items:flex-start; }
+  .dleft { flex:1.5; min-width:0; }
+  .dright { flex:1; min-width:260px; }
+  .dshot { width:100%; border:1px solid var(--line); border-radius:10px; display:block; }
+  .dright .card { margin-bottom:14px; }
+  .kv { display:flex; justify-content:space-between; font-size:12px; color:var(--txt); padding:5px 0; border-top:1px solid var(--line); }
+  .kv span:last-child { color:var(--dim); font-family:var(--mono); }
+  .strip { display:flex; gap:10px; flex-wrap:wrap; }
+  .stt { text-align:center; font-size:11px; color:var(--dim); }
+  .stt img, .stt .ph { display:block; width:150px; height:92px; border:1px solid var(--line); border-radius:6px; margin-bottom:4px; object-fit:cover; object-position:top; }
+  .stt.on img, .stt.on .ph { border:2px solid var(--primary); }
+  .stt.add .ph { border:1.5px dashed var(--line); display:flex; align-items:center; justify-content:center; color:var(--dim); }
+  .lchips { display:flex; gap:6px; flex-wrap:wrap; }
+  .lc { border:1px solid var(--line); border-radius:20px; padding:3px 10px; font-size:11px; color:var(--dim); background:none; cursor:pointer; }
+  .lc:hover { border-color:var(--primary); }
+  .hist { position:relative; padding-left:18px; }
+  .hist:before { content:""; position:absolute; left:4px; top:5px; bottom:5px; width:2px; background:var(--line); }
+  .hi { position:relative; font-size:12px; color:var(--txt); padding:5px 0; }
+  .hi:before { content:""; position:absolute; left:-16px; top:10px; width:7px; height:7px; border-radius:50%; background:var(--dim); }
+  .hi small { display:block; color:var(--dim); font-size:10px; }
+  .dormcard { border:1px dashed var(--line); border-radius:10px; padding:18px; background:#FCFCFD; }
+  .dormcard h3 { color:var(--dim); font-size:14px; text-transform:none; letter-spacing:0; margin-bottom:5px; }
+  .dormcard p { font-size:12px; color:var(--dim); max-width:640px; margin-bottom:12px; }
+  .dormcard .comps { display:flex; gap:10px; flex-wrap:wrap; }
+  .dormcard .comps i { width:120px; height:60px; border:1px dashed var(--line); border-radius:6px; display:block; }
+  .create { border:2px solid var(--primary); border-radius:12px; padding:18px; background:rgba(79,70,229,.04); margin-bottom:16px; display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .create .t { flex:1; min-width:280px; }
+  .create .kick { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--dim); display:block; margin-bottom:4px; }
+  .create h3 { font-size:15px; margin-bottom:4px; text-transform:none; letter-spacing:0; color:var(--txt); }
+  .create p { font-size:12px; color:var(--dim); max-width:620px; }
 </style>
 </head>
 <body>
 <div id="shell">
   <h1 id="title"></h1>
   <div class="tabs" role="tablist">
-    <button class="tab active" data-tab="overview" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Overview</button>
+    <button class="tab active" data-tab="home" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Home</button>
     <button class="tab" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
-    <button class="tab" data-tab="tokens" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><circle cx="5.5" cy="6" r="1" fill="currentColor"/><circle cx="10.5" cy="6" r="1" fill="currentColor"/><circle cx="5.8" cy="10" r="1" fill="currentColor"/><path d="M14.2 8c0 1.8-1.4 2-2.6 2s-2 .8-1.2 2.2c.6 1-.2 2-1.4 2"/></svg>Tokens</button>
+    <button class="tab" data-tab="design" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><circle cx="5.5" cy="6" r="1" fill="currentColor"/><circle cx="10.5" cy="6" r="1" fill="currentColor"/><circle cx="5.8" cy="10" r="1" fill="currentColor"/><path d="M14.2 8c0 1.8-1.4 2-2.6 2s-2 .8-1.2 2.2c.6 1-.2 2-1.4 2"/></svg>Design language</button>
     <button class="tab" data-tab="useit" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2" width="13" height="9" rx="2"/><path d="M5 11v2.6L8.2 11"/></svg>Use it</button>
   </div>
   <span class="spacer"></span>
-  <span class="pill"><b id="n-cap">0</b> unlocked</span>
-  <span class="pill"><b id="n-fro">0</b> locked</span>
-  <span class="pill" id="server-pill">static view</span>
+  <button class="rchip" id="readychip" aria-label="context readiness breakdown"><span class="rring" id="ready-ring"></span><span id="ready-label">—</span></button>
+  <button class="pill jpill" id="journalpill">Journal</button>
   <button id="recapbtn">+ Capture again</button>
   <button id="capbtn"></button>
+  <div id="readypop"></div>
 </div>
 
 <section class="pane" id="pane-map">
-  <canvas id="canvas"></canvas>
-  <div id="maplegend">
-    <span><span class="dot" style="background:var(--primary)"></span>page</span>
-    <span><span class="dot" style="background:var(--tpl)"></span>template (1 stands for many)</span>
-    <span><span class="dot" style="border:1.5px dashed var(--dim)"></span>locked — discovered, not downloaded</span>
-    <span>hover: real links · click: details</span>
-  </div>
-  <button id="fitbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>fit</button>
+  <svg id="maplines"></svg>
+  <div id="mapworld"></div>
+  <div class="mapfog" id="mapfog"></div>
+  <div id="mapnote"></div>
+  <div id="mapstats"></div>
+  <div id="maplegend"></div>
 </section>
 
-<section class="pane scrollpane active" id="pane-overview"></section>
-<section class="pane scrollpane" id="pane-tokens"></section>
+<section class="pane scrollpane active" id="pane-home"></section>
+<section class="pane scrollpane" id="pane-design"></section>
 <section class="pane scrollpane" id="pane-useit"></section>
+<section class="pane scrollpane" id="pane-journal"></section>
+<section class="pane scrollpane" id="pane-page"></section>
 <section class="pane" id="pane-onboard"></section>
 
 <div id="panel"><button class="close" onclick="closePanel()" aria-label="close">×</button><div id="panel-body"></div></div>
@@ -255,15 +410,20 @@ const PROMPTS = {
   auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
   recaptureCheck: () => "The product may have changed. Re-run `node tools/capture.js --config design-context/product.json`, then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
   bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/INDEX.md` to learn this product, and ask me what I want to work on.",
+  // A.8 (ux-copy.md — verbatim, thin-library degrade clause included)
+  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. Build it in this product's own language — reuse its real patterns, spacing, and components; work in `wireframes/new/‹concept›/round-1/`, never in `design-context/`. If the library is too thin to know this product's grammar for some part, say so plainly and mark that part as an assumption — never invent house style. Render previews with `node tools/shot.js`.",
+  askQuestion: () => "Read `design-context/registry.json` and `INDEX.md` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.",
 };
 const COPY_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.4 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.4"/></svg>';
 function pchip(label, text, ghost){ return `<button type="button" class="pchip${ghost?' ghost':''}" data-prompt="${esc(text)}">${COPY_SVG}${esc(label)}</button>`; }
 function copyPrompt(text){ if(!text) return;
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-    .then(()=>toast('Copied — paste it to your AI.'))
-    .catch(()=>{ try{ prompt('Copy this prompt:', text); }catch(_){} }); }
+    .then(()=>toast('Copied — paste it into your AI chat.'))
+    .catch(()=>{ toast('Your browser blocked the copy — the prompt is shown below to copy by hand.'); try{ prompt('Copy this prompt:', text); }catch(_){} }); }
 // one delegated handler for every chip, anywhere (works during onboarding completion too)
 document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-prompt]'); if (b) copyPrompt(b.getAttribute('data-prompt')); });
+// delegated in-dashboard navigation: any [data-goto] sets the hash → route() (below) reacts
+document.addEventListener('click', e=>{ const g = e.target.closest && e.target.closest('[data-goto]'); if (g && !g.hasAttribute('data-prompt')){ e.preventDefault(); if (window.closePanel) window.closePanel(); location.hash = g.getAttribute('data-goto'); } });
 
 // ═════════════════════════ ONBOARDING ════════════════════════════════════════
 // wizard → (login-page capture → login window) → live capture → completion.
@@ -503,27 +663,20 @@ async function onCaptureDone(info){
   if (serverMode && STATUS.capture && STATUS.capture.running){ mountOnboard(); showProgress(true); attachStream(); return; } // kill-resilience resume
   if (serverMode && STATUS.firstRun){ mountOnboard(); showWizard(); return; }
   if (DASH) initDashboard();
-  else document.getElementById('pane-overview').innerHTML =
+  else document.getElementById('pane-home').innerHTML =
     '<div class="card" style="max-width:520px;margin:8vh auto">No library captured yet. Run <code>tools/start.sh</code> and follow the on-screen setup.</div>';
 })();
 
 // ═════════════════════════ DASHBOARD (map · overview · tokens) ════════════════
 // Everything below runs only when a captured library exists.
 function initDashboard(){
-  // ── tabs ──
-  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
-    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+t.dataset.tab));
-    if (t.dataset.tab==='map'){ resize(); if (!window.__fitted){ fit(); window.__fitted=true; } }
-  });
+  // ── tabs + journal pill → hash-based routing (route()/showPane() are hoisted, defined below) ──
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ location.hash = t.dataset.tab; });
+  { const jp=document.getElementById('journalpill'); if(jp) jp.onclick=()=>{ location.hash='journal'; }; }
 
-  // ═════════ MAP TAB (coverage skill tree) ═════════
-  const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-  let W, H, DPR = devicePixelRatio || 1;
-  function resize(){ const r = canvas.parentElement.getBoundingClientRect(); W = r.width; H = r.height;
-    canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; }
-  addEventListener('resize', resize); resize();
-
+  // ═════════ MAP TAB — M22 orbital under fog ═════════
+  // Honesty invariant: every spatial encoding is MEASURED — ring = clicks-from-home (clickDepth),
+  // node size = inbound links (observed), bearing = the page's nav section. Only the fog is decorative.
   const nodes = [], byId = {};
   DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
   DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
@@ -533,139 +686,102 @@ function initDashboard(){
   document.getElementById('title').innerHTML = esc(DATA.product) + ' <span class="mono">design context</span>';
   document.title = DATA.product + ' — design context';
   const lockedTotal = DATA.frontier.reduce((s,f)=>s+(f.count||1),0);
-  document.getElementById('n-cap').textContent = DATA.nodes.length;
-  document.getElementById('n-fro').textContent = lockedTotal;
+  const root = nodes.find(n=>!n.locked && (n.id===DATA.rootSlug || n.route==='/')) || nodes.find(n=>!n.locked) || nodes[0];
 
-  const root = nodes.find(n=>!n.locked && n.route==='/') || nodes.find(n=>!n.locked) || nodes[0];
-  const children = {}; nodes.forEach(n=>children[n.id]=[]);
-  const inbound = {}; nodes.forEach(n=>inbound[n.id]=[]);
-  edges.forEach(e=>inbound[e.b].push(e.a));
-  nodes.forEach(n=>{
-    if (n===root) return;
-    let p = null;
-    if (n.locked) p = inbound[n.id].find(a=>byId[a] && !byId[a].locked) || root.id;
-    else if (adj[root.id].has(n.id)) p = root.id;
-    else p = inbound[n.id].find(a=>byId[a] && !byId[a].locked && a!==n.id) || root.id;
-    n.parent = p; children[p].push(n.id);
-  });
-  function leaves(id){ const c = children[id]; return c.length ? c.reduce((s,k)=>s+leaves(k),0) : 1; }
-  const weight = (id) => byId[id].locked ? 0.35 : 1 + 0.15*Math.min(leaves(id), 8);
-  const RING = [0, 250, 450, 610];
-  function placeLockedFan(parent, kids){
-    const span = Math.min(parent.span || Math.PI/3, Math.PI/2.8);
-    const step = 0.09, perRow = Math.max(3, Math.floor(span/step));
-    const pr = Math.hypot(parent.x, parent.y) || 1;
-    kids.forEach((k,i)=>{
-      const row = Math.floor(i/perRow), left = kids.length - row*perRow, cnt = Math.min(left, perRow);
-      const a = parent.angle + (i%perRow - (cnt-1)/2)*step;
-      const r = pr + 120 + row*58;
-      const kn = byId[k]; kn.x = Math.cos(a)*r; kn.y = Math.sin(a)*r; kn.angle = a; kn.depth = parent.depth+1; kn.span = step;
-    });
-  }
-  function place(id, a0, a1, depth){
-    const n = byId[id];
-    const mid = (a0+a1)/2, r = RING[Math.min(depth, RING.length-1)];
-    n.x = Math.cos(mid)*r; n.y = Math.sin(mid)*r; n.angle = mid; n.depth = depth; n.span = a1-a0;
-    const cap = children[id].filter(k=>!byId[k].locked), locked = children[id].filter(k=>byId[k].locked);
-    if (cap.length){
-      const total = cap.reduce((s,k)=>s+weight(k),0); let a = a0;
-      cap.forEach((k,idx)=>{ const span = (a1-a0)*weight(k)/total; byId[k].lblAlt = idx%2; place(k, a, a+span, depth+1); a += span; });
-    }
-    if (locked.length) placeLockedFan(n, locked);
-  }
-  root.x = 0; root.y = 0; root.depth = 0; root.angle = -Math.PI/2; root.span = 2*Math.PI;
-  { const kids = children[root.id];
-    const cap = kids.filter(k=>!byId[k].locked), locked = kids.filter(k=>byId[k].locked);
-    const total = kids.reduce((s,k)=>s+weight(k),0); let a = -Math.PI/2;
-    cap.concat(locked).forEach((k,idx)=>{ byId[k].lblAlt = idx%2; const span = 2*Math.PI*weight(k)/total;
-      if (byId[k].locked){ const kn=byId[k]; const mid=a+span/2; kn.x=Math.cos(mid)*(RING[1]+130); kn.y=Math.sin(mid)*(RING[1]+130); kn.angle=mid; kn.depth=1; kn.span=span; }
-      else place(k, a, a+span, 1);
-      a += span; }); }
+  const selected = new Set(); let activeNode = null;
+  const world = document.getElementById('mapworld'), fogEl = document.getElementById('mapfog'), linesEl = document.getElementById('maplines');
+  const capNodes = nodes.filter(n=>!n.locked && n!==root);
+  const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...DATA.frontier.map(f=>f.inboundCount||0));
+  const secList0 = (DATA.sections||[]).filter(s=>s!=='Home');
+  const secList = secList0.length ? secList0 : ['Other'];
+  const bearing = {}; secList.forEach((s,i)=> bearing[s] = -Math.PI/2 + (i/secList.length)*2*Math.PI);
+  const bearingOf = (s)=> bearing[s]!=null ? bearing[s] : 0;
+  const pos = {}; // id -> {x,y}
 
-  let tx=0, ty=0, scale=1, minScale=0.2;
-  function fit(){
-    const xs = nodes.map(n=>n.x), ys = nodes.map(n=>n.y);
-    const bw = Math.max(...xs)-Math.min(...xs)+300, bh = Math.max(...ys)-Math.min(...ys)+300;
-    scale = Math.min(W/bw, H/bh, 1.4); minScale = scale*0.8;
-    tx = -(Math.max(...xs)+Math.min(...xs))/2; ty = -(Math.max(...ys)+Math.min(...ys))/2;
-  }
-  document.getElementById('fitbtn').onclick = fit; // first fit happens on first Map-tab open (pane starts hidden)
-  function toScreen(x,y){ return [W/2 + (x+tx)*scale, H/2 + (y+ty)*scale]; }
-  function toWorld(px,py){ return [(px-W/2)/scale - tx, (py-H/2)/scale - ty]; }
+  function layoutMap(){
+    const pane = document.getElementById('pane-map'); const r = pane.getBoundingClientRect();
+    const W = r.width, H = r.height; if (!W || !H) return;
+    const cx = W/2, cy = H/2, minD = Math.min(W,H);
+    const maxD = Math.max(1, ...capNodes.map(n=> n.clickDepth==null ? 1 : n.clickDepth));
+    const R1 = minD*0.26, Rmax = minD*0.42;
+    const ringR = (d)=> maxD<=1 ? R1 : R1 + (d-1)*(Rmax-R1)/(maxD-1);
+    const nullR = minD*0.47, ghostR = minD*0.55;
+    // captured nodes: group by section+depth, spread within the sector wedge (wider for dense sections),
+    // and stagger radius in 3 lanes to de-cluster — no physics. Radius jitter stays under a ring gap so
+    // ring membership (the honest clicks-from-home encoding) is never blurred.
+    const groups = {}; capNodes.forEach(n=>{ const k=(n.section||'Other')+'|'+(n.clickDepth==null?'x':n.clickDepth); (groups[k]=groups[k]||[]).push(n); });
+    const gap = 2*Math.PI/secList.length;
+    const jitter = maxD<=1 ? minD*0.055 : Math.min(minD*0.03, 0.25*(Rmax-R1)/(maxD-1));
+    Object.values(groups).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
+      const w = gap*Math.min(0.9, 0.32 + 0.10*g.length);
+      g.forEach((n,i)=>{ const b=bearingOf(n.section); const off = g.length>1 ? (i-(g.length-1)/2)*(w/g.length) : 0;
+        const lane = (i%3)-1;
+        n._a = b+off; n._r = (n.clickDepth==null ? nullR : ringR(n.clickDepth)) + lane*jitter; n._crowded = g.length>6; }); });
+    // ghosts: top-K by inbound, placed in the fog at their section bearing
+    const ghosts = DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
+    const shown = ghosts.slice(0, Math.min(ghosts.length,14));
+    const gg = {}; shown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
+    Object.values(gg).forEach(g=>{ g.forEach((f,i)=>{ const b=bearingOf(f.section); f._a = b + (i-(g.length-1)/2)*0.16; f._r = ghostR + (i%2)*minD*0.045; }); });
 
-  const selected = new Set();
-  let activeNode=null, hoverNode=null, dragNode=null;
-  const isNeighbor = (n) => { const f = hoverNode||activeNode; if (!f) return true; return n===f || adj[f.id].has(n.id); };
+    let html = '';
+    for (let d=1; d<=maxD; d++){ const rr=ringR(d);
+      html += `<div class="mapring" style="left:${cx}px;top:${cy}px;width:${rr*2}px;height:${rr*2}px"></div>`;
+      html += `<div class="maprlbl" style="left:${cx+rr}px;top:${cy}px">${d} click${d===1?'':'s'}</div>`; }
+    // home (the sun — carries the logo/screenshot)
+    const homeD = Math.max(58, minD*0.10);
+    html += `<button class="mapnode" data-mapid="${esc(root.id)}" title="${esc(root.label||root.id)}" style="left:${cx}px;top:${cy}px;width:${homeD}px;height:${homeD}px;border-width:3px;border-color:var(--primary-strong);${root.screenshot?`background-image:url('${esc(root.screenshot)}')`:''}"></button>`;
+    html += `<div class="maphomelbl" style="left:${cx}px;top:${cy+homeD/2+6}px">${esc(root.label||root.id)}<small>${root.inboundCount||0} links in · ${(root.linksTo||[]).length} out</small></div>`;
+    pos[root.id] = {x:cx,y:cy};
+    // captured nodes
+    capNodes.forEach(n=>{ const x=cx+Math.cos(n._a)*n._r, y=cy+Math.sin(n._a)*n._r; pos[n.id]={x,y};
+      const sz = Math.round(16 + 46*Math.min(1,(n.inboundCount||0)/maxIn));
+      const hasStates = (n.states||[]).some(s=>s.captured);
+      html += `<button class="mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}" data-mapid="${esc(n.id)}" title="${esc(n.label||n.id)} — from ${n.inboundCount||0}" style="left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;${n.screenshot?`background-image:url('${esc(n.screenshot)}')`:''}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`;
+      if (!n._crowded) html += `<div class="mapnlbl" style="left:${x}px;top:${y+sz/2+3}px">${esc(short(n.label||n.id,18))}<br><small>from ${n.inboundCount||0}${n.clickDepth==null?' · not linked from home':''}</small></div>`; });
+    // ghosts in the fog, sized by inbound-from-captured
+    shown.forEach(f=>{ const x=cx+Math.cos(f._a)*f._r, y=cy+Math.sin(f._a)*f._r; pos[f.id]={x,y};
+      const gs = Math.round(12 + 18*Math.min(1,(f.inboundCount||1)/maxIn));
+      html += `<button class="mapghost" data-mapid="${esc(f.id)}" style="left:${x}px;top:${y}px"><span class="gc" style="width:${gs}px;height:${gs}px"></span><b>${esc(short(f.pattern||f.label||'',16))}</b><small>from ${f.inboundCount||f.count||1}</small></button>`; });
+    // deep-fog label for the template-covered overflow
+    const shownLocked = shown.reduce((s,f)=>s+(f.count||1),0); const deep = Math.max(0, lockedTotal-shownLocked);
+    if (deep>0) html += `<div style="position:absolute;left:${Math.min(W-90,cx+minD*0.44)}px;top:${Math.max(60,cy-minD*0.30)}px;transform:translate(-50%,-50%);z-index:6;text-align:center;font-size:10.5px;color:#AEB4C0;text-transform:uppercase;letter-spacing:1px">deep fog<span style="display:block;text-transform:none;letter-spacing:0;font-size:9px;margin-top:3px">…${deep} more pages —<br>the templates already stand for most</span></div>`;
+    // district summary cards (functional read) — top sections by explored, floating above the fog.
+    // stacked on the edge matching each section's bearing side, so they never occlude the orbits.
+    const dcards=(DATA.districts||[]).slice().sort((a,b)=>b.explored-a.explored).slice(0,6);
+    let rN=0, lN=0;
+    dcards.forEach(dst=>{ const b=bearingOf(dst.name); const right=Math.cos(b)>=0;
+      const dx = right ? W-118 : 118, dy = 185 + (right?rN++:lN++)*92;
+      const tot=dst.explored+dst.fog, pct=tot?Math.round(100*dst.explored/tot):0;
+      html += `<div class="mapdistrict" style="left:${dx}px;top:${dy}px;transform:translate(-50%,0)"><h4>${esc(dst.name)}</h4>
+        <p>${dst.explored} explored · ${dst.fog} in the fog${dst.states?` · ${dst.states} ${dst.states===1?'page has':'pages have'} states`:''}</p>
+        <div class="bar"><i style="width:${pct}%"></i></div></div>`; });
+    world.innerHTML = html;
 
-  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); }
-  function drawLabel(x,y,text,color,size){
-    ctx.font = `${size}px ${'system-ui'}`; const w = ctx.measureText(text).width;
-    ctx.fillStyle='rgba(248,250,252,.92)'; roundRect(x-w/2-5, y-size+2, w+10, size+7, 4); ctx.fill();
-    ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text, x, y+3);
+    // fog: clear over the explored orbits, thick past them (pure CSS radial-gradient — the only decorative encoding)
+    const clear=minD*0.46, mid=minD*0.55, opaque=minD*0.68;
+    fogEl.style.background = `radial-gradient(circle at ${cx}px ${cy}px, rgba(240,243,247,0) ${clear}px, rgba(223,229,239,.60) ${mid}px, rgba(216,223,235,.93) ${opaque}px, rgba(214,221,233,1) ${opaque+60}px)`;
+    linesEl.setAttribute('viewBox',`0 0 ${W} ${H}`); linesEl.setAttribute('width',W); linesEl.setAttribute('height',H); linesEl.innerHTML='';
+    // overlays
+    const explored = capNodes.length+1, known = explored+lockedTotal;
+    const pct = known ? 100*explored/known : 0;
+    document.getElementById('mapstats').innerHTML = `<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home · every unlock pushes the fog back`;
+    document.getElementById('mapnote').textContent = 'rings = how many clicks from home · hover a page for its real links · every unlock pushes the fog back';
+    document.getElementById('maplegend').innerHTML =
+      `<span class="lg"><i style="width:14px;height:14px;border:2.5px solid var(--primary);border-radius:50%"></i>explored — size = how linked-to</span>
+       <span class="lg"><i style="width:11px;height:11px;border:2px solid #C9CDD6;border-radius:50%"></i>explored, dormant caption</span>
+       <span class="lg"><i style="width:11px;height:11px;border:2px dashed #AEB4C0;border-radius:50%"></i>ghost in the fog — locked</span>`;
   }
-  function draw(){
-    ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
-    const focus = hoverNode||activeNode;
-    nodes.forEach(n=>{ if (n===root || !n.parent) return; const p = byId[n.parent];
-      const [x1,y1]=toScreen(p.x,p.y), [x2,y2]=toScreen(n.x,n.y);
-      ctx.beginPath(); ctx.setLineDash(n.locked?[3,4]:[]);
-      const dimmed = focus && !(isNeighbor(n)&&isNeighbor(p)) && n!==focus && p!==focus;
-      ctx.strokeStyle = dimmed ? 'rgba(102,112,133,.06)' : n.locked ? 'rgba(102,112,133,.20)' : 'rgba(79,70,229,.22)';
-      ctx.lineWidth = 1.2;
-      const mx=(x1+x2)/2, my=(y1+y2)/2, cx=W/2+tx*scale, cy=H/2+ty*scale;
-      ctx.moveTo(x1,y1); ctx.quadraticCurveTo(mx+(mx-cx)*0.08, my+(my-cy)*0.08, x2, y2); ctx.stroke(); ctx.setLineDash([]);
-    });
-    if (focus) edges.forEach(e=>{ if (e.a!==focus.id && e.b!==focus.id) return;
-      const a=byId[e.a], b=byId[e.b]; const [x1,y1]=toScreen(a.x,a.y), [x2,y2]=toScreen(b.x,b.y);
-      ctx.beginPath(); ctx.setLineDash(e.kind==='frontier'?[3,4]:[]);
-      ctx.strokeStyle='rgba(79,70,229,.55)'; ctx.lineWidth=1.6;
-      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]); });
-    nodes.forEach(n=>{
-      const [x,y]=toScreen(n.x,n.y);
-      const dimmed = focus && !isNeighbor(n);
-      ctx.globalAlpha = dimmed ? 0.22 : 1;
-      if (n.locked){
-        const r = (n.kind==='frontier-group'? Math.min(7+Math.log2(n.count+1)*2.4,15) : 6)*Math.min(scale,1.15);
-        ctx.beginPath(); ctx.arc(x,y,Math.max(r,3),0,7);
-        ctx.fillStyle='rgba(152,162,179,.15)'; ctx.fill();
-        ctx.setLineDash([3,3]); ctx.strokeStyle = n.someSelected ? '#B45309' : '#98A2B3'; ctx.lineWidth = n.someSelected?2:1.2; ctx.stroke(); ctx.setLineDash([]);
-        if (n.kind==='frontier-group'){ ctx.fillStyle='#667085'; ctx.font=`${Math.max(9,9*scale)}px ui-monospace,monospace`; ctx.textAlign='center'; ctx.fillText(n.count, x, y+3); }
-        if ((scale>1.02 && n.kind==='frontier-group') || n===focus)
-          drawLabel(x, y+Math.max(r,3)+13, short(n.pattern||n.label||'', 26), '#667085', Math.max(9.5,10*Math.min(scale,1)));
-      } else {
-        const r = (n===root?15: n.kind==='template'?12:10)*Math.min(scale,1.15);
-        ctx.beginPath(); ctx.arc(x,y,Math.max(r,4),0,7);
-        ctx.fillStyle = n.kind==='template' ? '#7C3AED' : '#4F46E5';
-        if (n===focus){ ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=20; }
-        ctx.fill(); ctx.shadowBlur=0;
-        ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=2; ctx.stroke();
-        if (n.states && n.states.some(s=>s.captured)){ ctx.beginPath(); ctx.arc(x+r*0.8,y-r*0.8,Math.max(3,3.4*Math.min(scale,1)),0,7); ctx.fillStyle='#15803D'; ctx.fill(); }
-        drawLabel(x, y+Math.max(r,4)+14+(n.lblAlt?13:0), short(n.label||n.id), dimmed?'#98A2B3':'#101828', Math.max(10,11*Math.min(scale,1)));
-        if (n.kind==='template' && scale>0.7) drawLabel(x, y+Math.max(r,4)+28+(n.lblAlt?13:0), `1 of ${n.standsFor}`, '#7C3AED', 9.5);
-      }
-      ctx.globalAlpha = 1;
-    });
-    requestAnimationFrame(draw);
-  }
+  function resize(){ layoutMap(); }
+  function fit(){ layoutMap(); }
+  addEventListener('resize', ()=>{ if (document.getElementById('pane-map').classList.contains('active')) layoutMap(); });
 
-  let panning=false, px0=0, py0=0, moved=false;
-  function nodeAt(px,py){ const [wx,wy]=toWorld(px,py);
-    let best=null, bd=1e9;
-    nodes.forEach(n=>{ const dx=n.x-wx, dy=n.y-wy; const d=dx*dx+dy*dy; const hit=Math.pow(16/Math.min(scale,1)+4,2);
-      if (d<hit && d<bd){ best=n; bd=d; } });
-    return best; }
-  canvas.addEventListener('mousedown', e=>{ const n=nodeAt(e.clientX,e.clientY-52);
-    if (n){ dragNode=n; } else { panning=true; } px0=e.clientX; py0=e.clientY; moved=false; canvas.style.cursor='grabbing'; });
-  addEventListener('mousemove', e=>{ if (!document.getElementById('pane-map').classList.contains('active')) return;
-    const dx=e.clientX-px0, dy=e.clientY-py0;
-    if (dragNode){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; dragNode.x += dx/scale; dragNode.y += dy/scale; px0=e.clientX; py0=e.clientY; }
-    else if (panning){ if (Math.abs(dx)+Math.abs(dy)>3) moved=true; tx += dx/scale; ty += dy/scale; px0=e.clientX; py0=e.clientY; }
-    else { hoverNode = nodeAt(e.clientX,e.clientY-52) || null; canvas.style.cursor = hoverNode?'pointer':'grab'; }});
-  addEventListener('mouseup', ()=>{ if (dragNode && !moved) openPanel(dragNode);
-    dragNode=null; panning=false; canvas.style.cursor='grab'; });
-  canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f = e.deltaY<0?1.12:0.89;
-    const [wx,wy]=toWorld(e.clientX,e.clientY-52); scale=Math.min(Math.max(scale*f,minScale),3);
-    const [wx2,wy2]=toWorld(e.clientX,e.clientY-52); tx+=wx2-wx; ty+=wy2-wy; }, {passive:false});
+  // hover → draw the page's REAL links (out + in); click → detail panel (panel-first, VAL F4)
+  function drawLinks(id){ const n=byId[id]; if(!n||!pos[id]){ linesEl.innerHTML=''; return; }
+    const seg=(a,b,out)=>{ const pa=pos[a],pb=pos[b]; if(!pa||!pb) return ''; return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="${out?'rgba(79,70,229,.55)':'rgba(102,112,133,.4)'}" stroke-width="1.4"/>`; };
+    let s=''; (n.linksTo||[]).forEach(t=>s+=seg(id,t,true)); (n.linkedFrom||[]).forEach(t=>s+=seg(t,id,false)); linesEl.innerHTML=s; }
+  world.addEventListener('mouseover', e=>{ const b=e.target.closest('[data-mapid]'); if(b) drawLinks(b.getAttribute('data-mapid')); });
+  world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b) linesEl.innerHTML=''; });
+  world.addEventListener('click', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) openPanel(n); } });
 
   function openPanel(n){ activeNode=n; const el=document.getElementById('panel-body');
     if (n.locked){
@@ -687,9 +803,9 @@ function initDashboard(){
         <div class="route">${esc(n.route)}</div>
         ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img src="${esc(n.screenshot)}" loading="lazy" alt="screenshot of ${esc(n.label||n.id)}"></a>`:''}
         <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages with this layout`:''}</div>
-        <div class="desc">${esc(n.desc||'')} <span class="ai" title="model-written orientation, not extracted fact">ai</span></div>
-        <div class="links"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
-        <div class="chiprow" style="margin-top:12px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : ''}</div>
+        <div class="desc">${n.descPending?'<span class="meta">— caption dormant, waiting for your AI</span>':esc(n.desc||'')} ${n.descPending?'':'<span class="ai" title="model-written orientation, not extracted fact">ai</span>'}</div>
+        <div class="chiprow" style="margin-top:12px"><button class="pchip ghost" data-goto="page/${esc(n.id)}">Open the full page doc</button>${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : ''}</div>
+        <div class="links" style="margin-top:8px;font-size:12px"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> · <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
         ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
@@ -722,75 +838,231 @@ function initDashboard(){
   };
 
   // server chrome: live-unlock affordances + re-run entry, only when the server is up
-  const sp=document.getElementById('server-pill');
-  if (serverMode){ sp.textContent='live · can unlock'; sp.classList.add('on');
-    const rb=document.getElementById('recapbtn'); rb.style.display='block';
-    rb.onclick=()=>{ mountOnboard(); showWizard(STATUS && STATUS.product); }; }
-  else sp.textContent='static view';
+  const sp=document.getElementById('server-pill'); // pill removed in v2 shell; guarded for safety
+  if (serverMode){ if(sp){ sp.textContent='live · can unlock'; sp.classList.add('on'); }
+    const rb=document.getElementById('recapbtn'); if(rb){ rb.style.display='block';
+      rb.onclick=()=>{ mountOnboard(); showWizard(STATUS && STATUS.product); }; } }
+  else if(sp) sp.textContent='static view';
   syncCapBtn();
 
-  // ═════════ OVERVIEW TAB ═════════
-  (function renderOverview(){
-    const O = DASH.overview, el = document.getElementById('pane-overview');
-    const covered = DATA.nodes.length, coverage = Math.round(100*covered/(covered+lockedTotal));
-    const tplCountO = O.templates.length, standsFor = O.standsForTotal;
-    const health = [];
-    O.health.skipped.forEach(s=>health.push(`<div class="hrow"><span class="chip warn">${esc(s.reason)}</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span></div>`));
-    O.health.failed.forEach(s=>health.push(`<div class="hrow"><span class="chip bad">failed</span><span style="font-family:var(--mono);font-size:12px">${esc(s.slug)}</span><span class="pill">${esc(s.error||'')}</span></div>`));
-    O.health.actions.forEach(a=>health.push(`<div class="hrow"><span class="chip warn">action</span><span>dismissed a cookie banner via “${esc(a.buttonText)}” — the one sanctioned click, logged</span></div>`));
-    if (O.health.capped) health.push(`<div class="hrow"><span class="chip warn">cap</span><span>${O.health.capped} nav candidates beyond the cap stayed on the frontier</span></div>`);
-    el.innerHTML = `
-      <div class="chiprow" style="margin-bottom:14px">
-        ${DASH.pendingDescriptions ? pchip('Describe the library ('+DASH.pendingDescriptions+' pending)', PROMPTS.describeLibrary()) : ''}
-        ${pchip("What's missing?", PROMPTS.whatsMissing(), true)}
-      </div>
-      <div class="kpis">
-        <div class="kpi blue"><div class="n">${covered}</div><div class="l">pages unlocked</div></div>
-        <div class="kpi purple"><div class="n">~${standsFor}</div><div class="l">pages represented (templates)</div></div>
-        <div class="kpi amber"><div class="n">${lockedTotal}</div><div class="l">discovered, locked</div></div>
-        <div class="kpi blue"><div class="n">${coverage}%</div><div class="l">of known surface unlocked</div></div>
-        <div class="kpi green"><div class="n">${O.statesTotal}</div><div class="l">states captured</div></div>
-        <div class="kpi purple"><div class="n">${tplCountO}</div><div class="l">layout templates found</div></div>
-      </div>
-      <div class="grid2 secgap">
-        <div class="card">
-          <h3 style="margin-top:0">Navigation — the product's own IA <span class="ai" title="descriptions are model-written">ai</span></h3>
-          <table class="digest">${O.nav.map(n=>`<tr>
-            <td style="white-space:nowrap"><b>${esc(short(n.label,26))}</b><br><span class="r">${esc(n.route)}</span></td>
-            <td>${esc(n.desc||'')} <a href="pages/${esc(n.slug)}/page.md" target="_blank" style="white-space:nowrap">doc</a></td></tr>`).join('')}
-          </table>
-        </div>
-        <div>
-          <div class="card">
-            <h3 style="margin-top:0">Capture health</h3>
-            ${health.length? health.join('') : '<div class="hrow"><span class="chip ok">clean</span><span>nothing skipped, nothing failed</span></div>'}
-          </div>
-          <div class="card" style="margin-top:12px">
-            <h3 style="margin-top:0">Recent captures</h3>
-            ${O.recent.map(r=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px;color:var(--dim)">${esc((r.at||'').slice(0,10))}</span><span>${esc(short(r.label,40))}</span></div>`).join('')}
-          </div>
-          ${O.notes.length?`<div class="card" style="margin-top:12px"><h3 style="margin-top:0">Designer notes</h3>
-            ${O.notes.map(n=>`<div class="hrow"><span style="font-family:var(--mono);font-size:11px">${esc(n.slug)}</span><span>${esc(n.notes)}</span></div>`).join('')}</div>`:''}
-        </div>
-      </div>
-      <h3 class="secgap">Layout templates — one unlocked page stands for many <span class="ai">ai</span></h3>
-      <div class="tplcards">
-        ${O.templates.map(t=>`<a class="tplcard" href="pages/${esc(t.slug)}/page.md" target="_blank" style="color:inherit;text-decoration:none">
-          <img src="${esc(t.screenshot)}" loading="lazy" alt="">
-          <div class="b"><div class="p">${esc(t.pattern)}</div><div class="sf">1 captured of ${t.standsFor}</div>
-          <div style="font-size:12px;color:var(--dim);margin-top:4px">${esc(short(t.desc||'',90))}</div></div></a>`).join('')}
-      </div>`;
-  })();
+  // ═════════ READINESS CHIP + BREAKDOWN ═════════
+  function renderReadiness(){
+    const R = DASH.readiness; const chip=document.getElementById('readychip');
+    if(!R || !chip) return;
+    const ring=document.getElementById('ready-ring'), lab=document.getElementById('ready-label'), pop=document.getElementById('readypop');
+    const full = R.score>=100;
+    if(ring) ring.style.setProperty('--pct', R.score);
+    chip.classList.toggle('quiet', full);
+    // OPEN WORDING (flagged): ship "100% context ready" — the "context complete" alternative is a P3 call (PRD §2, ux-copy open q)
+    lab.textContent = R.score + '% context ready';
+    pop.innerHTML = `<h4>Context readiness — ${R.score}%</h4>
+      <div class="pnote">A composite of how ready this library is as AI context — not surface coverage. <span class="ai" title="heuristic v1 weighting">heuristic</span></div>
+      ${R.components.map(c=>`<div class="rcomp"><div class="rlab"><span>${esc(c.label)}</span><b>${c.earned} / ${c.max}</b></div>
+        <div class="rbar"><i style="width:${Math.round(100*c.earned/Math.max(c.max,1))}%"></i></div>
+        <div class="rdet">${esc(c.detail)}</div></div>`).join('')}`;
+    chip.onclick=(e)=>{ e.stopPropagation(); pop.classList.toggle('open'); };
+    document.addEventListener('click', e=>{ if(!pop.contains(e.target) && e.target!==chip) pop.classList.remove('open'); });
+  }
 
-  // ═════════ TOKENS TAB ═════════
+  // ═════════ HOME (atlas + ledger) + JOURNAL + PAGE DOC ═════════
+  function fmtDate(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch{ return String(iso).slice(0,10); } }
+  function fmtTime(iso){ try{ return new Date(iso).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }catch{ return ''; } }
+  function firstSlug(){ return (DATA.nodes.find(n=>n.kind!=='template')||DATA.nodes[0]||{}).id||'<slug>'; }
+
+  function ledgerEntry(ev, compact){
+    const when = ev.dateOnly ? fmtDate(ev.at) : [fmtDate(ev.at), fmtTime(ev.at)].filter(Boolean).join(' · ');
+    let link='';
+    if(ev.link){ if(ev.link.page) link=`<button class="elink" data-goto="page/${esc(ev.link.page)}">open the page</button>`;
+      else if(ev.link.tab){ const lbl=ev.link.tab==='map'?'open the map':ev.link.tab==='design'?'open Design language':'see what it wrote'; link=`<button class="elink" data-goto="${esc(ev.link.tab)}">${lbl}</button>`; } }
+    let thumbs='';
+    if(!compact && ev.kind==='capture'){ const t=DATA.nodes.filter(n=>n.screenshot).slice(0,5).map(n=>`<img src="${esc(n.screenshot)}" loading="lazy" alt="">`).join(''); if(t) thumbs=`<div class="thumbs">${t}</div>`; }
+    return `<div class="ent" data-actor="${esc(ev.actor)}"><div class="emeta">${esc(when)} · ${esc(ev.actor)}</div>
+      <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${thumbs}${link}</div>`;
+  }
+
+  function nextSlot(){
+    const R=DASH.readiness, pend=DASH.pendingDescriptions||0, I=DASH.identity;
+    if(R && R.score>=100)
+      return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
+        <div class="edetail">Your library is complete and current. When your product ships something new, check for changes here — the ledger will tell you what moved.</div>
+        <div class="chiprow">${pchip('Check for changes', PROMPTS.recaptureCheck())}</div></div>`;
+    if(pend>0)
+      return `<div class="ent hero"><div class="emeta">next · one move unlocks the rest</div>
+        <span class="etitle">Give your AI this toolkit</span>
+        <div class="edetail">One prompt, pasted into your AI chat — it reads all ${I.downloaded} pages, fills the captions, and this ledger records the run. A couple of minutes.</div>
+        <div class="chiprow">${pchip('Copy the prompt', PROMPTS.describeLibrary())}</div></div>`;
+    return `<div class="ent hero"><div class="emeta">next · your AI knows your product now</div>
+      <span class="etitle">Make your first thing</span>
+      <div class="edetail">A wireframe on a real page, or a question answered from the library.</div>
+      <div class="chiprow">${pchip('Copy a wireframe prompt', PROMPTS.wireframe(firstSlug()))}${pchip('Ask a question', PROMPTS.askQuestion(), true)}</div></div>`;
+  }
+
+  function ledgerRail(){
+    const evs = DASH.events.slice().reverse().slice(0,5);
+    return `<aside class="rail">
+      <div class="railh">The ledger — everything that happens here</div>
+      <div class="led">
+        ${nextSlot()}
+        ${evs.map(e=>ledgerEntry(e,true)).join('')}
+        <div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Drift checks land here</span><div class="edetail">"3 pages changed — review side by side"</div></div>
+      </div>
+      <div class="railfoot">every capture, read, and design run is appended · <button class="elink" data-goto="journal">full journal</button></div>
+    </aside>`;
+  }
+
+  function renderHome(){
+    const I=DASH.identity, pend=DASH.pendingDescriptions||0, nodes=DATA.nodes;
+    const described=nodes.filter(n=>!n.descPending), templates=nodes.filter(n=>n.kind==='template');
+    const withStates=nodes.filter(n=>(n.states||[]).some(s=>s.captured));
+    const subtitle = pend>0 ? `${I.name} — ${I.downloaded} pages, as they really look` : `${I.name} — ${I.downloaded} pages, all described`;
+    const ghostsShown = DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)).slice(0,2);
+    const ghostShownCount = ghostsShown.reduce((s,f)=>s+(f.count||1),0);
+    const overflowN = Math.max(0, lockedTotal - ghostShownCount);
+    const cardHtml = (n)=>`<button class="pg" data-goto="page/${esc(n.id)}">
+        ${n.kind==='template'?`<span class="count">stands for ${n.standsFor}</span>`:''}
+        ${n.screenshot?`<img class="shot" src="${esc(n.screenshot)}" loading="lazy" alt="">`:'<span class="shot hatch"></span>'}
+        <span class="m"><span class="nm">${esc(n.label||n.id)}</span><span class="rt">${esc(n.route||'')}</span>
+        <span class="cap${n.descPending?' dorm':''}">${n.descPending?'— caption dormant, waiting for your AI':esc(n.desc||'')}</span></span></button>`;
+    const ghostHtml = (f)=>`<button class="pg locked" data-goto="map"><span class="shot">not downloaded yet</span>
+        <span class="m"><span class="nm">${esc(f.pattern||f.label||'locked')}</span><span class="rt">linked from ${f.inboundCount||f.count||1} pages</span>
+        <span class="unlock">Unlock</span></span></button>`;
+    const overflow = overflowN>0 ? `<button class="pg locked" data-goto="map"><span class="shot">…and ${overflowN} more on the map</span>
+        <span class="m"><span class="nm">Everything else</span><span class="rt">the map holds them</span><span class="unlock">Open the map</span></span></button>` : '';
+    const logo = I.logo ? `<img class="logo" src="${esc(I.logo)}" alt="">` : `<span class="logo hatch"></span>`;
+    document.getElementById('pane-home').innerHTML = `<div class="home">
+      <div class="ident">${logo}
+        <div class="who"><b>${esc(subtitle)}</b>
+          ${I.description?`<span class="desc"><span>${esc(I.description.text)}</span><span class="ai" title="observed from the captured page">meta description · observed</span></span>`:''}</div>
+        <div class="facts">
+          <div><div class="fv">${I.found}</div><div class="fl">found</div></div>
+          <div><div class="fv">${I.downloaded}</div><div class="fl">downloaded</div></div>
+          <div><div class="fv">${I.described}/${I.describable}</div><div class="fl">described</div></div>
+          <div><div class="fv">${fmtDate(I.capturedAt)}</div><div class="fl">captured · current</div></div>
+        </div>
+      </div>
+      <div class="homecols">
+        <div class="gridwrap">
+          <div class="filters">
+            <button class="filt on" data-filt="all">All ${nodes.length}</button>
+            <button class="filt" data-filt="templates">Templates ${templates.length}</button>
+            <button class="filt" data-filt="described">Described ${described.length}</button>
+            <button class="filt" data-filt="states">With states ${withStates.length}</button>
+            <button class="filt" data-goto="map">Locked ${lockedTotal}</button>
+          </div>
+          <div class="atlas" id="atlas">${nodes.map(cardHtml).join('')}${ghostsShown.map(ghostHtml).join('')}${overflow}</div>
+        </div>
+        ${ledgerRail()}
+      </div>
+    </div>`;
+    const atlas=document.getElementById('atlas');
+    document.querySelectorAll('#pane-home .filt[data-filt]').forEach(b=>b.onclick=()=>{
+      document.querySelectorAll('#pane-home .filt[data-filt]').forEach(x=>x.classList.toggle('on', x===b));
+      const f=b.dataset.filt;
+      atlas.querySelectorAll('.pg').forEach(c=>{ const g=c.getAttribute('data-goto')||'';
+        if(c.classList.contains('locked')){ c.style.display = f==='all'?'':'none'; return; }
+        const n=byId[g.replace('page/','')]; let show=true;
+        if(f==='templates') show=n&&n.kind==='template';
+        else if(f==='described') show=n&&!n.descPending;
+        else if(f==='states') show=n&&(n.states||[]).some(s=>s.captured);
+        c.style.display=show?'':'none'; });
+    });
+  }
+
+  function journalFeed(filter){
+    const evs=DASH.events.slice().reverse();
+    const match=(a)=> filter==='all' || (filter==='you'&&/you/i.test(a)) || (filter==='kit'&&a==='the kit') || (filter==='ai'&&/your AI/i.test(a));
+    let html=nextSlot(), lastDay='';
+    for(const e of evs){ if(!match(e.actor)) continue; const day=fmtDate(e.at); if(day&&day!==lastDay){ html+=`<div class="jday">${esc(day)}</div>`; lastDay=day; } html+=ledgerEntry(e,false); }
+    html+=`<div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Re-capture &amp; drift checks land here too</span><div class="edetail">"3 pages changed since your last accepted capture — review side by side" — same feed, same grammar.</div></div>`;
+    return `<section class="led">${html}</section>`;
+  }
+  function renderJournal(){
+    document.getElementById('pane-journal').innerHTML=`<div class="jwrap">
+      <div class="jhead"><div><h1>The journal — everything that happened to this library</h1>
+        <p>appended automatically from the library's own metadata · nothing here is editable</p></div>
+        <div class="jfilters">
+          <button class="filt on" data-jf="all">All</button><button class="filt" data-jf="you">You</button>
+          <button class="filt" data-jf="kit">The kit</button><button class="filt" data-jf="ai">Your AI</button></div></div>
+      <div id="jfeed">${journalFeed('all')}</div></div>`;
+    document.querySelectorAll('#pane-journal .filt[data-jf]').forEach(b=>b.onclick=()=>{
+      document.querySelectorAll('#pane-journal .filt[data-jf]').forEach(x=>x.classList.toggle('on',x===b));
+      document.getElementById('jfeed').innerHTML=journalFeed(b.dataset.jf); });
+  }
+
+  function renderPageDoc(slug){
+    const el=document.getElementById('pane-page'); const n=byId[slug];
+    if(!n || n.locked){ el.innerHTML=`<div class="pgdoc"><div class="crumb"><button class="lnk" data-goto="home">Home</button></div><div class="card">That page isn't in the library.</div></div>`; return; }
+    const states=n.states||[];
+    const known=['empty','error','filtered','filled','sorted']; const missing=known.filter(k=>!states.some(s=>(s.name||'').includes(k)));
+    const leadsTo=(n.linksTo||[]).slice(0,8), reachedFrom=(n.linkedFrom||[]).slice(0,8);
+    const moreFrom=Math.max(0,(n.linkedFrom||[]).length-reachedFrom.length);
+    const chip=(id)=>`<button class="lc" data-goto="page/${esc(id)}">${esc(byId[id]?(byId[id].label||id):id)}</button>`;
+    const hist=[];
+    DASH.events.forEach(e=>{ if(e.link&&e.link.page===slug) hist.push({t:e.title,at:e.at,actor:e.actor}); });
+    if(!n.descPending) hist.push({t:'Described', at:null, actor:'your AI'});
+    hist.push({t:'Captured', at:n.capturedAt, actor:'the kit'});
+    hist.sort((a,b)=>((b.at||'') < (a.at||'') ? -1 : (b.at||'')>(a.at||'')?1:0));
+    el.innerHTML=`<div class="pgdoc">
+      <div class="crumb"><button class="lnk" data-goto="home">Home</button> / ${esc(n.section||'')} / ${esc(n.label||n.id)}</div>
+      <div class="dhd"><h1>${esc(n.label||n.id)}</h1><span class="rt">${esc(n.route||'')} · captured ${fmtDate(n.capturedAt)} · current</span>
+        <div class="acts">${pchip('Wireframe on this page',PROMPTS.wireframe(slug))}${pchip('Ask about this page',PROMPTS.askQuestion(),true)}<a class="pchip ghost" href="${esc(n.pageHtml)}" target="_blank">Open real HTML</a></div></div>
+      <div class="dcols">
+        <div class="dleft">
+          ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank"><img class="dshot" src="${esc(n.screenshot)}" alt=""></a>`:'<span class="dshot hatch" style="height:400px"></span>'}
+          <h3>States</h3>
+          <div class="strip">
+            ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured&&n.screenshot?`<img src="pages/${esc(slug)}/states/${esc(s.name)}/screenshot.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">`:'<span class="ph"></span>'}${esc(s.name)}</span>`).join(''):''}
+            <span class="stt add"><span class="ph">+ add a state by URL</span>${esc(missing.slice(0,3).join(' · ')||'more')}</span>
+          </div>
+        </div>
+        <div class="dright">
+          <div class="card"><h3 style="margin-top:0">What this page is <span class="ai" title="model-written orientation">ai</span></h3>
+            <div style="font-size:13px;color:${n.descPending?'var(--dim)':'var(--txt)'}">${n.descPending?'— not described yet. Copy the describe prompt on Home to fill this in.':esc(n.desc||'')}</div></div>
+          <div class="card"><h3 style="margin-top:0">Observed <span class="ai" title="extracted from the DOM">dom</span></h3>
+            <div class="kv"><span>Linked from</span><span>${n.inboundCount||0} pages</span></div>
+            <div class="kv"><span>Links out</span><span>${(n.linksTo||[]).length}</span></div>
+            <div class="kv"><span>Clicks from home</span><span>${n.clickDepth==null?'not linked from home':n.clickDepth}</span></div>
+            ${n.standsFor?`<div class="kv"><span>Layout template</span><span>stands for ${n.standsFor}</span></div>`:''}</div>
+          <div class="card"><h3 style="margin-top:0">Leads to <span class="ai" title="from the DOM">dom</span></h3>
+            <div class="lchips">${leadsTo.map(chip).join('')||'<span class="edetail">—</span>'}</div>
+            <h3>Reached from</h3>
+            <div class="lchips">${reachedFrom.map(chip).join('')}${moreFrom?`<button class="lc" data-goto="map">…${moreFrom} more on the map</button>`:''}${reachedFrom.length?'':'<span class="edetail">—</span>'}</div></div>
+          <div class="card"><h3 style="margin-top:0">This page's history <span class="ai" title="derived from the journal">journal</span></h3>
+            <div class="hist">${hist.map(h=>`<div class="hi">${esc(h.t)}<small>${[h.at?fmtDate(h.at):'',h.actor].filter(Boolean).join(' · ')}</small></div>`).join('')}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ═════════ ROUTING ═════════
+  function showPane(name){
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.id==='pane-'+name));
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===name));
+    const jp=document.getElementById('journalpill'); if(jp) jp.classList.toggle('on', name==='journal');
+    if(name==='map'){ resize(); if(!window.__fitted){ fit(); window.__fitted=true; } }
+    const sp=document.querySelector('.pane.active.scrollpane'); if(sp) sp.scrollTop=0;
+  }
+  function route(){
+    const h=(location.hash||'').replace(/^#/,'');
+    if(h.indexOf('page/')===0){ renderPageDoc(decodeURIComponent(h.slice(5))); return showPane('page'); }
+    if(h==='journal'){ renderJournal(); return showPane('journal'); }
+    if(h==='map'||h==='design'||h==='useit'){ return showPane(h); }
+    renderHome(); showPane('home');
+  }
+
+  // ═════════ DESIGN LANGUAGE TAB (tokens; Components section added in renderDesignExtras) ═════════
   (function renderTokens(){
-    const T = DASH.tokens, el = document.getElementById('pane-tokens');
+    const T = DASH.tokens, el = document.getElementById('pane-design');
     const lum = h => { const n = parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255)); };
     const sw = c => `<div class="sw"><div class="c" style="background:${esc(c.value)};${lum(c.value)>235?'border-bottom:1px solid var(--line);':''}"></div>
       <div class="i"><b>${esc(c.value)}</b>×${c.count.toLocaleString()} · ${c.pages}p${c.alpha?' · α':''}</div></div>`;
     const spacing = T.spacing, radius = T.radius;
     el.innerHTML = `
-      <div class="chiprow" style="margin-bottom:12px">${pchip('Audit the visual language', PROMPTS.auditTokens())}</div>
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">
+        <div><h2 style="font-size:19px">${esc(DASH.identity.name)}'s visual language — as it is actually used</h2>
+        <p style="font-size:12px;color:var(--dim);margin-top:3px">every value below was measured across the ${DASH.identity.downloaded} captured pages <span class="ai">observed · heuristic</span></p></div>
+        <div style="margin-left:auto">${pchip('Audit the visual language', PROMPTS.auditTokens())}</div>
+      </div>
       <div class="provenance">Everything below is <code>method: heuristic</code> — values <b>observed</b> on the captured pages, aggregated and clustered by statistics.
         They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
         (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
@@ -816,7 +1088,14 @@ function initDashboard(){
         </div>
       </div>
       <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
-      <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>`;
+      <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>
+      <h3 class="secgap">Components — the product's repeating parts <span class="ai">${DASH.patternsPresent?'':'coming'}</span></h3>
+      ${DASH.patternsPresent
+        ? `<div class="card"><div class="meta">Mined components are in <a href="patterns.json" target="_blank">patterns.json</a>.</div></div>`
+        : `<div class="dormcard"><h3>Not mined yet</h3>
+            <p>The kit can analyze the captured HTML for repeating components — the real buttons, cards, and rows this product is built from — so new designs reuse them instead of approximating. This section fills in when that runs.</p>
+            ${pchip('Learn what pattern mining will do', "Explain what 'pattern mining' would add to this design-context library: analyzing the captured page.html files for repeating components (buttons, cards, rows) so new designs reuse the product's real parts. Describe what the Components section would then show. Don't run anything yet — just explain.", true)}
+            <div class="comps"><i></i><i></i><i></i><i></i></div></div>`}`;
   })();
 
   // ═════════ USE-IT TAB ═════════
@@ -859,7 +1138,13 @@ function initDashboard(){
 
     el.innerHTML = `<div class="useit">
       <h2>Use it — what to do with your design context</h2>
-      <p class="lead">Prompts are the interface. Each button copies a ready-to-paste instruction with this workspace's real file paths already filled in.</p>
+      <p class="lead">your AI has read this library · answers and designs will be grounded in it, not generic</p>
+      <div class="create">
+        <div class="t"><span class="kick">The reason this library exists</span>
+          <h3>Design something new — in ${esc(DASH.identity.name)}'s own language</h3>
+          <p>A new page or flow that borrows the real components, patterns, and grammar of the ${DASH.identity.downloaded} pages here — it lands in <code>wireframes/new/</code>, the library stays untouched.</p></div>
+        ${pchip('Copy the design-new prompt', PROMPTS.designNew())}
+      </div>
       <div class="sensitivity">Captured logged-in? The library holds your <b>real account data</b> (orders, addresses). Share the folder or bundles accordingly — and <code>profiles/</code> (your live browser session) must never leave this machine.</div>
       <div class="mode">
         <span class="badge">recommended</span>
@@ -906,10 +1191,10 @@ node tools/shot.js &lt;file.html&gt; [out.png] [--full]   # preview any local HT
       copyPrompt(text); document.getElementById('bundle-note').textContent = note; btn.disabled=false; };
   })();
 
-  // deep links from the completion screen (Explore the map → #map)
-  { const h = (location.hash||'').replace('#',''); if (h==='map' || h==='useit'){ const tb=document.querySelector('.tab[data-tab="'+h+'"]'); if (tb) tb.click(); } }
-
-  draw();
+  // readiness chip + initial route (honors #map / #page/<slug> deep links from onboarding or shared URLs)
+  renderReadiness();
+  addEventListener('hashchange', route);
+  route();
 }
 </script>
 </body>
