@@ -12,8 +12,11 @@ set -eu
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 KIT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 cd "$KIT_DIR"
-PORT=4173
-URL="http://localhost:$PORT"
+
+# We prefer 4173 but fall back within this range, so a second product workspace never lands on
+# the FIRST one's dashboard (each server reports its own workspace path at /api/status).
+BASE_PORT=4173
+PORT_RANGE=10
 
 open_browser() {
   if command -v open >/dev/null 2>&1; then open "$URL" >/dev/null 2>&1 || true          # macOS
@@ -21,9 +24,31 @@ open_browser() {
   else echo "→ Open $URL in your browser."; fi
 }
 
-# Is something already listening on the port? (dependency-free: use node's net module.)
-port_open() {
-  node -e "const s=require('net').connect($PORT,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1000);" >/dev/null 2>&1
+# Scan [BASE_PORT, BASE_PORT+PORT_RANGE): reuse THIS workspace's own server if it's already up
+# (matched by workspacePath, not just an open port), else report the first free port.
+# Prints one of: "REUSE <port>" · "FREE <port>" · "NONE".  (dependency-free: node's net/http)
+scan_ports() {
+  node -e '
+    const http = require("http"), net = require("net");
+    const KIT = process.env.KIT_DIR, base = +process.env.BASE_PORT, range = +process.env.PORT_RANGE;
+    const isFree = (p) => new Promise((r) => { const s = net.connect(p, "127.0.0.1");
+      s.on("connect", () => { s.end(); r(false); }); s.on("error", () => r(true));
+      setTimeout(() => { s.destroy(); r(true); }, 400); });
+    const workspaceOf = (p) => new Promise((r) => {
+      const req = http.get({ host: "127.0.0.1", port: p, path: "/api/status", timeout: 800 }, (res) => {
+        let d = ""; res.on("data", (c) => (d += c));
+        res.on("end", () => { try { r(JSON.parse(d).workspacePath || null); } catch { r(null); } }); });
+      req.on("error", () => r(null)); req.on("timeout", () => { req.destroy(); r(null); }); });
+    (async () => {
+      let firstFree = null;
+      for (let p = base; p < base + range; p++) {
+        if (await isFree(p)) { if (firstFree === null) firstFree = p; continue; }
+        const ws = await workspaceOf(p);
+        if (ws && ws === KIT) { console.log("REUSE " + p); return; }   // our own server, any port
+      }
+      console.log(firstFree !== null ? "FREE " + firstFree : "NONE");
+    })();
+  '
 }
 
 if ! command -v node >/dev/null 2>&1; then
@@ -31,11 +56,23 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-# Server already up (from a previous start) → just open the dashboard.
-if port_open; then
-  echo "→ The design-context server is already running. Opening the dashboard…"
+DECISION=$(KIT_DIR="$KIT_DIR" BASE_PORT="$BASE_PORT" PORT_RANGE="$PORT_RANGE" scan_ports)
+KIND=$(printf '%s' "$DECISION" | awk '{print $1}')
+PORT=$(printf '%s' "$DECISION" | awk '{print $2}')
+
+if [ "$KIND" = "REUSE" ]; then
+  URL="http://localhost:$PORT"
+  echo "→ This workspace's design-context server is already running. Opening the dashboard…"
   open_browser
   exit 0
+elif [ "$KIND" = "FREE" ]; then
+  URL="http://localhost:$PORT"
+  if [ "$PORT" != "$BASE_PORT" ]; then
+    echo "→ Port $BASE_PORT is in use by another workspace; using $PORT for this one instead."
+  fi
+else
+  echo "❌  Ports $BASE_PORT–$((BASE_PORT + PORT_RANGE - 1)) are all in use. Stop one and run this again."
+  exit 1
 fi
 
 # First-run installs can take minutes — say so BEFORE each slow step.
@@ -56,9 +93,13 @@ node "$SCRIPT_DIR/map.js" --port "$PORT" &
 SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null || true' INT TERM
 
+port_listening() {
+  node -e "const s=require('net').connect($PORT,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1000);" >/dev/null 2>&1
+}
+
 i=0
 while [ $i -lt 40 ]; do
-  if port_open; then break; fi
+  if port_listening; then break; fi
   sleep 0.25
   i=$((i + 1))
 done
