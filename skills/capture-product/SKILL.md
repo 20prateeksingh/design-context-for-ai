@@ -77,9 +77,9 @@ Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer la
 - Anything skipped/failed/capped, with reasons, per manifest. Never hide gaps.
 - Show 1–2 `screenshot.png`s so they see it worked.
 - Point them at `INDEX.md` as the browsable map of everything captured — and tell them their AI tools should start at `registry.json`.
-- Point them at the dashboard's **Use it** tab (`tools/start.sh` → http://localhost:4173 → Use it) — it hands them the next moves as one-click, paste-ready prompts (describe, wireframe, what's-missing, audit tokens, context bundle for chat-only AIs). It's the designer-facing home for everything below.
+- Point them at the dashboard's **Home** (`tools/start.sh` → http://localhost:4173) — their product as a page atlas with a running ledger. The single next move to name is the ledger's **"Give your AI this toolkit"** threshold: one copied prompt makes the AI describe every page and the dormant captions light up. (The **Use it** tab holds the rest — wireframe, design-something-new, what's-missing, context bundle.)
 
-Then offer the map: "run `node tools/map.js` and open http://localhost:4173 — your product as a map; grey nodes are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
+Then offer the map: "run `node tools/map.js` and open http://localhost:4173, then the Map tab — your product plotted by clicks-from-home; the ghosts in the fog are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
 
 Iteration from the map: the designer may select frontier pages there (server does the capture), or ask you — then run `node tools/capture.js --urls "<u1>,<u2>"`. New pages need the describe step (§5) — check for `_(not yet described)` sections after any selective pull. States with a URL: `node tools/capture.js --state <slug>:<name> --url <stateUrl>`.
 

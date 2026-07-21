@@ -56,6 +56,64 @@ function extractAiSection(pageMdText) {
   return body && body !== PENDING ? body : null;
 }
 
+// ── Dashboard-v2 derivations (all deterministic; embedded additively) ─────────
+// clickDepth: BFS over the captured link graph from the home page (route '/').
+// depth 0 = home; depth null = captured but not reachable from home (drawn honestly on
+// the outer ring, never faked into a nearer one).
+function computeDepths(pages, rootSlug) {
+  const depth = {};
+  for (const s of Object.keys(pages)) depth[s] = null;
+  if (!rootSlug || !pages[rootSlug]) return depth;
+  const strip = (t) => t.replace(' (template)', '');
+  depth[rootSlug] = 0;
+  let frontierLayer = [rootSlug];
+  while (frontierLayer.length) {
+    const next = [];
+    for (const s of frontierLayer) for (const raw of pages[s].linksTo || []) {
+      const t = strip(raw);
+      if (pages[t] && depth[t] === null) { depth[t] = depth[s] + 1; next.push(t); }
+    }
+    frontierLayer = next;
+  }
+  return depth;
+}
+
+// The product's own nav section, derived from the first route segment (never invented).
+// '/' → 'Home'; '/account/orders' → 'Account'; '/the-gift-card-store' → 'The Gift Card Store'.
+function sectionOf(route) {
+  const segs = (route || '/').split('/').filter(Boolean);
+  if (!segs.length) return 'Home';
+  return segs[0].split(/[-_]/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Home';
+}
+function sectionOfUrl(u) { try { return sectionOf(new URL(u).pathname); } catch { return 'Other'; } }
+
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'", '#x27': "'", nbsp: ' ' };
+function decodeEntities(s) {
+  return String(s || '').replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => {
+    const key = e.toLowerCase();
+    if (ENT[key] != null) return ENT[key];
+    if (/^#x/i.test(e)) { const n = parseInt(e.slice(2), 16); return isNaN(n) ? m : String.fromCodePoint(n); }
+    if (/^#/.test(e)) { const n = parseInt(e.slice(1), 10); return isNaN(n) ? m : String.fromCodePoint(n); }
+    return m;
+  });
+}
+// Observed page-level description — <meta name=description> or og:description, from the
+// captured DOM (method: 'dom'). Never fetched; only read from the already-captured page.html.
+function extractMetaDescription(html) {
+  if (!html) return null;
+  const tagRe = /<meta\b[^>]*>/gi; let m;
+  while ((m = tagRe.exec(html))) {
+    const tag = m[0];
+    const nm = /\b(?:name|property)\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (!nm) continue;
+    const key = nm[1].toLowerCase();
+    if (key !== 'description' && key !== 'og:description') continue;
+    const c = /\bcontent\s*=\s*(["'])([\s\S]*?)\1/i.exec(tag); // same quote closes (apostrophes inside stay)
+    if (c && c[2].trim()) return decodeEntities(c[2]).replace(/\s+/g, ' ').trim();
+  }
+  return null;
+}
+
 // ── Token aggregation: merge per-page computed-tokens into observed scales ────
 // Statistics only (frequency + clustering), stamped method:heuristic. Deterministic:
 // stable sort (count desc, value asc), timestamps from the manifest, never Date.now().
@@ -202,10 +260,10 @@ function buildIndex(libDir) {
   }
   const singles = [];
   const frontier = []; let gi = 0;
-  const pushGroup = (pattern, items) => frontier.push({
+  const pushGroup = (pattern, items) => { const viaAll = new Set(items.flatMap(i => [...i.via])); frontier.push({
     id: 'f' + (gi++), kind: 'frontier-group', pattern, count: items.length,
-    urls: items.slice(0, 30).map(i => i.url), via: [...new Set(items.flatMap(i => [...i.via]))].slice(0, 6),
-    underTemplate: repByWild.get(wildNorm(pattern)) || null });
+    urls: items.slice(0, 30).map(i => i.url), via: [...viaAll].slice(0, 6), inboundCount: viaAll.size, // inbound-from-captured (uncapped) → honest ghost sizing
+    underTemplate: repByWild.get(wildNorm(pattern)) || null }); };
   for (const [pat, items] of groupsByPat) { if (items.length >= 3) pushGroup(pat, items); else singles.push(...items); }
   const byPrefix = new Map();
   for (const f of singles) {
@@ -219,13 +277,120 @@ function buildIndex(libDir) {
   const MAX_SINGLES = 25; // labeled (nav) singles first, then the rest; overflow folds into one node
   leftover.sort((a, b) => (b.label ? 1 : 0) - (a.label ? 1 : 0));
   leftover.slice(0, MAX_SINGLES).forEach(f => frontier.push({ id: 'f' + (gi++), kind: 'frontier', pattern: f.pattern, count: 1,
-    url: f.url, urls: [f.url], label: f.label, via: [...f.via].slice(0, 6), underTemplate: repByWild.get(wildNorm(f.pattern)) || null }));
+    url: f.url, urls: [f.url], label: f.label, via: [...f.via].slice(0, 6), inboundCount: f.via.size, underTemplate: repByWild.get(wildNorm(f.pattern)) || null }));
   if (leftover.length > MAX_SINGLES) pushGroup('(assorted one-off pages)', leftover.slice(MAX_SINGLES));
   const frontierTotal = [...fro.values()].length;
 
   // 3. per-page page.md (regenerated; AI section preserved)
   const navOrder = sitemap.pages.map(x => x.slug);
   const ordered = [...navOrder.filter(s => pages[s]), ...Object.keys(pages).filter(s => !navOrder.includes(s))];
+
+  // ── 2d. Dashboard-v2 derived data (deterministic; embedded additively) ──────────
+  const round1 = (x) => Math.round(x * 10) / 10;
+  const rootSlug = ordered.find(s => pages[s].meta.route === '/')
+    || [...ordered].sort((a, b) => pages[b].linkedFrom.length - pages[a].linkedFrom.length)[0]
+    || ordered[0];
+  const depths = computeDepths(pages, rootSlug);
+  const tokens = aggregateTokens(pagesDir, ordered);
+
+  const capturedCount = ordered.length;
+  const describedCount = ordered.filter(s => pages[s].description).length;
+  const tplCountD = ordered.filter(s => pages[s].meta.template).length;
+  const pagesWithStates = ordered.filter(s => pages[s].states.some(x => x.captured)).length;
+  const statesTotalD = ordered.reduce((n, s) => n + pages[s].states.filter(x => x.captured).length, 0);
+  const productSummaryPresent = (() => { try { const p = path.join(libDir, 'product-summary.md'); return fs.existsSync(p) && fs.readFileSync(p, 'utf8').trim().length > 0; } catch { return false; } })();
+  const patternsPresent = fs.existsSync(path.join(libDir, 'patterns.json'));
+  const tokensPresent = tokens.colors.top.length > 0 && tokens.typography.ramp.length > 0;
+
+  // readiness = COMPOSITE context-readiness score (not surface coverage). Heuristic v1, labeled.
+  const KEY_PAGES_TARGET = 12, STATES_TARGET = 3;
+  const rc = [
+    { key: 'keyPages', label: 'Key pages captured', earned: round1(30 * Math.min(1, capturedCount / KEY_PAGES_TARGET)), max: 30, detail: `${capturedCount} page${capturedCount === 1 ? '' : 's'} captured` },
+    { key: 'tokens', label: 'Visual language extracted', earned: tokensPresent ? 14 : 0, max: 14, detail: tokensPresent ? `${tokens.colors.top.length} colors · ${tokens.typography.ramp.length} type sizes` : 'not extracted yet' },
+    { key: 'descriptions', label: 'Pages described', earned: round1(capturedCount ? 30 * describedCount / capturedCount : 0), max: 30, detail: `${describedCount} of ${capturedCount} described` },
+    { key: 'productSummary', label: 'Product summary', earned: productSummaryPresent ? 8 : 0, max: 8, detail: productSummaryPresent ? 'written by your AI' : 'not written yet' },
+    { key: 'states', label: 'Key states captured', earned: round1(18 * Math.min(1, pagesWithStates / STATES_TARGET)), max: 18, detail: `${pagesWithStates} of ${STATES_TARGET} key pages with states` },
+  ];
+  const readiness = {
+    score: Math.round(rc.reduce((n, c) => n + c.earned, 0)), reachable: 100, method: 'heuristic', formula: 'v1',
+    note: 'Composite context-readiness (how ready this library is to serve as AI design context) — NOT surface coverage. Heuristic v1; the weighting is a first pass.',
+    components: rc,
+  };
+
+  // identity — name + observed meta description (from the already-captured DOM; never fetched) + facts.
+  const rootHtml = (() => { try { return fs.readFileSync(path.join(pagesDir, rootSlug, 'page.html'), 'utf8'); } catch { return ''; } })();
+  const metaDesc = extractMetaDescription(rootHtml);
+  let identHost = ''; try { identHost = new URL(sitemap.origin).host; } catch { identHost = sitemap.origin; }
+  const identity = {
+    name: sitemap.product, host: identHost, origin: sitemap.origin,
+    logo: null, // no favicon/logo in captured assets → UI renders the hatched placeholder; never fetched
+    description: metaDesc ? { text: metaDesc, method: 'dom' } : null,
+    found: capturedCount + frontierTotal, downloaded: capturedCount, described: describedCount, describable: capturedCount,
+    capturedAt: manifest.capturedAt,
+  };
+
+  // nav sections (bearings) + district summaries — measured from the route graph, honest.
+  const sectionsOrder = [];
+  { const seen = new Set(); for (const s of ordered) { const sec = sectionOf(pages[s].meta.route); if (!seen.has(sec)) { seen.add(sec); sectionsOrder.push(sec); } } }
+  const districts = sectionsOrder.filter(x => x !== 'Home').map(name => ({
+    name,
+    explored: ordered.filter(s => s !== rootSlug && sectionOf(pages[s].meta.route) === name).length,
+    fog: frontier.reduce((n, f) => n + ((f.pattern ? sectionOf(f.pattern) : sectionOfUrl(f.url)) === name ? (f.count || 1) : 0), 0),
+    states: ordered.filter(s => sectionOf(pages[s].meta.route) === name && pages[s].states.some(x => x.captured)).length,
+  }));
+
+  // events[] — the journal feed, assembled from EMBEDDED/stable metadata only (never page.md mtime,
+  // which build-index itself rewrites every run; never Date.now). Deterministic ordering.
+  const pageLabelOf = (s) => pages[s] ? (pages[s].meta.navLabel || templateLabel(pages[s].meta) || pages[s].meta.title || s) : s;
+  const events = [];
+  const capAt = manifest.capturedAt;
+  const dudSkip = (manifest.skipped || []).length, failCount = (manifest.failed || []).length;
+  events.push({ at: capAt, dateOnly: false, seq: 1, actor: 'the kit', kind: 'capture',
+    title: `Captured ${capturedCount} page${capturedCount === 1 ? '' : 's'} of ${identHost}`,
+    detail: `${identity.found} discovered · ${tplCountD} layout template${tplCountD === 1 ? '' : 's'}${dudSkip ? ` · ${dudSkip} dud excluded` : ''}${failCount ? ` · ${failCount} failed` : ''}`,
+    link: { tab: 'map' } });
+  if (tokensPresent) events.push({ at: capAt, dateOnly: true, seq: 2, actor: 'the kit', kind: 'tokens',
+    title: 'Extracted the visual language',
+    detail: `${tokens.colors.top.length} colors · ${tokens.typography.ramp.length} type sizes${tokens.spacing.baseUnit ? ` · ${tokens.spacing.baseUnit}px base` : ''}`,
+    link: { tab: 'design' } });
+  if (describedCount > 0) {
+    // No embedded timestamp for the describe step → anchor to the latest capture (describing can't
+    // predate capture) and show the date only, never a fabricated clock time.
+    const latestCap = ordered.map(s => pages[s].meta.capturedAt).filter(Boolean).sort().pop() || capAt;
+    events.push({ at: latestCap, dateOnly: true, seq: 3, actor: 'your AI', kind: 'describe',
+      title: `Read the library — ${describedCount} page${describedCount === 1 ? '' : 's'} described`,
+      detail: describedCount === capturedCount ? 'Wrote "what this page is" for every page.' : `${capturedCount - describedCount} still pending.`,
+      link: { tab: 'home' } });
+  }
+  for (const s of ordered) for (const st of pages[s].states) if (st.captured && st.capturedAt)
+    events.push({ at: st.capturedAt, dateOnly: false, seq: 5, actor: 'you', kind: 'state',
+      title: `State added — ${st.name}`, detail: `on ${pageLabelOf(s)}`, link: { page: s } });
+  // wireframe rounds — scan the sibling wireframes/ dir (build-index never writes there → dir mtime
+  // is stable across consecutive runs, so this stays deterministic for the run-twice check).
+  try {
+    const wfRoot = path.join(libDir, '..', 'wireframes');
+    const countHtml = (dir, depth = 0) => { let n = 0; try { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isFile() && /\.html$/i.test(e.name)) n++; else if (e.isDirectory() && depth < 1) n += countHtml(path.join(dir, e.name), depth + 1); } } catch {} return n; };
+    const scanRounds = (base, label, isNew) => { try {
+      for (const e of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!e.isDirectory() || !/^round-/i.test(e.name)) continue;
+        const rdir = path.join(base, e.name); const n = e.name.replace(/^round-/i, '');
+        const approaches = countHtml(rdir);
+        events.push({ at: fs.statSync(rdir).mtime.toISOString(), dateOnly: false, seq: 6, actor: 'you + your AI', kind: 'wireframe',
+          title: `Wireframes — ${label}, round ${n}${approaches ? ` · ${approaches} approach${approaches === 1 ? '' : 'es'}` : ''}`,
+          detail: `${isNew ? 'wireframes/new/' : 'wireframes/'}${isNew ? label : (pages[label] ? label : label)}/${e.name} · library untouched`,
+          link: (!isNew && pages[label]) ? { page: label } : null });
+      }
+    } catch {} };
+    if (fs.existsSync(wfRoot)) for (const e of fs.readdirSync(wfRoot, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      if (e.name === 'new') { for (const c of fs.readdirSync(path.join(wfRoot, 'new'), { withFileTypes: true })) if (c.isDirectory()) scanRounds(path.join(wfRoot, 'new', c.name), c.name, true); }
+      else scanRounds(path.join(wfRoot, e.name), pageLabelOf(e.name), false);
+    }
+  } catch {}
+  // ascending by time, stable tiebreak (seq, then kind, then title) → identical across re-runs
+  events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0) || (a.seq - b.seq) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
+
   for (const slug of ordered) {
     const p = pages[slug]; const m = p.meta;
     const standsFor = m.template ? `Represents **${m.collapsed + 1} pages** sharing the layout \`${m.pattern}\` (${m.collapsed} not captured — same template).` : null;
@@ -275,10 +440,14 @@ function buildIndex(libDir) {
       files: { pageMd: `pages/${slug}/page.md`, screenshot: `pages/${slug}/screenshot.png`, html: `pages/${slug}/page.html`, content: `pages/${slug}/content.md`, tokens: `pages/${slug}/computed-tokens.json`, meta: `pages/${slug}/meta.json` },
       linksTo: p.linksTo, linkedFrom: p.linkedFrom, contentHash: m.contentHash,
       states: p.states, designerNotes: p.notes,
+      // additive dashboard-v2 fields (never mutate/remove existing ones): observed inbound count + measured click-depth from home
+      inboundCount: p.linkedFrom.length, clickDepth: depths[slug],
       // description = the ai section's FIRST paragraph (one-liner); the full screen doc stays in page.md
       description: p.description ? { text: p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim(), method: 'ai', fullDoc: `pages/${slug}/page.md` } : null,
     }]; })),
     frontier: { total: frontierTotal, note: 'discovered during capture, not downloaded; select on map.html or pass to capture.js --urls', nodes: frontier },
+    // additive dashboard-v2 top-level fields
+    identity, readiness, events,
   };
   fs.writeFileSync(path.join(libDir, 'registry.json'), JSON.stringify(registry, null, 2), 'utf8');
 
@@ -287,13 +456,13 @@ function buildIndex(libDir) {
   let hygiene = null;
   try { hygiene = require('./hygiene.js').runHygiene(libDir); } catch (_) {}
 
-  // 4b. tokens.json + dashboard.html — Map · Overview · Design Tokens (self-contained; live via tools/map.js)
-  const tokens = aggregateTokens(pagesDir, ordered);
+  // 4b. tokens.json + dashboard.html — Map · Home · Design language (self-contained; live via tools/map.js)
   fs.writeFileSync(path.join(libDir, 'tokens.json'), JSON.stringify(tokens, null, 2), 'utf8');
   const tplPath = path.join(__dirname, 'dashboard-template.html');
   if (fs.existsSync(tplPath)) {
     const mapData = {
       product: sitemap.product, origin: sitemap.origin, generatedAt: manifest.capturedAt,
+      rootSlug, sections: sectionsOrder, districts,
       nodes: ordered.map(slug => { const p = pages[slug]; const m = p.meta; return {
         id: slug, kind: m.template ? 'template' : 'page',
         label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), route: m.route,
@@ -301,8 +470,10 @@ function buildIndex(libDir) {
         screenshot: `pages/${slug}/screenshot.png`, pageHtml: `pages/${slug}/page.html`, pageMd: `pages/${slug}/page.md`,
         capturedAt: m.capturedAt, standsFor: m.template ? m.collapsed + 1 : null,
         states: p.states, notes: p.notes, descPending: !p.description,
+        inboundCount: p.linkedFrom.length, clickDepth: depths[slug], section: sectionOf(m.route),
+        linksTo: p.linksTo.map(t => t.replace(' (template)', '')), linkedFrom: p.linkedFrom,
       }; }),
-      frontier,
+      frontier: frontier.map(f => ({ ...f, section: f.pattern ? sectionOf(f.pattern) : sectionOfUrl(f.url) })),
       edges: [
         ...ordered.flatMap(slug => pages[slug].linksTo.map(t => ({ a: slug, b: t.replace(' (template)', ''), kind: 'link' }))),
         ...frontier.flatMap(f => (f.underTemplate ? [f.underTemplate] : f.via.slice(0, 3)).map(v => ({ a: v, b: f.id, kind: 'frontier' }))),
@@ -323,7 +494,9 @@ function buildIndex(libDir) {
     };
     const dash = { map: mapData, overview, tokens: { ...tokens, raw: undefined }, // raw stays in tokens.json, not the page
       workspaceName: path.basename(path.dirname(libDir)),
-      pendingDescriptions: ordered.filter(s => !pages[s].description).length };
+      pendingDescriptions: ordered.filter(s => !pages[s].description).length,
+      // dashboard-v2 additions
+      identity, readiness, events, patternsPresent, productSummaryPresent };
     const html = fs.readFileSync(tplPath, 'utf8')
       .replace('/*__DASHDATA__*/null', JSON.stringify(dash).replace(/</g, '\\u003c'));
     fs.writeFileSync(path.join(libDir, 'dashboard.html'), html, 'utf8');
