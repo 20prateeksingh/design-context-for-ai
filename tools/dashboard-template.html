@@ -469,9 +469,18 @@ async function onCaptureDone(info){
   // a real page slug for the wireframe starter (registry.json now exists — build-index ran at capture end)
   let firstSlug='<slug>';
   try { const reg = await fetch('/registry.json').then(r=>r.json()); const ks = Object.keys(reg.pages||{}); if (ks.length) firstSlug = ks[0]; } catch(_){}
+  // capped count comes from the manifest (authoritative) — the log-parsed counters don't track it,
+  // and omitting it is how the completion screen used to imply a fuller picture than it captured.
+  let cappedCount=0;
+  try { const m = await fetch('/manifest.json').then(r=>r.json()); cappedCount = m.capped||0; } catch(_){}
+  const sub = [];
+  if (tplCount) sub.push(`${tplCount} repeating layout${tplCount===1?'':'s'} collapsed to one example each.`);
+  if (skipCount) sub.push(`${skipCount} skipped (the Overview tab says why).`);
+  if (cappedCount){ const one = cappedCount===1;
+    sub.push(`${cappedCount} more page${one?'':'s'} ${one?'was':'were'} discovered but not downloaded — a cap keeps this first pass small. Find ${one?'it':'them'} on the map's frontier (step 2) and unlock anything that matters.`); }
   obEl().innerHTML = `<div class="ob">
     <h2>Captured ${capCount} page${capCount===1?'':'s'} of ${esc(host)} ✓</h2>
-    <p class="sub">${tplCount?`${tplCount} repeating layout${tplCount===1?'':'s'} collapsed to one example each. `:''}${skipCount?`${skipCount} skipped (the Overview tab says why). `:''}Your product is now design context your AI tools can read. Three moves to start:</p>
+    <p class="sub">${sub.length?sub.join(' ')+' ':''}Your product is now design context your AI tools can read. Three moves to start:</p>
     <div class="ok-note" style="padding:16px">
       <div style="margin-bottom:6px"><b>1 · Describe your pages</b> — an AI writes a guide for each captured page.</div>
       <div class="chiprow" style="margin-bottom:14px">${pchip('Copy the describe prompt', PROMPTS.describeLibrary())}</div>
