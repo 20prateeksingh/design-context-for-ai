@@ -52,7 +52,9 @@ const LOGIN_PAGE = hasFlag('--login-page');
 const START_URL = getArg('--url', null) || CFG.url || null;
 const ONLY_URLS = getArg('--urls', null);   // selective capture: comma-separated URLs from the map's frontier
 const STATE = getArg('--state', null);      // state capture: <pageSlug>:<stateName>, with --url = the state's URL
-if (!START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
+const GUIDED = hasFlag('--guided');         // guided capture: headed browser, human drives, snapshot on the overlay button
+const GUIDED_PAGE = getArg('--page', null); // default page slug guided states attach to (overridable per-capture in the overlay)
+if (require.main === module && !START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --guided --url <startUrl> [--page <slug>]   (human drives; snapshot button-only states/modals)\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
 
 const PROFILE = getArg('--profile', 'default');
 const DEPTH = parseInt(getArg('--depth', String(CFG_PRESETS.depth != null ? CFG_PRESETS.depth : 1)), 10);
@@ -354,17 +356,13 @@ async function classifyBadPage(page) {
   });
 }
 
-// ── Capture one page → pages/<slug>/ ─────────────────────────────────────────
-async function capturePage(page, context, url, meta, outDir, actionLog) {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-  await settle(page);
-  await dismissBanner(page, actionLog);
-
+// ── Snapshot the CURRENTLY-LOADED page → pages/<subdir||slug>/ ────────────────
+// No navigation: the caller has already positioned the page (capturePage navigates first;
+// guided capture lets the human navigate/click). Reused by both so the artifact shape is identical.
+// NOTE: inlining mutates the live DOM (link→style, img→data-uri). Callers that keep interacting
+// with the page afterward (guided mode) remount their own UI after this returns.
+async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
   const finalUrl = page.url();
-  // In --login-page mode the login route IS the target — capture it; skip the auth-redirect guard.
-  if (!meta.loginPage && /\/(login|signin|sign-in|signup|auth)\b/i.test(new URL(finalUrl).pathname) && !/login|signin/i.test(new URL(url).pathname)) {
-    return { status: 'auth-redirect', finalUrl };
-  }
   const bad = await classifyBadPage(page);
   if (bad) return { status: bad, finalUrl };
 
@@ -391,27 +389,99 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
   let html = await page.evaluate(() => `<!DOCTYPE html>${document.documentElement.outerHTML}`);
   html = prettyHtml(makeStatic(html, finalUrl));
 
+  const method = meta.method || 'dom';
   fs.writeFileSync(path.join(dir, 'page.html'), html, 'utf8');
-  fs.writeFileSync(path.join(dir, 'content.md'), `# ${title}\n\nSource: ${finalUrl} — verbatim copy, method: dom\n\n${content}\n`, 'utf8');
+  fs.writeFileSync(path.join(dir, 'content.md'), `# ${title}\n\nSource: ${finalUrl} — verbatim copy, method: ${method}\n\n${content}\n`, 'utf8');
   fs.writeFileSync(path.join(dir, 'computed-tokens.json'), JSON.stringify(tokens, null, 2), 'utf8');
 
   const origin = new URL(finalUrl).origin;
   const outLinks = linksOut.map(h => normalizeUrl(h, origin)).filter(u => u && isCapturable(u, origin));
   const metaOut = {
-    url, finalUrl, route: new URL(finalUrl).pathname, pattern: meta.pattern || routePattern(finalUrl),
+    url: requestedUrl, finalUrl, route: new URL(finalUrl).pathname, pattern: meta.pattern || routePattern(finalUrl),
     title, navLabel: meta.label || null,
     template: meta.template || null, collapsed: meta.collapsed || 0,
     linksOut: [...new Set(outLinks)].slice(0, 200),
     capturedAt: new Date().toISOString(), viewport: VIEWPORT,
-    source: 'scrape', method: 'dom', contentHash: contentHash(html),
+    source: 'scrape', method, contentHash: contentHash(html),
+    // method: 'guided' — reached by a human interaction (click/wizard), not URL navigation.
+    // reachedBy records HOW, so a state with no inbound link is explained, not mysterious.
+    ...(meta.reachedBy ? { reachedBy: meta.reachedBy } : {}),
     ...(meta.loginPage ? { capturedLoggedOut: true, note: 'signed-out surface captured before login existed' } : {}),
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(metaOut, null, 2), 'utf8');
   return { status: 'ok', slug, meta: metaOut, sizeKb: Math.round(html.length / 1024) };
 }
 
+// ── Capture one page → pages/<slug>/ (navigate, settle, then snapshot) ────────
+async function capturePage(page, context, url, meta, outDir, actionLog) {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await settle(page);
+  await dismissBanner(page, actionLog);
+
+  const finalUrl = page.url();
+  // In --login-page mode the login route IS the target — capture it; skip the auth-redirect guard.
+  if (!meta.loginPage && /\/(login|signin|sign-in|signup|auth)\b/i.test(new URL(finalUrl).pathname) && !/login|signin/i.test(new URL(url).pathname)) {
+    return { status: 'auth-redirect', finalUrl };
+  }
+  return writeSnapshot(page, context, url, meta, outDir);
+}
+
+// ── Guided-capture overlay (runs IN the page; injected on every document) ─────
+// The one piece of UI the tool draws: a corner chip the designer clicks to snapshot the
+// current state. The designer drives the product; this only records. Excluded from the
+// snapshot itself (the Node handler removes it before capture, remounts after).
+function guidedOverlayInjector(defaultPage) {
+  if (window.top !== window) return; // top frame only
+  function build() {
+    if (document.getElementById('__dck_overlay') || !document.body) return;
+    const wrap = document.createElement('div');
+    wrap.id = '__dck_overlay';
+    wrap.setAttribute('style', [
+      'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
+      'width:270px', 'background:#111', 'color:#fff', 'padding:12px 12px 10px',
+      'border-radius:10px', 'box-shadow:0 6px 24px rgba(0,0,0,.35)', 'opacity:.96',
+      'font:13px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif',
+    ].join(';'));
+    const field = 'width:100%;box-sizing:border-box;margin:4px 0;padding:6px 8px;border:1px solid #444;border-radius:6px;background:#1c1c1c;color:#fff;font:12px sans-serif';
+    wrap.innerHTML =
+      '<div style="font-weight:600;margin-bottom:6px">📸 Guided Capture</div>' +
+      '<label style="font-size:11px;color:#aaa">Page slug</label>' +
+      '<input id="__dck_page" style="' + field + '" value="' + String(defaultPage || '').replace(/"/g, '&quot;') + '">' +
+      '<label style="font-size:11px;color:#aaa">State name</label>' +
+      '<input id="__dck_state" style="' + field + '" placeholder="e.g. fee-advance">' +
+      '<label style="font-size:11px;color:#aaa">Reached by (optional)</label>' +
+      '<input id="__dck_note" style="' + field + '" placeholder="e.g. Balances → Fee Advance tab">' +
+      '<button id="__dck_btn" style="width:100%;margin-top:8px;padding:7px;border:0;border-radius:6px;background:#2f6fed;color:#fff;font-weight:600;cursor:pointer">📸 Capture this state</button>' +
+      '<div id="__dck_status" style="font-size:11px;color:#9fd39f;margin-top:6px;min-height:14px"></div>';
+    document.body.appendChild(wrap);
+    const btn = wrap.querySelector('#__dck_btn');
+    const statusEl = wrap.querySelector('#__dck_status');
+    if (window.__dckLast) statusEl.textContent = window.__dckLast;
+    btn.addEventListener('click', async () => {
+      const pageSlug = wrap.querySelector('#__dck_page').value.trim();
+      const state = wrap.querySelector('#__dck_state').value.trim();
+      const note = wrap.querySelector('#__dck_note').value.trim();
+      if (!state) { statusEl.style.color = '#e6a'; statusEl.textContent = 'name the state first'; return; }
+      btn.disabled = true; statusEl.style.color = '#ccc'; statusEl.textContent = 'capturing…';
+      try {
+        const r = await window.__dckCapture({ page: pageSlug, state, note });
+        // (the overlay is typically remounted by the handler; this is a fallback if it wasn't)
+        statusEl.style.color = r && r.ok ? '#9fd39f' : '#e6a';
+        statusEl.textContent = r && r.ok ? ('✓ saved "' + state + '"') : ('✗ ' + ((r && r.error) || 'failed'));
+      } catch (e) { statusEl.style.color = '#e6a'; statusEl.textContent = '✗ ' + (e.message || 'failed'); }
+      btn.disabled = false;
+    });
+  }
+  window.__dckMount = () => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); build(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
+  else build();
+}
+
+// Exported for tests/reuse. Requiring this file no longer auto-runs the CLI (guarded below).
+module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor };
+
 // ── Main ──────────────────────────────────────────────────────────────────────
-(async () => {
+if (require.main === module) (async () => {
   // ── Login-page mode (PRD §2·4a): ephemeral, logged-out, one page → pages/login/ ──
   // Runs BEFORE login.js, so no persistent profile exists yet — uses a throwaway context that
   // never touches (or locks) the designer's profile. The signed-out surface is uncapturable once
@@ -436,6 +506,73 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
       try { require('./build-index.js').buildIndex(OUT_DIR); console.log('📇  index refreshed'); }
       catch (e) { console.log(`⚠  build-index skipped: ${e.message.split('\n')[0]}`); }
     }
+    return;
+  }
+
+  // ── Guided capture: headed browser, the DESIGNER drives, snapshot on the overlay button ──
+  // Closes the button-only-state / modal gap (tabs with no URL, multi-step wizards) that the
+  // URL-based crawl and --state cannot reach. The tool NEVER clicks product controls — a human
+  // reaches the state, the overlay button records it (method: guided, with a reached-by note).
+  if (GUIDED) {
+    const OUT_DIR = path.join(KIT_DIR, 'design-context');
+    fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
+    if (!START_URL) { console.error('Usage: node capture.js --guided --url <startUrl> [--page <slug>] [--profile default]'); process.exit(1); }
+    if (!fs.existsSync(PROFILE_DIR)) {
+      console.error(`\n❌  Guided capture needs your logged-in profile.\n   Run first: node tools/login.js --url ${START_URL}\n`);
+      process.exit(1);
+    }
+    console.log(`\n🚀 Guided capture — ${START_URL}`);
+    console.log(`   A browser opens on your logged-in session. Drive to each state you want`);
+    console.log(`   (click a tab, step through a wizard), then click "📸 Capture this state".`);
+    console.log(`   Close the window when you're done.\n`);
+    let gctx;
+    try {
+      gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
+    } catch (e) {
+      if (/existing browser session|already in use/i.test(e.message)) {
+        console.error(`\n❌  The capture profile is open in another window (login.js?). Close it and re-run.\n`);
+        process.exit(1);
+      }
+      throw e;
+    }
+    const captures = [];
+    await gctx.exposeBinding('__dckCapture', async (source, payload) => {
+      const pageObj = source.page;
+      const pslug = String(payload.page || GUIDED_PAGE || slugFor(pageObj.url(), pageObj.url())).trim();
+      const sname = String(payload.state || '').trim();
+      if (!pslug) return { ok: false, error: 'page slug missing' };
+      if (!sname) return { ok: false, error: 'name the state first' };
+      const safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'state';
+      try {
+        await pageObj.evaluate(() => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); }); // keep the overlay out of the snapshot
+        const r = await writeSnapshot(pageObj, gctx, pageObj.url(),
+          { slug: pslug, subdir: path.join(pslug, 'states', safeName), label: sname, method: 'guided', reachedBy: payload.note || null, pattern: routePattern(pageObj.url()) },
+          OUT_DIR);
+        const msg = r.status === 'ok' ? `✓ saved "${sname}" (${r.sizeKb} KB)` : `✗ ${r.status}`;
+        await pageObj.evaluate((m) => { window.__dckLast = m; if (window.__dckMount) window.__dckMount(); }, msg).catch(() => {});
+        if (r.status !== 'ok') { console.log(`  ✗ ${pslug} › ${sname}: ${r.status}`); return { ok: false, error: r.status }; }
+        captures.push({ page: pslug, state: sname, url: pageObj.url() });
+        console.log(`  ✓ ${pslug} › ${sname}  (${r.sizeKb} KB)`);
+        return { ok: true, sizeKb: r.sizeKb };
+      } catch (e) {
+        console.log(`  ✗ ${pslug} › ${sname}: ${e.message.split('\n')[0]}`);
+        return { ok: false, error: e.message.split('\n')[0] };
+      }
+    });
+    await gctx.addInitScript(guidedOverlayInjector, GUIDED_PAGE || '');
+    const gp = gctx.pages()[0] || await gctx.newPage();
+    await gp.goto(START_URL, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+    await new Promise((resolve) => gctx.on('close', resolve));
+    console.log(`\n✅  Guided session ended — ${captures.length} state(s) captured.`);
+    try {
+      const { buildIndex } = require('./build-index.js');
+      const r = buildIndex(OUT_DIR);
+      console.log(`📇  Index + map rebuilt (${r.pages} pages)`);
+    } catch (e) { console.log(`⚠  build-index failed: ${e.message.split('\n')[0]}`); }
+    try {
+      const { runHygiene, formatHygiene } = require('./hygiene.js');
+      console.log(formatHygiene(runHygiene(OUT_DIR)));
+    } catch (e) { console.log(`⚠  hygiene skipped: ${e.message.split('\n')[0]}`); }
     return;
   }
 
