@@ -567,6 +567,7 @@ if (require.main === module) (async () => {
         if (fs.existsSync(mp)) { try { capturedIndex.set(s, formatWhen(JSON.parse(fs.readFileSync(mp, 'utf8')).capturedAt)); } catch (_) {} }
       } }
     const captures = [];
+    const sessionNames = new Set(); // `${slug}/${name}` captured THIS session — repeats get suffixed, never overwritten
     // URL-awareness: the overlay asks this on every navigation → red (new) vs green (seen, + when).
     await gctx.exposeBinding('__dckStatus', async (source, url) => {
       const slug = slugFor(url, url);
@@ -580,11 +581,20 @@ if (require.main === module) (async () => {
       const sname = String(payload.state || '').trim();
       // New URL → capture as a PAGE. Already-captured URL → this is a variant, capture as a STATE (needs a name).
       if (!isNew && !sname) return { ok: false, error: 'name the state (this URL is already captured)' };
-      const safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
-      const label = isNew ? slug : `${slug} › ${sname}`;
+      let safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'state';
+      // Collision guard: a name reused WITHIN this session is a distinct new capture → suffix it so it
+      // never silently overwrites (the "5× modal" data-loss bug). A name matching only a PRIOR session's
+      // state is left as-is → deliberate re-capture still overwrites.
+      if (!isNew && sessionNames.has(`${slug}/${safeName}`)) {
+        let i = 2, cand; const statesRoot = path.join(OUT_DIR, 'pages', slug, 'states');
+        do { cand = `${safeName}-${i++}`; } while (sessionNames.has(`${slug}/${cand}`) || fs.existsSync(path.join(statesRoot, cand)));
+        safeName = cand;
+      }
+      if (!isNew) sessionNames.add(`${slug}/${safeName}`);
+      const label = isNew ? slug : `${slug} › ${safeName}`;
       const meta = isNew
         ? { slug, label: null, method: 'guided', reachedBy: `guided capture — ${url}`, pattern: routePattern(url) }
-        : { slug, subdir: path.join(slug, 'states', safeName || 'state'), label: sname, method: 'guided', reachedBy: `${new URL(url).pathname} · state: ${sname}`, pattern: routePattern(url) };
+        : { slug, subdir: path.join(slug, 'states', safeName), label: safeName, method: 'guided', reachedBy: `${new URL(url).pathname} · state: ${safeName}`, pattern: routePattern(url) };
       try {
         await pageObj.evaluate(() => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); }); // keep the overlay out of the snapshot
         const r = await writeSnapshot(pageObj, gctx, url, meta, OUT_DIR);
