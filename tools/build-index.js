@@ -28,6 +28,22 @@ const PENDING = '_(not yet described — run the describe step)_';
 
 function normalize(u) { try { const x = new URL(u); x.hash = ''; let s = x.href; if (s.endsWith('/') && x.pathname !== '/') s = s.slice(0, -1); return s; } catch { return u; } }
 
+// A template representative page has no nav label and would otherwise inherit ONE collapsed
+// instance's <title> or route as its identity (e.g. "XFlow" / "/connected-users/account_F0A_…").
+// Derive a clean human name from the pattern instead: /connected-users/:id → "Connected User Details".
+// Returns null for non-template pages so their existing label fallback is untouched.
+function templateLabel(m) {
+  if (!m || !m.template || !m.pattern) return null;
+  const segs = m.pattern.split('/').filter(s => s && !/^[:[]/.test(s)); // drop dynamic segments (:id, [id])
+  const last = segs[segs.length - 1];
+  if (!last) return null;
+  const words = last.split(/[-_]/).filter(Boolean);
+  if (!words.length) return null;
+  words[words.length - 1] = words[words.length - 1].replace(/s$/, ''); // singularize the final word only
+  const titled = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return titled ? `${titled} Details` : null;
+}
+
 function headingsFrom(contentMd, max = 8) {
   return contentMd.split('\n').filter(l => /^#{1,6} /.test(l)).slice(1, 1 + max) // skip the title line
     .map(l => l.replace(/^#+ /, '').trim()).filter(Boolean);
@@ -226,7 +242,7 @@ function buildIndex(libDir) {
       `method: dom (facts) + labeled ai section (description)`,
       '---',
       '',
-      `# ${m.navLabel || m.title || slug}`,
+      `# ${m.navLabel || templateLabel(m) || m.title || slug}`,
       '',
       '## What this page is',
       AI_BEGIN,
@@ -254,7 +270,7 @@ function buildIndex(libDir) {
     generated: 'build-index.js — derived view; ground truth lives in pages/*/meta.json',
     howToConsume: 'Start at INDEX.md (human) or here (machine). Each page: pages/<slug>/ with page.md (digest), screenshot.png, page.html (editable baseline), content.md (verbatim copy), computed-tokens.json, meta.json. description.method=ai means model-written orientation prose, not extracted fact.',
     pages: Object.fromEntries(ordered.map(slug => { const p = pages[slug]; const m = p.meta; return [slug, {
-      route: m.route, url: m.finalUrl, label: m.navLabel || null, title: m.title || null,
+      route: m.route, url: m.finalUrl, label: m.navLabel || templateLabel(m) || null, title: m.title || null,
       template: m.template ? { pattern: m.pattern, standsFor: m.collapsed + 1 } : null,
       files: { pageMd: `pages/${slug}/page.md`, screenshot: `pages/${slug}/screenshot.png`, html: `pages/${slug}/page.html`, content: `pages/${slug}/content.md`, tokens: `pages/${slug}/computed-tokens.json`, meta: `pages/${slug}/meta.json` },
       linksTo: p.linksTo, linkedFrom: p.linkedFrom, contentHash: m.contentHash,
@@ -275,7 +291,7 @@ function buildIndex(libDir) {
       product: sitemap.product, origin: sitemap.origin, generatedAt: manifest.capturedAt,
       nodes: ordered.map(slug => { const p = pages[slug]; const m = p.meta; return {
         id: slug, kind: m.template ? 'template' : 'page',
-        label: m.navLabel || (m.title || slug).slice(0, 40), route: m.route,
+        label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), route: m.route,
         desc: p.description ? p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null,
         screenshot: `pages/${slug}/screenshot.png`, pageHtml: `pages/${slug}/page.html`, pageMd: `pages/${slug}/page.md`,
         capturedAt: m.capturedAt, standsFor: m.template ? m.collapsed + 1 : null,
@@ -293,7 +309,7 @@ function buildIndex(libDir) {
         desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null, descPending: !pages[s].description })),
       templates: ordered.filter(s => pages[s].meta.template).map(s => ({ slug: s, pattern: pages[s].meta.pattern, standsFor: pages[s].meta.collapsed + 1,
         screenshot: `pages/${s}/screenshot.png`, desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
-      recent: ordered.map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title || s, at: pages[s].meta.capturedAt }))
+      recent: ordered.map(s => ({ slug: s, label: pages[s].meta.navLabel || templateLabel(pages[s].meta) || pages[s].meta.title || s, at: pages[s].meta.capturedAt }))
         .sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 8),
       statesTotal: ordered.reduce((n, s) => n + pages[s].states.filter(x => x.captured).length, 0),
       notes: ordered.filter(s => pages[s].notes).map(s => ({ slug: s, notes: pages[s].notes })),
@@ -312,7 +328,7 @@ function buildIndex(libDir) {
   const line = (slug) => { const p = pages[slug]; const m = p.meta;
     const desc = p.description ? p.description.split(/(?<=\.)\s/)[0].replace(/\|/g, '\\|') : '_pending_';
     const tpl = m.template ? ` ⧉×${m.collapsed + 1}` : '';
-    return `| **${m.navLabel || m.title || slug}**${tpl} | \`${m.route}\` | ${desc} | [📸](pages/${slug}/screenshot.png) [HTML](pages/${slug}/page.html) [MD](pages/${slug}/page.md) |`; };
+    return `| **${m.navLabel || templateLabel(m) || m.title || slug}**${tpl} | \`${m.route}\` | ${desc} | [📸](pages/${slug}/screenshot.png) [HTML](pages/${slug}/page.html) [MD](pages/${slug}/page.md) |`; };
   const navSlugs = ordered.filter(s => !pages[s].meta.template);
   const tplSlugs = ordered.filter(s => pages[s].meta.template);
   const index = [
