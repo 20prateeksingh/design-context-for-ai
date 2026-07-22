@@ -26,7 +26,8 @@
  * Guided capture (guided-capture-integration PRD, F5):
  *   POST /api/guided/start {startUrl?}    → spawns capture.js --guided --url (headed, human drives);
  *                                           409 if a capture/guided/login already holds the profile
- *   GET  /api/guided/status               → {running, startedAt, captures:N, lastCapture}
+ *   POST /api/guided/stop                 → ends a running guided session (SIGTERM → graceful close)
+ *   GET  /api/guided/status               → {running, startedAt, captures:N, lastCapture, capturing}
  *                                           (also folded into /api/status as `guided`)
  *   (SSE) reuses /api/capture/events with namespaced "guided" / "guided-done" events
  *
@@ -129,10 +130,12 @@ function guidedStatePayload() {
     startUrl: guidedJob ? guidedJob.startUrl : null,
     captures: guidedJob ? guidedJob.captures.length : 0,
     lastCapture: guidedJob ? guidedJob.lastCapture : null,
+    capturing: !!(guidedJob && guidedJob.capturing),   // a page snapshot is in flight right now
     code: guidedJob ? guidedJob.code : null,
   };
 }
-// Parse capture.js's stdout for the stable `GUIDED_JSON:` line (one per capture) → live status + SSE.
+// Parse capture.js's stdout for the stable `GUIDED_JSON:` line → live status + SSE. Two shapes:
+// {phase:'capturing',url} (a snapshot started) and {slug,state,url,at,...} (one finished).
 function pushGuidedOutput(text) {
   if (!guidedJob) return;
   guidedJob._partial += String(text).replace(/\r/g, '');
@@ -140,8 +143,11 @@ function pushGuidedOutput(text) {
   guidedJob._partial = parts.pop();
   for (const ln of parts) {
     if (ln.indexOf('GUIDED_JSON:') === 0) {
-      try { const c = JSON.parse(ln.slice('GUIDED_JSON:'.length)); guidedJob.captures.push(c); guidedJob.lastCapture = c; broadcast('guided', JSON.stringify(guidedStatePayload())); }
-      catch (_) {}
+      try { const c = JSON.parse(ln.slice('GUIDED_JSON:'.length));
+        if (c.phase === 'capturing') { guidedJob.capturing = true; }
+        else { guidedJob.captures.push(c); guidedJob.lastCapture = c; guidedJob.capturing = false; }
+        broadcast('guided', JSON.stringify(guidedStatePayload()));
+      } catch (_) {}
     }
   }
 }
@@ -154,9 +160,10 @@ function startGuided(startUrl, res) {
   const url = /^https?:\/\//.test(s) ? s : (product && product.url) || null;
   if (!url) return json(res, 400, { ok: false, error: 'no start URL and no product.json — answer onboarding first' });
   busy = true;
-  guidedJob = { running: true, code: null, startedAt: new Date().toISOString(), startUrl: url, captures: [], lastCapture: null, _partial: '' };
+  guidedJob = { running: true, code: null, startedAt: new Date().toISOString(), startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, _partial: '' };
   console.log(`▶ guided ${url}`);
   const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), '--guided', '--url', url], { cwd: __dirname });
+  guidedJob.child = child;   // held so /api/guided/stop can end the session (SIGTERM → graceful close)
   child.stdout.on('data', pushGuidedOutput);
   child.stderr.on('data', pushGuidedOutput);
   child.on('error', (e) => { console.log(`✗ guided ${e.message}`); });
@@ -269,6 +276,15 @@ const server = http.createServer((req, res) => {
       }
 
       if (url === '/api/guided/start') return startGuided(data.startUrl, res);
+
+      if (url === '/api/guided/stop') {
+        if (!(guidedJob && guidedJob.running)) return json(res, 200, { ok: true, alreadyStopped: true });
+        // SIGTERM → capture.js closes its browser context → 'close' fires → it writes the session +
+        // hygiene artifacts and rebuilds, then exits (the same clean path as quitting the window).
+        try { if (guidedJob.child) guidedJob.child.kill('SIGTERM'); } catch (_) {}
+        console.log('▶ guided stop requested');
+        return json(res, 200, { ok: true, stopping: true });
+      }
 
       if (url === '/api/capture' || url === '/api/state') {
         if (url === '/api/capture') {
