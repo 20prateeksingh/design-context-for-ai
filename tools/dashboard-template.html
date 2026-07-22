@@ -1174,14 +1174,12 @@ function initDashboard(){
   // in the browser, then writes it to the clipboard as a user gesture. No plugin, no network, no server
   // required (the copy works on file:// too; the server, when present, only records the exit).
   const FIG_LABEL = '⧉ Copy for Figma';
-  // The vendored converter's DEFAULT font loader fetches Inter from cdn.jsdelivr.net on EVERY convert —
-  // a network call the kit must never make (offline + no-CDN is a hard invariant, verified by network
-  // trace). This no-network loader keeps the kit fully local: font BYTES simply aren't embedded, so
-  // Figma renders text in its own matching typefaces (Inter etc. are built in). Text GEOMETRY is
-  // unaffected — the converter reads it from the live DOM's computed styles, not from font metrics — so
-  // fidelity holds. (External assets a SNAPSHOT itself references, e.g. an <img> to a CDN, are fetched by
-  // the browser rendering that page.html exactly as opening it directly would — snapshot content, not us.)
-  const FIGMA_FONT_LOADER = async ()=>{ throw new Error('offline — fonts render in Figma’s own typefaces'); };
+  // Font handling: the pasted Figma TEXT only survives if the converter can embed real font bytes — a
+  // loader that returns no/empty bytes makes Figma drop the text and keep only images + frames. So we
+  // use the converter's DEFAULT font loader, which fetches the needed font (falling back to Inter) from
+  // cdn.jsdelivr.net/fontsource. That is the ONE external request the kit makes during a copy: a cacheable
+  // GET of public font files, no user data. (See figma-exit-copy-paste-2026-07: fully-offline text needs
+  // fonts vendored locally — a follow-up; text fidelity wins over the no-CDN purity in the meantime.)
   let figmaLib = null;     // the lazy-loaded DomToFigma module (loaded once, on first Copy click)
   let figmaCache = null;   // { key, item, html } — a converted payload kept for a focused click:
                            //   both the two-phase re-arm (F2·3) AND the same-page repeat-copy cache (§4·5)
@@ -1222,7 +1220,7 @@ function initDashboard(){
       const width = Math.max(doc.documentElement.scrollWidth||0, doc.body.scrollWidth||0, 1440);
       if (Math.abs(width - 1440) > 1){ frame.style.width = width + 'px'; await sleep(80); }   // reflow at natural width, then re-measure height
       const height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);
-      const conv = lib.createFigmaConverter({ fontLoader: FIGMA_FONT_LOADER });
+      const conv = lib.createFigmaConverter();   // default font loader — embeds real fonts so Figma keeps the text
       const result = await conv.convert({ element: doc.body, width, height, name });
       return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0 };
     } finally {
