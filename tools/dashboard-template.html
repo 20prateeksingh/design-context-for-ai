@@ -1134,18 +1134,23 @@ function initDashboard(){
   // SSE primary (namespaced "guided"/"guided-done"), polling fallback — mirrors attachStream().
   function guidedStream(){
     let done=false;
-    const finish=()=>{ if(done) return; done=true;
+    const finish=(d)=>{ if(done) return; done=true; guidedLive=null;
+      if(d && d.error){                                   // launch failed (usually a locked profile) — say why, don't reload into nothing
+        toast('Guided capture couldn’t start: ' + d.error, true);
+        if(document.getElementById('pane-home').classList.contains('active')) renderHome();
+        return;
+      }
       toast('Guided session ended — rebuilding your library…', true);
       setTimeout(()=>{ location.hash=''; location.reload(); }, 900); };
     const update=(p)=>{ if(!p) return; guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture, capturing:!!p.capturing };
-      if(!p.running) return finish(); paintGuidedLive(); };
+      if(!p.running) return finish(p); paintGuidedLive(); };
     const poll=async()=>{ for(;;){ if(done) return;
       const s=await fetch('/api/guided/status').then(x=>x.json()).catch(()=>null);
       if(s){ update(s); if(!s.running) return; } await sleep(1200); } };
     if(typeof EventSource==='undefined') return poll();
     let es; try{ es=new EventSource('/api/capture/events'); }catch(_){ return poll(); }
     es.addEventListener('guided', e=>{ let p={}; try{p=JSON.parse(e.data);}catch(_){} update(p); });
-    es.addEventListener('guided-done', e=>{ try{es.close();}catch(_){} finish(); });
+    es.addEventListener('guided-done', e=>{ let d={}; try{d=JSON.parse(e.data);}catch(_){} try{es.close();}catch(_){} finish(d); });
     es.onerror=()=>{ if(done) return; try{es.close();}catch(_){} poll(); };
   }
 
