@@ -557,10 +557,12 @@ if (require.main === module) (async () => {
       console.error(`\n❌  Guided capture needs your logged-in profile.\n   Run first: node tools/login.js --url ${START_URL}\n`);
       process.exit(1);
     }
+    const QUIT_HINT = process.platform === 'darwin' ? 'press ⌘Q to QUIT the browser (⌘W / closing the window is not enough — Chrome keeps running)' : 'fully quit the browser window (closing it may not end the process)';
     console.log(`\n🚀 Guided capture — ${START_URL}`);
     console.log(`   A browser opens on your logged-in session. A pill sits at the bottom:`);
     console.log(`   it turns red on a URL never captured, green (with the time) on one already in`);
-    console.log(`   the library. Drive to any state and click 📸 Capture. Close the window when done.\n`);
+    console.log(`   the library. Drive to any state and click 📸 Capture.`);
+    console.log(`   When you're done, ${QUIT_HINT} — that ends the session, rebuilds the index, and runs the hygiene check.\n`);
     let gctx;
     try {
       gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
