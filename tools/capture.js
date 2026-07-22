@@ -145,12 +145,31 @@ function mergeTemplateGroups(groups) { // Map<pattern, {urls:Set, from}>
   }
 }
 
+// Analytics/nav-source params that must NOT fork a page into a distinct slug: they carry no content
+// (e.g. flipkart's ?link=home_rewards, utm_*, gclid). Stripping them is what makes the automated crawl
+// and guided capture agree on one slug per page — otherwise the crawl (following a tracked nav link)
+// and a guided visit (clean URL) produce two folders for the same page. Conservative denylist.
+const TRACKING_PARAM = /^(link|otracker\d*|utm_[a-z]+|gclid|gclsrc|fbclid|dclid|msclkid|mc_eid|mc_cid|igshid|_ga|cmpid|spm|ref_)$/i;
+function cleanSearch(search) {
+  if (!search) return '';
+  let sp; try { sp = new URLSearchParams(search); } catch { return ''; }
+  for (const k of [...sp.keys()]) if (TRACKING_PARAM.test(k)) sp.delete(k);
+  const kept = [...sp.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // stable → order-independent
+  return kept.length ? '?' + kept.map(([k, v]) => `${k}=${v}`).join('&') : '';
+}
+// Canonical per-page identity: pathname (no trailing slash) + meaningful query (tracking stripped, sorted).
+// The one key the crawl and guided both derive the same, so "already captured?" is answered consistently.
+function routeKey(url) {
+  try { const u = new URL(url); let p = u.pathname; if (p !== '/' && p.endsWith('/')) p = p.slice(0, -1); return p + cleanSearch(u.search); }
+  catch { return url || '/'; }
+}
 function slugFor(url, origin) {
   try {
     const u = new URL(url);
     let s = u.pathname === '/' ? 'home' : u.pathname.split('/').filter(Boolean).join('-');
     s = s.replace(/[^A-Za-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-    if (u.search) s += '-' + crypto.createHash('sha1').update(u.search).digest('hex').slice(0, 6);
+    const cs = cleanSearch(u.search);                    // tracking params never fork the slug
+    if (cs) s += '-' + crypto.createHash('sha1').update(cs).digest('hex').slice(0, 6);
     return s.slice(0, 80) || 'home';
   } catch { return 'page'; }
 }
@@ -530,7 +549,7 @@ function flattenHygiene(f) {
 }
 
 // Exported for tests/reuse. Requiring this file no longer auto-runs the CLI (guarded below).
-module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, flattenHygiene };
+module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, routeKey, cleanSearch, flattenHygiene };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 if (require.main === module) (async () => {
@@ -590,26 +609,33 @@ if (require.main === module) (async () => {
       throw e;
     }
     const formatWhen = (iso) => { try { return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch { return iso || ''; } };
-    // Seed the URL-awareness index from what's already captured (slug → when).
-    const capturedIndex = new Map();
+    // Seed the URL-awareness index keyed by ROUTE (tracking stripped), each → the slug already on disk.
+    // Keying by route (not by a freshly-derived slug) is what lets guided recognize a page the crawl
+    // saved under a tracking-suffixed slug (e.g. account-rewards-94b8ce from ?link=home_rewards) when the
+    // designer lands on the clean URL — so it re-captures that page instead of forking a duplicate folder.
+    const routeIndex = new Map(); // routeKey → { slug, at }
     { const pdir = path.join(OUT_DIR, 'pages');
       if (fs.existsSync(pdir)) for (const s of fs.readdirSync(pdir)) {
         const mp = path.join(pdir, s, 'meta.json');
-        if (fs.existsSync(mp)) { try { capturedIndex.set(s, formatWhen(JSON.parse(fs.readFileSync(mp, 'utf8')).capturedAt)); } catch (_) {} }
+        if (fs.existsSync(mp)) { try { const m = JSON.parse(fs.readFileSync(mp, 'utf8'));
+          routeIndex.set(routeKey(m.finalUrl || m.url || `/${s}`), { slug: s, at: formatWhen(m.capturedAt) });
+        } catch (_) {} }
       } }
     const startedAt = new Date().toISOString();  // session start — persisted at session end (F4)
     const captures = [];
     const sessionNames = new Set(); // `${slug}/${name}` captured THIS session — repeats get suffixed, never overwritten
     // URL-awareness: the overlay asks this on every navigation → red (new) vs green (seen, + when).
     await gctx.exposeBinding('__dckStatus', async (source, url) => {
-      const slug = slugFor(url, url);
-      return { slug, captured: capturedIndex.has(slug), at: capturedIndex.get(slug) || null };
+      const existing = routeIndex.get(routeKey(url));
+      return { slug: existing ? existing.slug : slugFor(url, url), captured: !!existing, at: existing ? existing.at : null };
     });
     await gctx.exposeBinding('__dckCapture', async (source, payload) => {
       const pageObj = source.page;
       const url = pageObj.url();
-      const slug = slugFor(url, url);                 // page slug auto-derived from the URL (no field to fill)
-      const isNew = !capturedIndex.has(slug);
+      const rk = routeKey(url);
+      const existing = routeIndex.get(rk);            // the slug already on disk for this route, if any
+      const slug = existing ? existing.slug : slugFor(url, url); // reuse the existing slug → overwrite, don't duplicate
+      const isNew = !existing;
       const sname = String(payload.state || '').trim();
       const recapture = !!payload.recapture;          // designer chose to overwrite the existing page
       // New URL → capture as a PAGE. Already-captured URL → either RE-CAPTURE the page (overwrite) or
@@ -637,7 +663,7 @@ if (require.main === module) (async () => {
         // Update the index BEFORE remounting, so the remounted pill's status reflects this capture (green + now).
         if (r.status === 'ok') {
           const at = new Date().toISOString();
-          capturedIndex.set(slug, formatWhen(at));
+          routeIndex.set(rk, { slug, at: formatWhen(at) });   // this route is now captured under `slug` → pill flips green, no re-duplicate
           const rec = { slug, state: sname || null, url, at, ...(recapture && !isNew ? { recapture: true } : {}) };
           captures.push(rec);
           // Stable machine line the server parses into live status + SSE (F5). ONLY under --guided —

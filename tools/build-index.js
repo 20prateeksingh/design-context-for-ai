@@ -28,6 +28,21 @@ const PENDING = '_(not yet described — run the describe step)_';
 
 function normalize(u) { try { const x = new URL(u); x.hash = ''; let s = x.href; if (s.endsWith('/') && x.pathname !== '/') s = s.slice(0, -1); return s; } catch { return u; } }
 
+// routeKey — canonical per-page identity with analytics/nav-source params stripped. MIRRORS
+// capture.js's routeKey (kept in sync by hand; both are tiny pure functions). Lets the link graph
+// resolve a nav link that carries a tracking param (e.g. /account/rewards?link=home_rewards) to the
+// page captured under the clean route — so tracked links don't leave real pages looking unlinked.
+const TRACKING_PARAM = /^(link|otracker\d*|utm_[a-z]+|gclid|gclsrc|fbclid|dclid|msclkid|mc_eid|mc_cid|igshid|_ga|cmpid|spm|ref_)$/i;
+function routeKey(u) {
+  try {
+    const x = new URL(u); let sp; try { sp = new URLSearchParams(x.search); } catch { sp = new URLSearchParams(); }
+    for (const k of [...sp.keys()]) if (TRACKING_PARAM.test(k)) sp.delete(k);
+    const kept = [...sp.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    let p = x.pathname; if (p !== '/' && p.endsWith('/')) p = p.slice(0, -1);
+    return p + (kept.length ? '?' + kept.map(([k, v]) => `${k}=${v}`).join('&') : '');
+  } catch { return u || '/'; }
+}
+
 // A template representative page has no nav label and would otherwise inherit ONE collapsed
 // instance's <title> or route as its identity (e.g. "XFlow" / "/connected-users/account_F0A_…").
 // Derive a clean human name from the pattern instead: /connected-users/:id → "Connected User Details".
@@ -186,9 +201,13 @@ function buildIndex(libDir) {
     pages[slug] = { meta, description, headings: headingsFrom(content) };
   }
 
-  // 2. link graph among captured pages: exact URL match, then template-pattern match
+  // 2. link graph among captured pages: exact URL match, then tracking-stripped routeKey, then template-pattern
   const byUrl = new Map();
-  for (const [slug, p] of Object.entries(pages)) { byUrl.set(normalize(p.meta.url), slug); byUrl.set(normalize(p.meta.finalUrl), slug); }
+  const byRouteKey = new Map();
+  for (const [slug, p] of Object.entries(pages)) {
+    byUrl.set(normalize(p.meta.url), slug); byUrl.set(normalize(p.meta.finalUrl), slug);
+    byRouteKey.set(routeKey(p.meta.finalUrl || p.meta.url), slug);
+  }
   const byPattern = new Map();
   for (const [slug, p] of Object.entries(pages)) if (p.meta.template) byPattern.set(p.meta.pattern, slug);
   const patternOf = (u) => { try { const segs = new URL(u).pathname.split('/').filter(Boolean); return '/' + segs.map(s => (/^\d+$/.test(s) || /^[0-9a-f]{12,}$/i.test(s) || (/\d/.test(s) && s.length >= 8 && /^[A-Za-z0-9_-]+$/.test(s))) ? ':id' : s).join('/'); } catch { return null; } };
@@ -198,6 +217,8 @@ function buildIndex(libDir) {
     for (const link of p.meta.linksOut || []) {
       const n = normalize(link);
       if (byUrl.has(n) && byUrl.get(n) !== slug) { to.add(byUrl.get(n)); continue; }
+      const rk = routeKey(link);                                  // tracked link → page captured under the clean route
+      if (byRouteKey.has(rk) && byRouteKey.get(rk) !== slug) { to.add(byRouteKey.get(rk)); continue; }
       const pat = patternOf(link);
       if (pat && byPattern.has(pat) && byPattern.get(pat) !== slug) to.add(byPattern.get(pat) + ' (template)');
     }
@@ -450,6 +471,26 @@ function buildIndex(libDir) {
       link: null });
   } catch (_) {}
 
+  // figma-copies.json (appended by map.js on each successful Copy-for-Figma) → one "you" event per
+  // copy (figma-exit-copy-paste PRD, F3). Additive + absent-safe: a workspace with no such file
+  // regenerates a byte-identical registry (crit #4). Derived from file CONTENTS (`at`), never mtime,
+  // so build-twice is identical. Capped to the last N in the ledger; full history stays in the file.
+  const FIGMA_LEDGER_CAP = 8;
+  try {
+    const fc = JSON.parse(fs.readFileSync(path.join(libDir, 'figma-copies.json'), 'utf8'));
+    const copies = (fc && Array.isArray(fc.copies)) ? fc.copies : [];
+    for (const c of copies.slice(-FIGMA_LEDGER_CAP)) {
+      if (!c || !c.slug || !c.at) continue;
+      const label = pageLabelOf(c.slug);
+      events.push({ at: c.at, dateOnly: false, seq: 5, actor: 'you', kind: 'figma',
+        title: c.state ? `Sent ${label} › ${c.state} to Figma` : `Sent ${label} to Figma`,
+        detail: null,
+        // link only when the page is still in the library (a copied page could be pruned later) — a
+        // dead link would 404; matches the hygiene-event safety posture.
+        link: pages[c.slug] ? { page: c.slug } : null });
+    }
+  } catch (_) {}
+
   // ascending by time, stable tiebreak (seq, then kind, then title) → identical across re-runs
   events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0) || (a.seq - b.seq) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
 
@@ -567,6 +608,16 @@ function buildIndex(libDir) {
     fs.writeFileSync(path.join(libDir, 'dashboard.html'), html, 'utf8');
     const stale = path.join(libDir, 'map.html'); if (fs.existsSync(stale)) fs.unlinkSync(stale); // superseded
   }
+
+  // 4c. _dom-to-figma.js — the vendored bundle that powers the ⧉ Copy for Figma exit, dropped beside
+  // dashboard.html as a DERIVED asset (regenerated every build like the dashboard, never hand-edited).
+  // 830KB, so it's NEVER inlined into the single-file dashboard — the dashboard lazy-loads it on the
+  // first Copy-for-Figma click (dashboard first-paint cost unchanged). Absent-safe: if the vendored
+  // file is missing, the build still succeeds and the dashboard shows its own paste-help toast.
+  try {
+    const vendored = path.join(__dirname, 'vendor', 'dom-to-figma.iife.js');
+    if (fs.existsSync(vendored)) fs.copyFileSync(vendored, path.join(libDir, '_dom-to-figma.js'));
+  } catch (e) { console.log(`⚠ dom-to-figma copy: ${e.message.split('\n')[0]}`); }
 
   // 5. INDEX.md — the human front door
   const line = (slug) => { const p = pages[slug]; const m = p.meta;

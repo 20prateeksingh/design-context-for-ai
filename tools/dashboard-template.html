@@ -105,6 +105,8 @@
            background:#F5F7FA; border:1px solid var(--line); border-radius:6px; margin-bottom:5px; }
   .state .tag { font-size:11px; color:var(--ok); font-family:var(--mono); }
   .state .tag.pending { color:var(--accent); }
+  .state .stateacts { display:flex; align-items:center; gap:8px; }
+  .state .stateacts .figbtn.mini { margin:0; }
   .urlrow { display:flex; gap:8px; align-items:flex-start; font-size:12px; padding:4px 0; border-bottom:1px solid var(--line); cursor:pointer; }
   .urlrow input { margin-top:3px; }
   .urlrow .u { word-break:break-all; font-family:var(--mono); font-size:11.5px; }
@@ -207,6 +209,16 @@
   .pchip svg { width:13px; height:13px; flex:none; }
   .pchip.ghost { background:#F5F7FA; color:var(--txt); border:1px solid var(--line); }
   .pchip.ghost:hover { background:#fff; border-color:var(--primary); }
+  /* ⧉ Copy for Figma — a real action button (not a copy-prompt chip); secondary to the primary
+     Wireframe chip it sits beside. Its label swaps to Converting…/Ready during the copy pipeline (F2). */
+  .figbtn { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; background:#F5F7FA;
+            color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:7px 12px; margin:0 8px 8px 0;
+            cursor:pointer; transition:background .2s,border-color .2s; text-align:left; }
+  .figbtn:hover { background:#fff; border-color:var(--primary); }
+  .figbtn:disabled { opacity:.7; cursor:progress; }
+  .figbtn.armed { background:rgba(79,70,229,.08); border-color:var(--primary); color:var(--primary-strong); }
+  /* compact per-state variant — lives under a states-strip tile / inside a panel state row */
+  .figbtn.mini { font-size:10.5px; font-weight:600; padding:3px 8px; margin:4px 0 0; gap:4px; }
   .chiprow { display:flex; flex-wrap:wrap; align-items:center; }
   .useit { max-width:820px; margin:0 auto; }
   .useit h2 { font-size:20px; font-weight:680; margin-bottom:4px; }
@@ -529,6 +541,8 @@ const PROMPTS = {
   // A.8 (ux-copy.md — verbatim, thin-library degrade clause included)
   designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. Build it in this product's own language — reuse its real patterns, spacing, and components; work in `wireframes/new/‹concept›/round-1/`, never in `design-context/`. If the library is too thin to know this product's grammar for some part, say so plainly and mark that part as an assumption — never invent house style. Render previews with `node tools/shot.js`.",
   askQuestion: () => "Read `design-context/registry.json` and `INDEX.md` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.",
+  // A.10 (ux-copy.md — verbatim) — the Figma exit: convert a captured page/state to editable Figma layers
+  figma: () => "Open the dashboard, go to the page you want, click ⧉ Copy for Figma, and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
 };
 const COPY_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.4 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.4"/></svg>';
 function pchip(label, text, ghost){ return `<button type="button" class="pchip${ghost?' ghost':''}" data-prompt="${esc(text)}">${COPY_SVG}${esc(label)}</button>`; }
@@ -1065,11 +1079,11 @@ function initDashboard(){
         <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages`:''} · linked from ${n.inboundCount||0} · ${depthTxt}</div>
         <div class="desc">${n.descPending?'<span class="meta">— caption dormant, waiting for your AI</span>':esc(n.desc||'')} ${n.descPending?'':'<span class="ai" title="model-written orientation, not extracted fact">ai</span>'}</div>
         <button class="btn primary" id="pnl-expand" style="width:100%;margin-top:12px">Expand ↗ Open the full page doc</button>
-        <div class="chiprow" style="margin-top:10px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : pchip('Ask about this page', PROMPTS.askQuestion(), true)}</div>
+        <div class="chiprow" style="margin-top:10px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${figmaBtn(n.id)}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : pchip('Ask about this page', PROMPTS.askQuestion(), true)}</div>
         <div class="links" style="margin-top:8px;font-size:12px"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> · <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
-        ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
+        ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="stateacts"><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span>${s.captured?figmaBtn(n.id, s.name, true):''}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
         <div id="stateform" style="margin-top:8px">
           <input id="st-name" placeholder="state name (e.g. empty, error)" aria-label="state name">
           <input id="st-url" placeholder="URL that shows this state" aria-label="state url">
@@ -1153,6 +1167,134 @@ function initDashboard(){
     es.addEventListener('guided-done', e=>{ let d={}; try{d=JSON.parse(e.data);}catch(_){} try{es.close();}catch(_){} finish(d); });
     es.onerror=()=>{ if(done) return; try{es.close();}catch(_){} poll(); };
   }
+
+  // ═════════ COPY FOR FIGMA (figma-exit-copy-paste PRD, F1/F2) ═════════
+  // One component everywhere (page-doc header · shared panel · each captured state). Converts the real
+  // SNAPSHOT DOM — pages/<slug>/page.html, or a state's page.html — into Figma's paste format entirely
+  // in the browser, then writes it to the clipboard as a user gesture. No plugin, no network, no server
+  // required (the copy works on file:// too; the server, when present, only records the exit).
+  const FIG_LABEL = '⧉ Copy for Figma';
+  let figmaLib = null;     // the lazy-loaded DomToFigma module (loaded once, on first Copy click)
+  let figmaCache = null;   // { key, item, html } — a converted payload kept for a focused click:
+                           //   both the two-phase re-arm (F2·3) AND the same-page repeat-copy cache (§4·5)
+
+  // Lazy-load the 830KB vendored bundle on first use ONLY — first paint never pays for it (§4·5).
+  function loadFigmaLib(){
+    if (figmaLib) return Promise.resolve(figmaLib);
+    if (typeof window.DomToFigma !== 'undefined'){ figmaLib = window.DomToFigma; return Promise.resolve(figmaLib); }
+    return new Promise((resolve, reject)=>{
+      const s = document.createElement('script'); s.src = '_dom-to-figma.js';
+      s.onload = ()=>{ figmaLib = window.DomToFigma || null; figmaLib ? resolve(figmaLib) : reject(new Error('converter missing after load')); };
+      s.onerror = ()=>reject(new Error('could not load the Figma converter'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // Convert one snapshot → a Figma clipboard payload. The snapshot's page.html runs in a hidden,
+  // OFFSCREEN same-origin iframe (never display:none — computed styles need real layout) so we convert
+  // the TRUE product DOM, not the dashboard. Width rule (F2·2) lands the frame at the snapshot's natural
+  // width (min 1440 — the capture viewport) so nothing crops. The iframe is always torn down (F2·hygiene).
+  async function convertSnapshot(src, name){
+    const lib = await loadFigmaLib();
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+    try {
+      await new Promise((resolve, reject)=>{
+        frame.onload = ()=>resolve();
+        frame.onerror = ()=>reject(new Error('could not load the snapshot'));
+        frame.src = src;
+        setTimeout(()=>reject(new Error('snapshot load timed out')), 30000);
+      });
+      const doc = frame.contentDocument;
+      if(!doc || !doc.body) throw new Error('snapshot has no body');
+      await sleep(120);   // settle beat: let late styles/layout apply before we measure
+      // width = max(documentElement.scrollWidth, body.scrollWidth, 1440) — the spike's crop is the regression test
+      const width = Math.max(doc.documentElement.scrollWidth||0, doc.body.scrollWidth||0, 1440);
+      if (Math.abs(width - 1440) > 1){ frame.style.width = width + 'px'; await sleep(80); }   // reflow at natural width, then re-measure height
+      const height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);
+      const conv = lib.createFigmaConverter();
+      const result = await conv.convert({ element: doc.body, width, height, name });
+      return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0 };
+    } finally {
+      frame.remove();
+    }
+  }
+
+  // Write a converted payload to the clipboard. Primary = the real Figma ClipboardItem; on a focused
+  // document where that specific write fails, fall back to a text/html envelope (F2·5, the spike's
+  // fallback). Returns 'ok' on success, 'refocus' when the doc isn't focused (caller re-arms, F2·3).
+  async function attemptWrite(payload){
+    try { await navigator.clipboard.write([payload.item]); return 'ok'; }
+    catch(e){
+      if (!document.hasFocus() || (e && e.name === 'NotAllowedError')) return 'refocus';
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([payload.html], { type:'text/html' }) })]);
+      return 'ok';
+    }
+  }
+
+  // Build a Copy-for-Figma button. slug → the page; state (optional) → convert THAT state's page.html;
+  // mini → the compact per-state variant. src/name are baked into data-attrs the delegated handler reads.
+  function figmaBtn(slug, state, mini){
+    const n = byId[slug]; if(!n) return '';
+    const src = state ? ('pages/' + slug + '/states/' + state + '/page.html') : (n.pageHtml || ('pages/' + slug + '/page.html'));
+    const name = state ? (dlabel(n) + ' › ' + state) : dlabel(n);
+    return '<button type="button" class="figbtn' + (mini ? ' mini' : '') + '" data-figma-src="' + esc(src) + '"'
+      + ' data-figma-slug="' + esc(slug) + '"' + (state ? ' data-figma-state="' + esc(state) + '"' : '')
+      + ' data-figma-name="' + esc(name) + '">' + FIG_LABEL + '</button>';
+  }
+  function setFigBtn(btn, text, cls){ btn.textContent = text; btn.className = 'figbtn' + (btn.classList.contains('mini') ? ' mini' : '') + (cls ? ' ' + cls : ''); }
+  function figSuccess(btn){
+    // (figmaCache is intentionally kept — an instant same-page repeat copy skips re-conversion, §4·5)
+    setFigBtn(btn, FIG_LABEL, '');
+    btn.disabled = false;
+    toast('Copied — paste into Figma (⌘V). It lands as editable layers.');
+    // F3 — record the exit in the ledger (server mode only; file:// copies work but are logged silently).
+    if (serverMode){ const slug = btn.getAttribute('data-figma-slug'), state = btn.getAttribute('data-figma-state') || null;
+      if (slug) api('/api/figma-copy', state ? { slug, state } : { slug }); }
+  }
+  function figRearm(btn){   // F2·3: payload is cached; the NEXT click (a fresh gesture) writes instantly
+    setFigBtn(btn, 'Ready — click to copy', 'armed'); btn.disabled = false;
+    toast('Keep this tab focused while copying.');
+  }
+  function figFail(btn){
+    setFigBtn(btn, FIG_LABEL, ''); btn.disabled = false; figmaCache = null;
+    toast('The copy didn\'t complete. Try again — and if pasting into Figma stays broken, Figma may have changed its format; check the kit repo for an update.', true);
+  }
+
+  // Single delegated handler for EVERY Copy-for-Figma button, anywhere it renders.
+  async function onFigmaClick(btn){
+    if (btn.disabled) return;
+    const src = btn.getAttribute('data-figma-src'), name = btn.getAttribute('data-figma-name') || 'page';
+    if(!src) return;
+    // Phase 2 — a payload for THIS target is already cached (a prior re-arm, or a repeat copy): if we're
+    // focused, write it instantly (no re-convert); if still unfocused, re-arm again.
+    if (figmaCache && figmaCache.key === src){
+      if (document.hasFocus()){ btn.disabled = true;
+        try { const r = await attemptWrite(figmaCache); r === 'ok' ? figSuccess(btn) : figRearm(btn); }
+        catch(_){ figFail(btn); }
+      } else { figRearm(btn); }
+      return;
+    }
+    // Phase 1 — convert (4–13s on real pages). Honest progress; block double-clicks; never freeze silently.
+    setFigBtn(btn, 'Converting for Figma…', ''); btn.disabled = true;
+    toast('big pages take ~10 seconds', true);
+    try {
+      const payload = await convertSnapshot(src, name);
+      figmaCache = { key: src, item: payload.item, html: payload.html };
+      toast('', false); const t=document.getElementById('toast'); if(t) t.style.display='none';
+      if (document.hasFocus()){
+        const r = await attemptWrite(figmaCache);
+        r === 'ok' ? figSuccess(btn) : figRearm(btn);
+      } else {
+        figRearm(btn);   // converted, but focus was lost mid-conversion — re-arm for a fresh-gesture write
+      }
+    } catch(e){ console.error('[figma]', e); figFail(btn); }
+  }
+  document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-figma-src]'); if (b){ e.preventDefault(); onFigmaClick(b); } });
+  // Cache invalidates on navigation (a different page/state means the cached payload is stale).
+  addEventListener('hashchange', ()=>{ figmaCache = null; });
 
   const capbtn = document.getElementById('capbtn');
   function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
@@ -1419,13 +1561,13 @@ function initDashboard(){
       <div class="retbar"><button class="retbtn" id="pg-back">${backLabel}</button>
         <span class="crumb" style="margin:0"><button class="lnk" data-goto="home">Home</button> / ${esc(n.section||'')} / ${esc(dlabel(n))}</span></div>
       <div class="dhd"><h1>${esc(dlabel(n))}</h1><span class="rt">${esc(n.route||'')} · captured ${fmtDate(n.capturedAt)} · current</span>
-        <div class="acts">${pchip('Wireframe on this page',PROMPTS.wireframe(slug))}${pchip('Ask about this page',PROMPTS.askQuestion(),true)}<a class="pchip ghost" href="${esc(n.pageHtml)}" target="_blank">Open real HTML</a></div></div>
+        <div class="acts">${pchip('Wireframe on this page',PROMPTS.wireframe(slug))}${figmaBtn(slug)}${pchip('Ask about this page',PROMPTS.askQuestion(),true)}<a class="pchip ghost" href="${esc(n.pageHtml)}" target="_blank">Open real HTML</a></div></div>
       <div class="dcols">
         <div class="dleft">
           ${n.screenshot?`<div class="shotwrap skel"><a href="${esc(n.screenshot)}" target="_blank"><img class="dshot capped fade" data-src="${esc(n.screenshot)}" alt=""></a></div><button class="shot-expand" id="shot-exp">expand full length</button>`:'<span class="dshot hatch" style="height:400px;display:block"></span>'}
           <h3>States</h3>
           <div class="strip">
-            ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured?img2('pages/'+esc(slug)+'/states/'+esc(s.name)+'/screenshot.png','stt-shot'):'<span class="ph"></span>'}${esc(s.name)}</span>`).join(''):''}
+            ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured?img2('pages/'+esc(slug)+'/states/'+esc(s.name)+'/screenshot.png','stt-shot'):'<span class="ph"></span>'}${esc(s.name)}${s.captured?('<br>'+figmaBtn(slug, s.name, true)):''}</span>`).join(''):''}
             <span class="stt add"><span class="ph">+ add a state by URL</span>${esc(missing.slice(0,3).join(' · ')||'more')}</span>
             <button class="stt guided" id="pg-guided" data-url="${esc(pageUrl(n))}">Can't reach it by URL? Guided capture</button>
           </div>
@@ -1570,6 +1712,12 @@ function initDashboard(){
         ${pchip('Copy the design-new prompt', PROMPTS.designNew())}
       </div>
       <div class="sensitivity">Captured logged-in? The library holds your <b>real account data</b> (orders, addresses). Share the folder or bundles accordingly — and <code>profiles/</code> (your live browser session) must never leave this machine.</div>
+      <div class="mode">
+        <span class="badge">new</span>
+        <h3>Take any page straight into Figma</h3>
+        <p>On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click <b>⧉ Copy for Figma</b> and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; your library stays untouched. No plugin, no Dev Mode, no network.</p>
+        <div class="chiprow">${pchip('How to copy for Figma', PROMPTS.figma(), true)}</div>
+      </div>
       <div class="mode">
         <span class="badge">recommended</span>
         <h3>With Claude Code</h3>
