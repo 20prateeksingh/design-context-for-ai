@@ -470,12 +470,12 @@ function guidedOverlayInjector() {
       cur = info;
       if (info.captured) {
         dot.style.background = '#4ac36a'; statusEl.style.color = '#d4ecd9';
-        statusEl.textContent = `✓ "${info.slug}" captured ${info.at} — Capture adds a state`;
+        statusEl.textContent = `✓ in your library since ${info.at} — Capture adds a state`;
         stateInput.style.display = '';
         if (!userEdited) stateInput.value = detectState();
       } else {
         dot.style.background = '#ff5252'; statusEl.style.color = '#ffd5d5';
-        statusEl.textContent = `✦ NEW — "${info.slug}" has never been captured`;
+        statusEl.textContent = `✦ NEW — not in your library yet`;
         stateInput.style.display = 'none';
       }
     }
@@ -500,8 +500,21 @@ function guidedOverlayInjector() {
   else build();
 }
 
+// Flatten hygiene.js's grouped findings into a plain list for persistence (F4·1). Mirrors the section
+// renders in hygiene.formatHygiene so the ledger's detail lines read the same, action included.
+function flattenHygiene(f) {
+  if (!f || f.error) return [];
+  const out = [];
+  const push = (it, text) => out.push({ severity: it.severity || 'warn', text, action: it.action || '' });
+  for (const it of f.duplicates || []) push(it, `${(it.pages || []).join(', ')} — ${it.issue}`);
+  for (const it of f.orphans || []) push(it, `${it.page} (${it.route}) — ${it.issue}`);
+  for (const it of f.identicalStates || []) push(it, `${it.page} › ${it.state} — ${it.issue}`);
+  for (const it of f.quality || []) push(it, `${it.target} — ${it.issue}`);
+  return out;
+}
+
 // Exported for tests/reuse. Requiring this file no longer auto-runs the CLI (guarded below).
-module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor };
+module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, flattenHygiene };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 if (require.main === module) (async () => {
@@ -566,6 +579,7 @@ if (require.main === module) (async () => {
         const mp = path.join(pdir, s, 'meta.json');
         if (fs.existsSync(mp)) { try { capturedIndex.set(s, formatWhen(JSON.parse(fs.readFileSync(mp, 'utf8')).capturedAt)); } catch (_) {} }
       } }
+    const startedAt = new Date().toISOString();  // session start — persisted at session end (F4)
     const captures = [];
     const sessionNames = new Set(); // `${slug}/${name}` captured THIS session — repeats get suffixed, never overwritten
     // URL-awareness: the overlay asks this on every navigation → red (new) vs green (seen, + when).
@@ -599,7 +613,14 @@ if (require.main === module) (async () => {
         await pageObj.evaluate(() => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); }); // keep the overlay out of the snapshot
         const r = await writeSnapshot(pageObj, gctx, url, meta, OUT_DIR);
         // Update the index BEFORE remounting, so the remounted pill's status reflects this capture (green + now).
-        if (r.status === 'ok') { capturedIndex.set(slug, formatWhen(new Date().toISOString())); captures.push({ slug, state: sname || null, url }); }
+        if (r.status === 'ok') {
+          const at = new Date().toISOString();
+          capturedIndex.set(slug, formatWhen(at));
+          captures.push({ slug, state: sname || null, url, at });
+          // Stable machine line the server parses into live status + SSE (F5). ONLY under --guided —
+          // capture.js is imported as a library elsewhere, so this must never print in other modes.
+          console.log('GUIDED_JSON:' + JSON.stringify({ slug, state: sname || null, url, at }));
+        }
         await pageObj.evaluate(() => { if (window.__dckMount) window.__dckMount(); }).catch(() => {});
         if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); return { ok: false, error: r.status }; }
         console.log(`  ✓ ${label}  (${r.sizeKb} KB)`);
@@ -613,7 +634,20 @@ if (require.main === module) (async () => {
     const gp = gctx.pages()[0] || await gctx.newPage();
     await gp.goto(START_URL, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await new Promise((resolve) => gctx.on('close', resolve));
+    const endedAt = new Date().toISOString();
     console.log(`\n✅  Guided session ended — ${captures.length} state(s) captured.`);
+    // ── Session persistence (F4·1, additive + absent-safe) — append this session to guided-sessions.json.
+    // The file grows across sessions; build-index derives one ledger event per session (capped) from it.
+    if (captures.length) {
+      try {
+        const gsPath = path.join(OUT_DIR, 'guided-sessions.json');
+        let store = { sessions: [] };
+        if (fs.existsSync(gsPath)) { try { const prev = JSON.parse(fs.readFileSync(gsPath, 'utf8')); if (prev && Array.isArray(prev.sessions)) store = prev; } catch (_) {} }
+        store.sessions.push({ startedAt, endedAt, startUrl: START_URL, captures });
+        fs.writeFileSync(gsPath, JSON.stringify(store, null, 2), 'utf8');
+        console.log(`🗒  guided-sessions.json updated (${store.sessions.length} session${store.sessions.length === 1 ? '' : 's'})`);
+      } catch (e) { console.log(`⚠  could not write guided-sessions.json: ${e.message.split('\n')[0]}`); }
+    }
     try {
       const { buildIndex } = require('./build-index.js');
       const r = buildIndex(OUT_DIR);
@@ -621,7 +655,12 @@ if (require.main === module) (async () => {
     } catch (e) { console.log(`⚠  build-index failed: ${e.message.split('\n')[0]}`); }
     try {
       const { runHygiene, formatHygiene } = require('./hygiene.js');
-      console.log(formatHygiene(runHygiene(OUT_DIR)));
+      const findings = runHygiene(OUT_DIR);
+      console.log(formatHygiene(findings));
+      // Persist a flattened findings list (F4·1) so the ledger can surface a hygiene event. Additive,
+      // absent-safe; generatedAt is a stable input (written once here), so build-twice stays deterministic.
+      try { fs.writeFileSync(path.join(OUT_DIR, 'hygiene.json'), JSON.stringify({ generatedAt: endedAt, findings: flattenHygiene(findings) }, null, 2), 'utf8'); }
+      catch (e) { console.log(`⚠  could not write hygiene.json: ${e.message.split('\n')[0]}`); }
     } catch (e) { console.log(`⚠  hygiene skipped: ${e.message.split('\n')[0]}`); }
     return;
   }

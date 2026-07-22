@@ -246,6 +246,23 @@
   .rcomp .rbar { height:6px; background:var(--bg); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
   .rcomp .rbar i { display:block; height:100%; background:var(--primary); }
   .rcomp .rdet { font-size:10.5px; color:var(--dim); margin-top:3px; }
+  /* readiness action row (F3) */
+  #readypop .ract { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
+  #readypop .ract .gobtn { font-size:12px; font-weight:600; background:var(--primary); color:#fff; border:0; border-radius:8px; padding:7px 12px; cursor:pointer; }
+  #readypop .ract .gobtn:hover { background:var(--primary-strong); }
+  /* F1 capture menu — anchored under "+ Capture again"; fixed so it never grows the header */
+  #recapmenu { position:fixed; z-index:60; min-width:288px; max-width:min(92vw,340px); background:var(--panel);
+               border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 34px rgba(16,24,40,.18); padding:6px; display:none; }
+  #recapmenu.open { display:block; }
+  #recapmenu button.mi { display:block; width:100%; text-align:left; background:none; border:0; border-radius:8px; padding:9px 11px; cursor:pointer; font:inherit; color:var(--txt); }
+  #recapmenu button.mi:hover, #recapmenu button.mi:focus-visible { background:#F5F7FA; }
+  #recapmenu .mi b { display:block; font-size:13px; font-weight:650; }
+  #recapmenu .mi .ex { display:block; font-size:11.5px; color:var(--dim); margin-top:3px; line-height:1.4; font-weight:400; }
+  #recapmenu .midiv { height:1px; background:var(--line); margin:4px 2px; }
+  /* ledger per-item detail lines (guided/hygiene events, F4) */
+  .ent .edlines { margin:6px 0 0; padding:0; list-style:none; }
+  .ent .edlines li { font-size:11.5px; color:var(--dim); line-height:1.5; padding-left:12px; position:relative; }
+  .ent .edlines li::before { content:"·"; position:absolute; left:2px; color:var(--line); font-weight:700; }
   .jpill.on { background:#EEF1F6; color:var(--txt); border-color:var(--primary); }
 
   /* home: identity + atlas + ledger */
@@ -333,6 +350,14 @@
   .stt img, .stt .ph { display:block; width:150px; height:92px; border:1px solid var(--line); border-radius:6px; margin-bottom:4px; object-fit:cover; object-position:top; }
   .stt.on img, .stt.on .ph { border:2px solid var(--primary); }
   .stt.add .ph { border:1.5px dashed var(--line); display:flex; align-items:center; justify-content:center; color:var(--dim); }
+  /* F2 — guided ingress: a states-strip tile (page doc) and an inline link (panel) */
+  .stt.guided { width:150px; align-self:stretch; display:flex; align-items:center; justify-content:center; text-align:center;
+                border:1.5px dashed var(--primary); border-radius:6px; background:rgba(79,70,229,.05); color:var(--primary-strong);
+                font-weight:600; font-size:11px; line-height:1.35; padding:8px; cursor:pointer; }
+  .stt.guided:hover, .stt.guided:focus-visible { background:rgba(79,70,229,.10); }
+  .guidedlink { display:inline-block; margin-top:8px; background:none; border:0; padding:0; cursor:pointer;
+                font:inherit; font-size:12px; font-weight:600; color:var(--primary-strong); text-align:left; }
+  .guidedlink:hover, .guidedlink:focus-visible { text-decoration:underline; }
   .lchips { display:flex; gap:6px; flex-wrap:wrap; }
   .lc { border:1px solid var(--line); border-radius:20px; padding:3px 10px; font-size:11px; color:var(--dim); background:none; cursor:pointer; }
   .lc:hover { border-color:var(--primary); }
@@ -434,6 +459,7 @@
   <button id="recapbtn">+ Capture again</button>
   <button id="capbtn"></button>
   <div id="readypop"></div>
+  <div id="recapmenu" role="menu" aria-hidden="true"></div>
 </div>
 
 <section class="pane" id="pane-map">
@@ -480,6 +506,8 @@ const PROMPTS = {
   wireframe: (slug) => "Read `design-context/pages/" + slug + "/page.md` and look at its `screenshot.png`. I want to explore: ‹describe your change›. Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` (never edit `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with `node tools/shot.js`.",
   whatsMissing: () => "Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`. Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why. Don't capture anything yet — recommend.",
   addState: () => "I can reach a page state via URL. Run `node tools/capture.js --state <slug>:<state-name> --url \"<the url>\"` and confirm it landed under `design-context/pages/<slug>/states/`.",
+  // A.9 (ux-copy.md — verbatim) — guided capture: human-driven, button-only states/modals
+  guided: () => "Run `node tools/capture.js --guided --url ‹where to start›`. A browser window opens on my logged-in profile — I'll drive. Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`. When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found.",
   auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
   recaptureCheck: () => "The product may have changed. Re-run `node tools/capture.js --config design-context/product.json`, then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
   bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/INDEX.md` to learn this product, and ask me what I want to work on.",
@@ -752,6 +780,7 @@ function initDashboard(){
   let pageOrigin = 'home';                     // provenance for the page-doc return affordance (F1)
   let mapView = { zoom:1, panX:0, panY:0 };    // persisted map camera (F1 restore · F2 zoom/pan)
   let mapReopen = null;                        // node id whose panel to reopen on return to map
+  let guidedLive = null;                       // guided-capture live state (F5): {running,count,lastCapture}
 
   // thumbnail: skeleton wrapper + fade-in on decode; monogram on error for logos (F5)
   function img2(src, cls, alt){ return src
@@ -1031,9 +1060,11 @@ function initDashboard(){
           <input id="st-url" placeholder="URL that shows this state" aria-label="state url">
           <button class="btn primary" id="st-add">Add &amp; download state</button>
           <div class="meta" style="margin-top:4px">States you can reach by URL (filters, #modal=…, ?tab=…). Others need the guided pass.</div>
+          <button class="guidedlink" id="st-guided" data-url="${esc(pageUrl(n))}">Can't reach it by URL? Guided capture</button>
         </div>`;
       wireThumbs(el);
       el.querySelector('#pnl-expand').onclick=()=>openFullDoc(n.id);
+      { const g=el.querySelector('#st-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url); }
       el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
         if(!name||!url) return toast('Give the state a name and a URL');
         if (serverMode){ toast('Capturing state — watch the browser window…', true);
@@ -1048,6 +1079,52 @@ function initDashboard(){
     pageOrigin = onMap ? 'map' : 'home'; if (onMap) mapReopen = slug;
     window.closePanel(); location.hash = 'page/' + slug; }
 
+  // ═════════ GUIDED CAPTURE (F1/F2/F3 launch · F5 live loop · file:// degrade) ═════════
+  // The full product URL for a page node (map nodes carry route, not the absolute URL).
+  function pageUrl(n){ const o=(DATA.origin||'').replace(/\/+$/,''); return o + (n && n.route ? n.route : '/'); }
+  // file:// fallback command — prompts-are-the-UI, same shape as v2's cd chip.
+  function guidedCmd(startUrl){ return `node tools/capture.js --guided --url "${startUrl || (DATA.origin||'<product URL>')}"`; }
+  // Launch a guided session. Server mode → POST; file:// → copy the command (handled at the call site
+  // via copyGuidedCmd). Returns silently; the live loop is driven by guidedStream().
+  async function launchGuided(startUrl){
+    // F1/F3 pass no URL → start at the product's own origin (validation workspaces have no product.json
+    // for the server to fall back to). F2 passes the specific page URL.
+    const u = startUrl || DATA.origin || '';
+    if(!serverMode) return copyGuidedCmd(u);
+    const r = await api('/api/guided/start', u?{startUrl:u}:{});
+    if(!r.ok){ toast(r.error || 'Another capture is running — finish or stop it first.'); return; }
+    guidedLive = { running:true, count:0, lastCapture:null };
+    paintGuidedLive();
+    guidedStream();
+  }
+  function copyGuidedCmd(startUrl){ const cmd=guidedCmd(startUrl);
+    (navigator.clipboard?navigator.clipboard.writeText(cmd):Promise.reject())
+      .then(()=>toast('Command copied — paste it in your terminal (or ask your AI to run it)'))
+      .catch(()=>{ try{ prompt('Run this in the terminal:', cmd); }catch(_){} }); }
+  // Live in-progress entry: sticky toast + (if home is showing) the ledger's next-slot updates.
+  function paintGuidedLive(){
+    const cnt = guidedLive ? guidedLive.count : 0;
+    toast(`Guided capture in progress — ${cnt} captured · the window is yours`, true);
+    if(document.getElementById('pane-home').classList.contains('active')) renderHome();
+  }
+  // SSE primary (namespaced "guided"/"guided-done"), polling fallback — mirrors attachStream().
+  function guidedStream(){
+    let done=false;
+    const finish=()=>{ if(done) return; done=true;
+      toast('Guided session ended — rebuilding your library…', true);
+      setTimeout(()=>{ location.hash=''; location.reload(); }, 900); };
+    const update=(p)=>{ if(!p) return; guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture };
+      if(!p.running) return finish(); paintGuidedLive(); };
+    const poll=async()=>{ for(;;){ if(done) return;
+      const s=await fetch('/api/guided/status').then(x=>x.json()).catch(()=>null);
+      if(s){ update(s); if(!s.running) return; } await sleep(1200); } };
+    if(typeof EventSource==='undefined') return poll();
+    let es; try{ es=new EventSource('/api/capture/events'); }catch(_){ return poll(); }
+    es.addEventListener('guided', e=>{ let p={}; try{p=JSON.parse(e.data);}catch(_){} update(p); });
+    es.addEventListener('guided-done', e=>{ try{es.close();}catch(_){} finish(); });
+    es.onerror=()=>{ if(done) return; try{es.close();}catch(_){} poll(); };
+  }
+
   const capbtn = document.getElementById('capbtn');
   function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
     capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
@@ -1060,12 +1137,35 @@ function initDashboard(){
       catch(_){ prompt('Run this in the terminal:', cmd); } }
   };
 
-  // server chrome: live-unlock affordances + re-run entry, only when the server is up
-  const sp=document.getElementById('server-pill'); // pill removed in v2 shell; guarded for safety
-  if (serverMode){ if(sp){ sp.textContent='live · can unlock'; sp.classList.add('on'); }
-    const rb=document.getElementById('recapbtn'); if(rb){ rb.style.display='block';
-      rb.onclick=()=>{ mountOnboard(); showWizard(STATUS && STATUS.product); }; } }
+  // server chrome (pill removed in v2 shell; guarded for safety)
+  const sp=document.getElementById('server-pill');
+  if (serverMode && sp){ sp.textContent='live · can unlock'; sp.classList.add('on'); }
   else if(sp) sp.textContent='static view';
+  // F1 — "+ Capture again" opens a two-item menu (re-capture · guided). Renders in BOTH modes; the
+  // guided item POSTs /api/guided/start in server mode and copies the command on file://. No third item.
+  (function setupCaptureMenu(){
+    const rb=document.getElementById('recapbtn'), menu=document.getElementById('recapmenu');
+    if(!rb||!menu) return;
+    rb.style.display='block'; rb.setAttribute('aria-haspopup','menu'); rb.setAttribute('aria-expanded','false');
+    menu.innerHTML =
+      `<button type="button" class="mi" role="menuitem" data-mi="recap"><b>Re-capture — refresh what's here</b></button>`+
+      `<div class="midiv"></div>`+
+      `<button type="button" class="mi" role="menuitem" data-mi="guided"><b>Guided capture — you drive, the kit records</b>`+
+        `<span class="ex">A browser window opens on your logged-in profile. Go anywhere — the pill tells you what's new; every capture lands here.</span></button>`;
+    const close=()=>{ menu.classList.remove('open'); menu.setAttribute('aria-hidden','true'); rb.setAttribute('aria-expanded','false'); };
+    const open=()=>{ menu.classList.add('open'); menu.setAttribute('aria-hidden','false'); rb.setAttribute('aria-expanded','true');
+      const r=rb.getBoundingClientRect(), w=menu.offsetWidth;
+      menu.style.top=(r.bottom+8)+'px'; menu.style.left=Math.max(8, Math.min(r.right-w, innerWidth-w-8))+'px';
+      const first=menu.querySelector('.mi'); if(first) first.focus(); };
+    rb.onclick=(e)=>{ e.stopPropagation(); menu.classList.contains('open')?close():open(); };
+    menu.addEventListener('click', e=>{ const b=e.target.closest('[data-mi]'); if(!b) return; const which=b.dataset.mi; close();
+      if(which==='recap'){ if(serverMode){ mountOnboard(); showWizard(STATUS && STATUS.product); } else copyPrompt(PROMPTS.recaptureCheck()); }
+      else if(which==='guided'){ launchGuided(); } });
+    document.addEventListener('click', e=>{ if(!menu.contains(e.target) && e.target!==rb) close(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  })();
+  // Resume a guided session already running on the server (kill-resilience across a dashboard reload).
+  if (serverMode && STATUS && STATUS.guided && STATUS.guided.running){ guidedLive={ running:true, count:STATUS.guided.captures||0, lastCapture:STATUS.guided.lastCapture }; guidedStream(); }
   syncCapBtn();
 
   // ═════════ READINESS CHIP + BREAKDOWN ═════════
@@ -1082,14 +1182,20 @@ function initDashboard(){
     const gaps = R.components.filter(c=>c.earned < c.max).sort((a,b)=>(b.max-b.earned)-(a.max-a.earned));
     const top = gaps[0];
     const whisper = (!full && top) ? `<div class="rnext">next +${Math.round(top.max-top.earned)}%: ${esc(top.label.toLowerCase())}</div>` : '';
+    // F3 — when states are the top gap, the whisper gains a real action: launch guided capture (the one
+    // path that reaches button-only states), beside a copy-prompt chip for the URL-reachable case.
+    const statesTop = (!full && top && top.key==='states');
+    const action = statesTop
+      ? `<div class="ract"><button type="button" class="gobtn" id="ready-guided">Launch guided capture</button>${pchip('Copy the add-a-state prompt', PROMPTS.addState(), true)}</div>` : '';
     pop.innerHTML = `<h4>Context readiness — ${R.score}%</h4>
-      ${whisper}
+      ${whisper}${action}
       <div class="pnote">A composite of how ready this library is as AI context — not surface coverage. <span class="ai" title="heuristic v1 weighting">heuristic</span></div>
       ${R.components.map(c=>`<div class="rcomp"><div class="rlab"><span>${esc(c.label)}</span><b>${c.earned} / ${c.max}</b></div>
         <div class="rbar"><i style="width:${Math.round(100*c.earned/Math.max(c.max,1))}%"></i></div>
         <div class="rdet">${esc(c.detail)}</div></div>`).join('')}`;
     chip.onclick=(e)=>{ e.stopPropagation(); pop.classList.toggle('open'); };
     document.addEventListener('click', e=>{ if(!pop.contains(e.target) && e.target!==chip) pop.classList.remove('open'); });
+    const rg=document.getElementById('ready-guided'); if(rg) rg.onclick=(e)=>{ e.stopPropagation(); pop.classList.remove('open'); launchGuided(); };
   }
 
   // ═════════ HOME (atlas + ledger) + JOURNAL + PAGE DOC ═════════
@@ -1104,12 +1210,23 @@ function initDashboard(){
       else if(ev.link.tab){ const lbl=ev.link.tab==='map'?'open the map':ev.link.tab==='design'?'open Design language':'see what it wrote'; link=`<button class="elink" data-goto="${esc(ev.link.tab)}">${lbl}</button>`; } }
     let thumbs='';
     if(!compact && ev.kind==='capture'){ const t=DATA.nodes.filter(n=>n.screenshot).slice(0,5).map(n=>`<img src="${esc(n.screenshot)}" loading="lazy" alt="">`).join(''); if(t) thumbs=`<div class="thumbs">${t}</div>`; }
+    // guided/hygiene events carry per-item detail lines (F4). Plain text only — a hygiene finding can
+    // name a since-pruned page, so these are never links. Compact rail trims to 3; journal shows all.
+    let dlines='';
+    if(ev.detailLines && ev.detailLines.length){ const shown = compact ? ev.detailLines.slice(0,3) : ev.detailLines;
+      const extra = (compact && ev.detailLines.length>3) ? `<li>…and ${ev.detailLines.length-3} more</li>` : '';
+      dlines = `<ul class="edlines">${shown.map(l=>`<li>${esc(l)}</li>`).join('')}${extra}</ul>`; }
     return `<div class="ent" data-actor="${esc(ev.actor)}"><div class="emeta">${esc(when)} · ${esc(ev.actor)}</div>
-      <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${thumbs}${link}</div>`;
+      <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${dlines}${thumbs}${link}</div>`;
   }
 
   function nextSlot(){
     const R=DASH.readiness, pend=DASH.pendingDescriptions||0, I=DASH.identity;
+    // F5 live loop: while a guided session runs, the next-slot IS the in-progress entry (SSE-updated).
+    if(guidedLive && guidedLive.running)
+      return `<div class="ent hero" id="guided-live"><div class="emeta">now · you</div>
+        <span class="etitle">Guided capture in progress — ${guidedLive.count} captured · the window is yours</span>
+        <div class="edetail">Drive to any state in the browser window and click 📸 Capture. Close the window when you're done — this ledger updates itself.</div></div>`;
     if(R && R.score>=100)
       return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
         <div class="edetail">Your library is complete and current. When your product ships something new, check for changes here — the ledger will tell you what moved.</div>
@@ -1258,6 +1375,7 @@ function initDashboard(){
           <div class="strip">
             ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured?img2('pages/'+esc(slug)+'/states/'+esc(s.name)+'/screenshot.png','stt-shot'):'<span class="ph"></span>'}${esc(s.name)}</span>`).join(''):''}
             <span class="stt add"><span class="ph">+ add a state by URL</span>${esc(missing.slice(0,3).join(' · ')||'more')}</span>
+            <button class="stt guided" id="pg-guided" data-url="${esc(pageUrl(n))}">Can't reach it by URL? Guided capture</button>
           </div>
         </div>
         <div class="dright">
@@ -1279,6 +1397,7 @@ function initDashboard(){
     </div>`;
     wireThumbs(el);
     const bk=el.querySelector('#pg-back'); if(bk) bk.onclick=()=>{ location.hash = backTo; };
+    { const g=el.querySelector('#pg-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url); }
     const exp=el.querySelector('#shot-exp'); if(exp) exp.onclick=()=>{ const s=el.querySelector('.dshot'); if(!s) return;
       const capped=s.classList.toggle('capped'); exp.textContent = capped?'expand full length':'collapse'; };
   }
@@ -1408,6 +1527,7 @@ function initDashboard(){
           ${pchip('Describe the pages', PROMPTS.describeLibrary())}
           ${pchip('First wireframe', PROMPTS.wireframe(firstSlug), true)}
           ${pchip('Add a state', PROMPTS.addState(), true)}
+          ${pchip('Guided capture', PROMPTS.guided(), true)}
           ${pchip("What's missing?", PROMPTS.whatsMissing(), true)}
           ${pchip('Re-capture check', PROMPTS.recaptureCheck(), true)}
         </div>
@@ -1432,6 +1552,7 @@ function initDashboard(){
         <div class="mono-cmd">tools/start.sh                                    # deps + server + this dashboard
 node tools/capture.js --urls "&lt;url1&gt;,&lt;url2&gt;"         # download specific frontier pages
 node tools/capture.js --state &lt;slug&gt;:&lt;name&gt; --url "&lt;url&gt;"  # capture a page state
+node tools/capture.js --guided --url "&lt;startUrl&gt;"        # you drive; snapshot button-only states/modals
 node tools/build-index.js                         # rebuild the consumption layer
 node tools/shot.js &lt;file.html&gt; [out.png] [--full]   # preview any local HTML</div>
         <p style="margin-top:10px">Any <code>pages/&lt;slug&gt;/page.html</code> opens in your browser and is editable — it's your design baseline.</p>

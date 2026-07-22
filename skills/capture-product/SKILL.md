@@ -66,7 +66,7 @@ The screen-doc shape (mirrors a mature product-context format):
 ### Notes              {template stands-for counts, empty-state reference value, duds, quirks}
 ```
 
-Everything in this section is labeled `method: ai` — orientation and interpretation, never ground truth. Documenting *performed* actions and unreached states is the guided pass's job, not yours.
+Everything in this section is labeled `method: ai` — orientation and interpretation, never ground truth. Documenting *performed* actions and unreached states is the **guided pass's** job, not yours: `node tools/capture.js --guided --url <startUrl>` opens a headed browser on the designer's logged-in profile, the **designer drives** to any button-only state or modal the URL crawl can't reach, and a pill records each one (`method: guided`). The tool still never clicks the product — a human reaches the state, the kit only snapshots it. Every guided capture and its post-run hygiene check land in the dashboard ledger.
 
 While describing, if a page's title is junk or opaque for a human skimming the dashboard (a truncated `<title>`, a generic "Details", a duplicate), you may propose a cleaner **`displayLabel`** for it — add `{"pages": {"<slug>": {"displayLabel": "Orders"}}}` to `design-context/annotations.json` (designer-owned; merge, never prune). build-index prefers it everywhere in the UI; ground truth (`meta.json` title) is never touched. Propose, don't force — the designer owns that file.
 
@@ -84,6 +84,12 @@ Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer la
 Then offer the map: "run `node tools/map.js` and open http://localhost:4173, then the Map tab — your product plotted by clicks-from-home; the ghosts in the fog are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
 
 Iteration from the map: the designer may select frontier pages there (server does the capture), or ask you — then run `node tools/capture.js --urls "<u1>,<u2>"`. New pages need the describe step (§5) — check for `_(not yet described)` sections after any selective pull. States with a URL: `node tools/capture.js --state <slug>:<name> --url <stateUrl>`.
+
+States you **can't** reach by URL — a modal, a multi-step wizard, a tab with no `?param` — are the guided pass (prompt canon **A.9**):
+
+> "Run `node tools/capture.js --guided --url ‹where to start›`. A browser window opens on my logged-in profile — I'll drive. Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`. When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found."
+
+From the dashboard the same launcher lives behind **+ Capture again → Guided capture**, the **Can't reach it by URL? Guided capture** link on any page's states strip, and (when states are the top readiness gap) the readiness popover's **Launch guided capture**.
 
 ## Notes
 
