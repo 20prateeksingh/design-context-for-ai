@@ -148,6 +148,10 @@ function pushGuidedOutput(text) {
         else { guidedJob.captures.push(c); guidedJob.lastCapture = c; guidedJob.capturing = false; }
         broadcast('guided', JSON.stringify(guidedStatePayload()));
       } catch (_) {}
+    } else {
+      // keep a short tail of plain output so a fast failure (e.g. profile locked) can be surfaced
+      const t = ln.trim();
+      if (t) { guidedJob.errTail.push(t); if (guidedJob.errTail.length > 12) guidedJob.errTail.shift(); }
     }
   }
 }
@@ -160,21 +164,31 @@ function startGuided(startUrl, res) {
   const url = /^https?:\/\//.test(s) ? s : (product && product.url) || null;
   if (!url) return json(res, 400, { ok: false, error: 'no start URL and no product.json — answer onboarding first' });
   busy = true;
-  guidedJob = { running: true, code: null, startedAt: new Date().toISOString(), startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, _partial: '' };
+  const startedAt = new Date().toISOString();
+  guidedJob = { running: true, code: null, startedAt, startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, errTail: [], _partial: '' };
   console.log(`▶ guided ${url}`);
   const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), '--guided', '--url', url], { cwd: __dirname });
-  guidedJob.child = child;   // held so /api/guided/stop can end the session (SIGTERM → graceful close)
+  guidedJob.child = child;   // held so /api/guided/stop (and server shutdown) can end the session cleanly
   child.stdout.on('data', pushGuidedOutput);
   child.stderr.on('data', pushGuidedOutput);
-  child.on('error', (e) => { console.log(`✗ guided ${e.message}`); });
+  child.on('error', (e) => { console.log(`✗ guided ${e.message}`); if (guidedJob) guidedJob.errTail.push(e.message); });
   child.on('exit', (code) => {
+    const captured = guidedJob ? guidedJob.captures.length : 0;
+    const fast = (Date.now() - Date.parse(startedAt)) < 8000;   // errored almost immediately
+    // Fast, non-zero exit with nothing captured = launch never really started — almost always the
+    // profile is locked by another capture/login window. Surface WHY instead of a silent reload.
+    let error = null;
+    if (code && code !== 0 && captured === 0 && fast) {
+      const tail = (guidedJob ? guidedJob.errTail : []).filter(l => /profile|another window|locked|in use|login|❌/i.test(l));
+      error = (tail[tail.length - 1] || 'Guided capture couldn’t start — the browser profile may be open in another window. Close any capture/login window and try again.').replace(/^❌\s*/, '');
+    }
     busy = false;
     if (guidedJob) { guidedJob.running = false; guidedJob.code = code; }
     // capture.js --guided already rebuilds at its own exit; rebuild here too so the dashboard's reload
     // sees the fresh registry/dashboard.html even if the child's own build-index was interrupted.
     try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ guided post-build: ${e.message.split('\n')[0]}`); }
-    console.log(`■ guided exited ${code} (${guidedJob ? guidedJob.captures.length : 0} captured)`);
-    broadcast('guided-done', JSON.stringify({ code, captures: guidedJob ? guidedJob.captures.length : 0 }));
+    console.log(`■ guided exited ${code} (${captured} captured)${error ? ' — ' + error : ''}`);
+    broadcast('guided-done', JSON.stringify({ code, captures: captured, error }));
   });
   json(res, 200, { ok: true, startUrl: url });
 }
@@ -335,3 +349,15 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`   Empty library → the dashboard runs onboarding (URL, sign-in, capture — no terminal).`);
   console.log(`   (Local only — nothing is exposed beyond this machine. Ctrl+C to stop.)\n`);
 });
+
+// On shutdown (Ctrl+C / restart), take a running guided session down WITH us — otherwise its headed
+// Chrome outlives the server, keeps the profile lock, and every future launch fails on the lock
+// (the "opens about:blank" symptom). SIGTERM lets capture.js close the browser + write its artifacts.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return; shuttingDown = true;
+  try { if (guidedJob && guidedJob.running && guidedJob.child) { console.log('■ shutting down — ending guided session'); guidedJob.child.kill('SIGTERM'); } } catch (_) {}
+  setTimeout(() => process.exit(0), 600);   // give capture.js a moment to close Chrome, then exit
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
