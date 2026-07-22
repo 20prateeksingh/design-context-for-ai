@@ -28,6 +28,8 @@ _Windows: `start.sh` is macOS/Linux; on Windows run the three step-by-step comma
 
 ## After capture — use it
 
+**Any moment of your product, in Figma, editable, in one paste.** On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click **⧉ Copy for Figma** and paste into your Figma file (⌘V). It lands as editable **auto-layout layers**, not a flat image — arrange or restyle freely. No plugin, no extension, no Dev Mode, no network; your library stays untouched.
+
 The dashboard's **Use it** tab turns the library into next moves — every button copies a ready-to-paste prompt with your real file paths already in it. In short:
 
 - **With Claude Code (recommended):** open Claude Code in this folder (`cd <your-workspace> && claude`) — it reads this workspace's instructions and knows every page. Ask it to *describe the pages*, *wireframe on a page*, or *what's missing?*
@@ -65,3 +67,7 @@ Repeating pages collapse to one representative: 300 product pages that share a l
 ## Requirements
 
 macOS/Linux with [Node.js](https://nodejs.org) (LTS). `tools/setup.sh` handles the rest.
+
+## Credits
+
+Figma paste powered by [@figit/dom-to-figma](https://www.npmjs.com/package/@figit/dom-to-figma) (MIT), vendored under `tools/vendor/`.

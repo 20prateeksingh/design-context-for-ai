@@ -31,6 +31,11 @@
  *                                           (also folded into /api/status as `guided`)
  *   (SSE) reuses /api/capture/events with namespaced "guided" / "guided-done" events
  *
+ * Copy for Figma (figma-exit-copy-paste PRD, F3):
+ *   POST /api/figma-copy {slug, state?}   → records the exit in figma-copies.json (additive) +
+ *                                           rebuilds so the "Sent ‹page› to Figma" ledger event shows.
+ *                                           The copy itself is 100% client-side; this only logs it.
+ *
  * Capture is spawned so it OUTLIVES any one HTTP request (kill-resilience: closing the browser
  * tab must not kill the capture). Job state (line ring buffer, running/exit) lives in this process;
  * the dashboard streams from here and can re-attach after a reload. One capture job at a time.
@@ -298,6 +303,28 @@ const server = http.createServer((req, res) => {
         try { if (guidedJob.child) guidedJob.child.kill('SIGTERM'); } catch (_) {}
         console.log('▶ guided stop requested');
         return json(res, 200, { ok: true, stopping: true });
+      }
+
+      if (url === '/api/figma-copy') {
+        // The Copy-for-Figma exit already ran client-side (the DOM→Figma conversion + clipboard write
+        // happen entirely in the dashboard). This only RECORDS the exit in the ledger — append to the
+        // additive figma-copies.json, then rebuild so the event renders. file:// mode never reaches
+        // here (no server); the copy still works there, the event is just skipped — no error.
+        const slug = String(data.slug || '').trim();
+        const state = data.state == null ? null : String(data.state).trim().slice(0, 80) || null;
+        if (!/^[A-Za-z0-9._-]+$/.test(slug)) return json(res, 400, { ok: false, error: 'need a valid slug' });
+        if (!fs.existsSync(path.join(LIB, 'pages', slug))) return json(res, 404, { ok: false, error: 'unknown page slug' });
+        const fcPath = path.join(LIB, 'figma-copies.json');
+        let fc = { copies: [] };
+        try { const parsed = JSON.parse(fs.readFileSync(fcPath, 'utf8')); if (parsed && Array.isArray(parsed.copies)) fc = parsed; } catch (_) {}
+        fc.copies.push({ slug, state, at: new Date().toISOString() });
+        try { fs.writeFileSync(fcPath, JSON.stringify(fc, null, 2), 'utf8'); }
+        catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+        // Rebuild so the ledger updates — but not while a capture holds the build (its own exit rebuilds
+        // and would race). If busy, the record is safely on disk; the next build derives the event.
+        if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ figma-copy post-build: ${e.message.split('\n')[0]}`); } }
+        console.log(`⧉ figma-copy ${slug}${state ? ' › ' + state : ''}`);
+        return json(res, 200, { ok: true });
       }
 
       if (url === '/api/capture' || url === '/api/state') {
