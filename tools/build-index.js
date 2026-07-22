@@ -402,6 +402,43 @@ function buildIndex(libDir) {
       else scanRounds(path.join(wfRoot, e.name), pageLabelOf(e.name), false);
     }
   } catch {}
+  // guided sessions → one ledger event per session (F4·2). Absent-safe. Capped to the last N so a
+  // long-lived guided-sessions.json never floods the ledger — full history stays in the file (the
+  // journal can show all). Derived from file CONTENTS (endedAt), never mtime → build-twice stable.
+  const GUIDED_LEDGER_CAP = 8;
+  let guidedSummary = null;
+  try {
+    const gs = JSON.parse(fs.readFileSync(path.join(libDir, 'guided-sessions.json'), 'utf8'));
+    const sessions = (gs && Array.isArray(gs.sessions)) ? gs.sessions : [];
+    if (sessions.length) {
+      const totalCaptures = sessions.reduce((n, s) => n + ((s.captures || []).length), 0);
+      guidedSummary = { sessions: sessions.length, captures: totalCaptures, lastAt: sessions[sessions.length - 1].endedAt || null };
+      for (const s of sessions.slice(-GUIDED_LEDGER_CAP)) {
+        const caps = s.captures || [];
+        if (!caps.length) continue;
+        const distinctPages = new Set(caps.map(c => c.slug)).size;
+        events.push({ at: s.endedAt || s.startedAt, dateOnly: false, seq: 5, actor: 'you', kind: 'guided',
+          title: `Guided capture — ${caps.length} state${caps.length === 1 ? '' : 's'} across ${distinctPages} page${distinctPages === 1 ? '' : 's'}`,
+          detail: null,
+          detailLines: caps.map(c => c.state ? `${pageLabelOf(c.slug)} › ${c.state}` : pageLabelOf(c.slug)),
+          link: null });
+      }
+    }
+  } catch (_) {}
+
+  // hygiene.json (persisted at a guided session's end) → one "the kit" event (F4·2). Targets render as
+  // PLAIN TEXT only — a finding can name a page pruned since, so never a link that can 404. Absent-safe.
+  try {
+    const hy = JSON.parse(fs.readFileSync(path.join(libDir, 'hygiene.json'), 'utf8'));
+    const findings = (hy && Array.isArray(hy.findings)) ? hy.findings : [];
+    const warns = findings.filter(x => (x.severity || 'warn') === 'warn').length;
+    events.push({ at: hy.generatedAt, dateOnly: false, seq: 7, actor: 'the kit', kind: 'hygiene',
+      title: warns > 0 ? `Hygiene check — ${warns} warning${warns === 1 ? '' : 's'}` : 'Hygiene check — clean',
+      detail: null,
+      detailLines: findings.slice(0, 6).map(f => `${f.text}${f.action ? ` → ${f.action}` : ''}`),
+      link: null });
+  } catch (_) {}
+
   // ascending by time, stable tiebreak (seq, then kind, then title) → identical across re-runs
   events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0) || (a.seq - b.seq) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
 
@@ -463,6 +500,9 @@ function buildIndex(libDir) {
     // additive dashboard-v2 top-level fields
     identity, readiness, events,
   };
+  // guided-capture summary — strictly additive AND only present when a guided session has run, so a
+  // workspace with no guided-sessions.json regenerates a byte-identical registry to before (crit #7).
+  if (guidedSummary) registry.guidedSessions = guidedSummary;
   fs.writeFileSync(path.join(libDir, 'registry.json'), JSON.stringify(registry, null, 2), 'utf8');
 
   // Hygiene lint over the just-written library (optional — never breaks a build if the module is absent).

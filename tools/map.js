@@ -23,6 +23,13 @@
  *   GET  /api/capture/events              → SSE: one "line" event per capture stdout line + "done"
  *   GET  /api/capture/log?since=n         → polling fallback for /api/capture/events
  *
+ * Guided capture (guided-capture-integration PRD, F5):
+ *   POST /api/guided/start {startUrl?}    → spawns capture.js --guided --url (headed, human drives);
+ *                                           409 if a capture/guided/login already holds the profile
+ *   GET  /api/guided/status               → {running, startedAt, captures:N, lastCapture}
+ *                                           (also folded into /api/status as `guided`)
+ *   (SSE) reuses /api/capture/events with namespaced "guided" / "guided-done" events
+ *
  * Capture is spawned so it OUTLIVES any one HTTP request (kill-resilience: closing the browser
  * tab must not kill the capture). Job state (line ring buffer, running/exit) lives in this process;
  * the dashboard streams from here and can re-attach after a reload. One capture job at a time.
@@ -53,9 +60,10 @@ const PRESETS = {
   notsure:   { depth: 2, cap: 25, loginSuggested: false },
 };
 
-let busy = false;              // one capture job at a time (shared by streaming + legacy runs)
+let busy = false;              // one capture job at a time (shared by streaming + legacy + guided runs)
 let capJob = null;             // { lines:[], _partial, running, code, mode, startedAt }
 let loginJob = null;           // { running, code, startedAt }
+let guidedJob = null;          // { running, code, startedAt, startUrl, captures:[], lastCapture, _partial }
 const sseClients = new Set();  // open SSE responses for /api/capture/events
 
 function json(res, code, obj) { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); }
@@ -111,6 +119,59 @@ function startCapture(mode, res) {
   json(res, 200, { ok: true, mode });
 }
 
+// ── Guided capture (F5) — headed, human-driven; spawned detached, streamed like a capture ─────────
+// Symmetric with startCapture: holds the same `busy` lock (guided uses the persistent profile, so it
+// conflicts with capture AND login — the shared lock is what makes all three mutually exclusive).
+function guidedStatePayload() {
+  return {
+    running: !!(guidedJob && guidedJob.running),
+    startedAt: guidedJob ? guidedJob.startedAt : null,
+    startUrl: guidedJob ? guidedJob.startUrl : null,
+    captures: guidedJob ? guidedJob.captures.length : 0,
+    lastCapture: guidedJob ? guidedJob.lastCapture : null,
+    code: guidedJob ? guidedJob.code : null,
+  };
+}
+// Parse capture.js's stdout for the stable `GUIDED_JSON:` line (one per capture) → live status + SSE.
+function pushGuidedOutput(text) {
+  if (!guidedJob) return;
+  guidedJob._partial += String(text).replace(/\r/g, '');
+  const parts = guidedJob._partial.split('\n');
+  guidedJob._partial = parts.pop();
+  for (const ln of parts) {
+    if (ln.indexOf('GUIDED_JSON:') === 0) {
+      try { const c = JSON.parse(ln.slice('GUIDED_JSON:'.length)); guidedJob.captures.push(c); guidedJob.lastCapture = c; broadcast('guided', JSON.stringify(guidedStatePayload())); }
+      catch (_) {}
+    }
+  }
+}
+function startGuided(startUrl, res) {
+  // 409 covers ALL profile users: capture (busy), another guided (busy while running), and login.
+  if (busy || (guidedJob && guidedJob.running)) return json(res, 409, { ok: false, error: 'Another capture is running — finish or stop it first.' });
+  if (loginJob && loginJob.running) return json(res, 409, { ok: false, error: 'finish logging in first (close the login window)' });
+  const product = readProduct();
+  const s = (startUrl || '').trim();
+  const url = /^https?:\/\//.test(s) ? s : (product && product.url) || null;
+  if (!url) return json(res, 400, { ok: false, error: 'no start URL and no product.json — answer onboarding first' });
+  busy = true;
+  guidedJob = { running: true, code: null, startedAt: new Date().toISOString(), startUrl: url, captures: [], lastCapture: null, _partial: '' };
+  console.log(`▶ guided ${url}`);
+  const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), '--guided', '--url', url], { cwd: __dirname });
+  child.stdout.on('data', pushGuidedOutput);
+  child.stderr.on('data', pushGuidedOutput);
+  child.on('error', (e) => { console.log(`✗ guided ${e.message}`); });
+  child.on('exit', (code) => {
+    busy = false;
+    if (guidedJob) { guidedJob.running = false; guidedJob.code = code; }
+    // capture.js --guided already rebuilds at its own exit; rebuild here too so the dashboard's reload
+    // sees the fresh registry/dashboard.html even if the child's own build-index was interrupted.
+    try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ guided post-build: ${e.message.split('\n')[0]}`); }
+    console.log(`■ guided exited ${code} (${guidedJob ? guidedJob.captures.length : 0} captured)`);
+    broadcast('guided-done', JSON.stringify({ code, captures: guidedJob ? guidedJob.captures.length : 0 }));
+  });
+  json(res, 200, { ok: true, startUrl: url });
+}
+
 // ── Legacy blocking capture (map frontier unlock + state add) ───────────────────
 function runCapture(cliArgs, res) {
   if (busy) return json(res, 409, { ok: false, error: 'a capture is already running — wait for it to finish' });
@@ -138,7 +199,9 @@ const server = http.createServer((req, res) => {
       workspacePath: KIT,  // absolute path of THIS workspace root — served live only, never baked into dashboard.html
       capture: { running: !!(capJob && capJob.running), mode: capJob ? capJob.mode : null, done: !!(capJob && !capJob.running) },
       login: { running: !!(loginJob && loginJob.running), done: !!(loginJob && !loginJob.running), started: !!loginJob },
+      guided: guidedStatePayload(),
     });
+    if (url === '/api/guided/status') return json(res, 200, { ok: true, ...guidedStatePayload() });
     if (url === '/api/login/status') return json(res, 200, {
       ok: true, running: !!(loginJob && loginJob.running), done: !!(loginJob && !loginJob.running), started: !!loginJob, code: loginJob ? loginJob.code : null,
     });
@@ -153,6 +216,12 @@ const server = http.createServer((req, res) => {
       if (capJob) {
         for (const ln of capJob.lines) res.write(`event: line\ndata: ${ln}\n\n`);
         if (!capJob.running) res.write(`event: done\ndata: ${JSON.stringify({ code: capJob.code, mode: capJob.mode })}\n\n`);
+      }
+      // Guided events are namespaced ("guided"/"guided-done") so the onboarding client (line/done only)
+      // never receives them. Replay current guided state so a reconnecting dashboard catches up.
+      if (guidedJob) {
+        res.write(`event: guided\ndata: ${JSON.stringify(guidedStatePayload())}\n\n`);
+        if (!guidedJob.running) res.write(`event: guided-done\ndata: ${JSON.stringify({ code: guidedJob.code, captures: guidedJob.captures.length })}\n\n`);
       }
       sseClients.add(res);
       const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch (_) {} }, 15000);
@@ -198,6 +267,8 @@ const server = http.createServer((req, res) => {
         const mode = data.mode === 'login-page' ? 'login-page' : 'full';
         return startCapture(mode, res);
       }
+
+      if (url === '/api/guided/start') return startGuided(data.startUrl, res);
 
       if (url === '/api/capture' || url === '/api/state') {
         if (url === '/api/capture') {
