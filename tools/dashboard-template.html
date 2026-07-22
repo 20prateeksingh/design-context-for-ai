@@ -255,6 +255,8 @@
   .gobtn:hover { background:var(--primary-strong); }
   .gobtn.ghost { background:transparent; color:var(--txt); border:1px solid var(--line); }
   .gobtn.ghost:hover { border-color:var(--primary); background:#F5F7FA; }
+  .gobtn:disabled { opacity:.5; cursor:not-allowed; }
+  .gobtn:disabled:hover { background:transparent; border-color:var(--line); }
   /* FB4: the in-progress ledger entry reads as ALIVE — a throbbing dot + a soft breathing ring */
   .ent.live { position:relative; animation:liveframe 2.4s ease-in-out infinite; }
   .livedot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--primary); margin-right:7px; vertical-align:middle; animation:livepulse 1.5s ease-in-out infinite; }
@@ -1117,9 +1119,10 @@ function initDashboard(){
   // End a running guided session from the dashboard (FB1) — the server SIGTERMs capture.js, which
   // closes its browser cleanly and still writes the session + hygiene artifacts. guided-done reloads us.
   async function endGuided(){
+    if(guidedLive && guidedLive.capturing){ toast('A page is still saving — one moment…'); return; }  // CTA is disabled here anyway
     toast('Ending the guided session…', true);
     const r = await api('/api/guided/stop', {});
-    if(!r || !r.ok) toast('Could not end the session: ' + ((r&&r.error)||'unknown'));
+    if(!r || !r.ok) toast('Could not end the session: ' + ((r&&r.error)||'unknown') + ' — if it says “unknown endpoint”, restart tools/map.js (the server predates this feature).');
     // success path: the guided-done SSE event (or poll) drives the rebuild + reload.
   }
   // Live in-progress entry: sticky toast + (if home is showing) the ledger's next-slot updates.
@@ -1260,7 +1263,7 @@ function initDashboard(){
       return `<div class="ent hero live" id="guided-live"><div class="emeta"><span class="livedot${cap?' hot':''}"></span>now · you</div>
         <span class="etitle">${title}</span>
         <div class="edetail">${detail}</div>
-        ${serverMode?`<div class="chiprow"><button type="button" class="gobtn ghost" data-guided-end>End session &amp; save</button></div>`:''}</div>`;
+        ${serverMode?`<div class="chiprow"><button type="button" class="gobtn ghost" data-guided-end ${cap?'disabled title="Wait for this page to finish saving…"':''}>${cap?'Saving…':'End session &amp; save'}</button></div>`:''}</div>`;
     }
     if(R && R.score>=100)
       return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
