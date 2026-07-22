@@ -416,9 +416,20 @@ function buildIndex(libDir) {
       for (const s of sessions.slice(-GUIDED_LEDGER_CAP)) {
         const caps = s.captures || [];
         if (!caps.length) continue;
-        const distinctPages = new Set(caps.map(c => c.slug)).size;
+        // Adaptive title: a capture with no state name is a NEW PAGE; one with a state name is a STATE
+        // of an existing page. Count each honestly so "N states across M pages" isn't claimed when the
+        // session only added whole pages.
+        const stateCount = caps.filter(c => c.state).length;
+        const pageCount = caps.length - stateCount;
+        const statePages = new Set(caps.filter(c => c.state).map(c => c.slug)).size;
+        const pg = (n) => `${n} page${n === 1 ? '' : 's'}`;
+        const st = (n) => `${n} state${n === 1 ? '' : 's'}`;
+        let title;
+        if (stateCount === 0) title = `Guided capture — ${pg(pageCount)}`;
+        else if (pageCount === 0) title = `Guided capture — ${st(stateCount)} across ${pg(statePages)}`;
+        else title = `Guided capture — ${pg(pageCount)} + ${st(stateCount)}`;
         events.push({ at: s.endedAt || s.startedAt, dateOnly: false, seq: 5, actor: 'you', kind: 'guided',
-          title: `Guided capture — ${caps.length} state${caps.length === 1 ? '' : 's'} across ${distinctPages} page${distinctPages === 1 ? '' : 's'}`,
+          title,
           detail: null,
           detailLines: caps.map(c => c.state ? `${pageLabelOf(c.slug)} › ${c.state}` : pageLabelOf(c.slug)),
           link: null });

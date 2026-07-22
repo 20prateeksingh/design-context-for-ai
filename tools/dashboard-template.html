@@ -491,6 +491,7 @@ const DATA = DASH ? DASH.map : null;
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const short = (s,n=24) => { s = s||''; return s.length>n ? s.slice(0,n-1)+'…' : s; };
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const IS_MAC = /Mac|iPhone|iPad/i.test((navigator.platform||'') + ' ' + (navigator.userAgent||''));
 let serverMode=false, STATUS=null;
 
 function api(p,body){ return fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
@@ -1216,8 +1217,13 @@ function initDashboard(){
     if(ev.detailLines && ev.detailLines.length){ const shown = compact ? ev.detailLines.slice(0,3) : ev.detailLines;
       const extra = (compact && ev.detailLines.length>3) ? `<li>…and ${ev.detailLines.length-3} more</li>` : '';
       dlines = `<ul class="edlines">${shown.map(l=>`<li>${esc(l)}</li>`).join('')}${extra}</ul>`; }
+    // On the describe-run card, when new pages are waiting (e.g. after a guided session), offer the
+    // top-up action right here too — not just in the next-slot hero.
+    let chip='';
+    if(ev.kind==='describe'){ const pend=DASH.pendingDescriptions||0;
+      if(pend>0) chip=`<div class="chiprow" style="margin-top:8px">${pchip(`Describe the ${pend} new page${pend===1?'':'s'}`, PROMPTS.describeLibrary())}</div>`; }
     return `<div class="ent" data-actor="${esc(ev.actor)}"><div class="emeta">${esc(when)} · ${esc(ev.actor)}</div>
-      <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${dlines}${thumbs}${link}</div>`;
+      <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${dlines}${thumbs}${chip}${link}</div>`;
   }
 
   function nextSlot(){
@@ -1226,16 +1232,25 @@ function initDashboard(){
     if(guidedLive && guidedLive.running)
       return `<div class="ent hero" id="guided-live"><div class="emeta">now · you</div>
         <span class="etitle">Guided capture in progress — ${guidedLive.count} captured · the window is yours</span>
-        <div class="edetail">Drive to any state in the browser window and click 📸 Capture. Close the window when you're done — this ledger updates itself.</div></div>`;
+        <div class="edetail">Drive to any state in the browser window and click 📸 Capture. When you're done, ${IS_MAC?'press <b>⌘Q</b> to quit the browser':'fully quit the browser'} — just closing the window may leave it running. Quitting ends the session and updates this ledger.</div></div>`;
     if(R && R.score>=100)
       return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
         <div class="edetail">Your library is complete and current. When your product ships something new, check for changes here — the ledger will tell you what moved.</div>
         <div class="chiprow">${pchip('Check for changes', PROMPTS.recaptureCheck())}</div></div>`;
-    if(pend>0)
-      return `<div class="ent hero"><div class="emeta">next · one move unlocks the rest</div>
-        <span class="etitle">Give your AI this toolkit</span>
-        <div class="edetail">One prompt, pasted into your AI chat — it reads all ${I.downloaded} pages, fills the captions, and this ledger records the run. A couple of minutes.</div>
-        <div class="chiprow">${pchip('Copy the prompt', PROMPTS.describeLibrary())}</div></div>`;
+    if(pend>0){
+      // Context-aware: first-run (AI has never read the library) vs top-up (it has, but new pages —
+      // e.g. from a guided session — are waiting). Same prompt fills only the pending ones either way.
+      const everRead = (I.described||0) > 0;
+      if(!everRead)
+        return `<div class="ent hero"><div class="emeta">next · one move unlocks the rest</div>
+          <span class="etitle">Give your AI this toolkit</span>
+          <div class="edetail">One prompt, pasted into your AI chat — it reads all ${I.downloaded} pages, fills the captions, and this ledger records the run. A couple of minutes.</div>
+          <div class="chiprow">${pchip('Copy the prompt', PROMPTS.describeLibrary())}</div></div>`;
+      return `<div class="ent hero"><div class="emeta">next · new pages waiting</div>
+        <span class="etitle">Let your AI read your ${pend} new page${pend===1?'':'s'}</span>
+        <div class="edetail">You've captured ${pend} page${pend===1?'':'s'} since your AI last read the library. One prompt and it describes just the new one${pend===1?'':'s'} — this ledger records the run.</div>
+        <div class="chiprow">${pchip('Copy the describe prompt', PROMPTS.describeLibrary())}</div></div>`;
+    }
     return `<div class="ent hero"><div class="emeta">next · your AI knows your product now</div>
       <span class="etitle">Make your first thing</span>
       <div class="edetail">A wireframe on a real page, or a question answered from the library.</div>
