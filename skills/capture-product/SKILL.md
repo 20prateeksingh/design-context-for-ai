@@ -80,7 +80,7 @@ Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer la
 - Show 1–2 `screenshot.png`s so they see it worked.
 - Point them at `INDEX.md` as the browsable map of everything captured — and tell them their AI tools should start at `registry.json`.
 - Point them at the dashboard's **Home** (`tools/start.sh` → http://localhost:4173) — their product as a page atlas with a running ledger. The single next move to name is the ledger's **"Give your AI this toolkit"** threshold: one copied prompt makes the AI describe every page and the dormant captions light up. (The **Use it** tab holds the rest — wireframe, design-something-new, what's-missing, context bundle.)
-- The headline capability worth naming: **⧉ Copy for Figma** — on any page (Home atlas panel, Map panel, page doc, or a captured state) one click copies that snapshot to the clipboard and it pastes into Figma (⌘V) as **editable auto-layout layers**. No plugin, no Dev Mode, no network (prompt canon **A.10**).
+- The headline capability worth naming: **⧉ Copy for Figma** — on any page (Home atlas panel, Map panel, page doc, or a captured state) one click copies that snapshot to the clipboard and it pastes into Figma (⌘V) as **editable auto-layout layers**. No plugin, no Dev Mode, no paid seat (prompt canon **A.10**).
 
 Then offer the map: "run `node tools/map.js` and open http://localhost:4173, then the Map tab — your product plotted by clicks-from-home; the ghosts in the fog are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
 
