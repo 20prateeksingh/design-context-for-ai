@@ -250,6 +250,18 @@
   #readypop .ract { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
   #readypop .ract .gobtn { font-size:12px; font-weight:600; background:var(--primary); color:#fff; border:0; border-radius:8px; padding:7px 12px; cursor:pointer; }
   #readypop .ract .gobtn:hover { background:var(--primary-strong); }
+  /* generic primary/ghost action buttons reused in the ledger (End session) */
+  .gobtn { font-size:12px; font-weight:600; background:var(--primary); color:#fff; border:0; border-radius:8px; padding:7px 12px; cursor:pointer; }
+  .gobtn:hover { background:var(--primary-strong); }
+  .gobtn.ghost { background:transparent; color:var(--txt); border:1px solid var(--line); }
+  .gobtn.ghost:hover { border-color:var(--primary); background:#F5F7FA; }
+  /* FB4: the in-progress ledger entry reads as ALIVE — a throbbing dot + a soft breathing ring */
+  .ent.live { position:relative; animation:liveframe 2.4s ease-in-out infinite; }
+  .livedot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--primary); margin-right:7px; vertical-align:middle; animation:livepulse 1.5s ease-in-out infinite; }
+  .livedot.hot { background:#f0a020; animation-duration:.9s; }
+  @keyframes livepulse { 0%,100%{ box-shadow:0 0 0 0 rgba(79,70,229,.45); opacity:1; } 50%{ box-shadow:0 0 0 6px rgba(79,70,229,0); opacity:.5; } }
+  @keyframes liveframe { 0%,100%{ box-shadow:0 0 0 1px rgba(79,70,229,.22); } 50%{ box-shadow:0 0 0 1px rgba(79,70,229,.5); } }
+  @media (prefers-reduced-motion: reduce){ .ent.live{ animation:none; } .livedot,.livedot.hot{ animation:none; } }
   /* F1 capture menu — anchored under "+ Capture again"; fixed so it never grows the header */
   #recapmenu { position:fixed; z-index:60; min-width:288px; max-width:min(92vw,340px); background:var(--panel);
                border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 34px rgba(16,24,40,.18); padding:6px; display:none; }
@@ -1094,7 +1106,7 @@ function initDashboard(){
     if(!serverMode) return copyGuidedCmd(u);
     const r = await api('/api/guided/start', u?{startUrl:u}:{});
     if(!r.ok){ toast(r.error || 'Another capture is running — finish or stop it first.'); return; }
-    guidedLive = { running:true, count:0, lastCapture:null };
+    guidedLive = { running:true, count:0, lastCapture:null, capturing:false };
     paintGuidedLive();
     guidedStream();
   }
@@ -1102,10 +1114,18 @@ function initDashboard(){
     (navigator.clipboard?navigator.clipboard.writeText(cmd):Promise.reject())
       .then(()=>toast('Command copied — paste it in your terminal (or ask your AI to run it)'))
       .catch(()=>{ try{ prompt('Run this in the terminal:', cmd); }catch(_){} }); }
+  // End a running guided session from the dashboard (FB1) — the server SIGTERMs capture.js, which
+  // closes its browser cleanly and still writes the session + hygiene artifacts. guided-done reloads us.
+  async function endGuided(){
+    toast('Ending the guided session…', true);
+    const r = await api('/api/guided/stop', {});
+    if(!r || !r.ok) toast('Could not end the session: ' + ((r&&r.error)||'unknown'));
+    // success path: the guided-done SSE event (or poll) drives the rebuild + reload.
+  }
   // Live in-progress entry: sticky toast + (if home is showing) the ledger's next-slot updates.
   function paintGuidedLive(){
     const cnt = guidedLive ? guidedLive.count : 0;
-    toast(`Guided capture in progress — ${cnt} captured · the window is yours`, true);
+    toast(guidedLive && guidedLive.capturing ? `Capturing this page… · ${cnt} saved so far` : `Guided capture in progress — ${cnt} captured · the window is yours`, true);
     if(document.getElementById('pane-home').classList.contains('active')) renderHome();
   }
   // SSE primary (namespaced "guided"/"guided-done"), polling fallback — mirrors attachStream().
@@ -1114,7 +1134,7 @@ function initDashboard(){
     const finish=()=>{ if(done) return; done=true;
       toast('Guided session ended — rebuilding your library…', true);
       setTimeout(()=>{ location.hash=''; location.reload(); }, 900); };
-    const update=(p)=>{ if(!p) return; guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture };
+    const update=(p)=>{ if(!p) return; guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture, capturing:!!p.capturing };
       if(!p.running) return finish(); paintGuidedLive(); };
     const poll=async()=>{ for(;;){ if(done) return;
       const s=await fetch('/api/guided/status').then(x=>x.json()).catch(()=>null);
@@ -1166,7 +1186,9 @@ function initDashboard(){
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   })();
   // Resume a guided session already running on the server (kill-resilience across a dashboard reload).
-  if (serverMode && STATUS && STATUS.guided && STATUS.guided.running){ guidedLive={ running:true, count:STATUS.guided.captures||0, lastCapture:STATUS.guided.lastCapture }; guidedStream(); }
+  if (serverMode && STATUS && STATUS.guided && STATUS.guided.running){ guidedLive={ running:true, count:STATUS.guided.captures||0, lastCapture:STATUS.guided.lastCapture, capturing:!!STATUS.guided.capturing }; guidedStream(); }
+  // FB1: "End session" on the live ledger entry (re-rendered often, so delegate).
+  document.addEventListener('click', e=>{ if(e.target.closest && e.target.closest('[data-guided-end]')){ e.preventDefault(); endGuided(); } });
   syncCapBtn();
 
   // ═════════ READINESS CHIP + BREAKDOWN ═════════
@@ -1229,10 +1251,17 @@ function initDashboard(){
   function nextSlot(){
     const R=DASH.readiness, pend=DASH.pendingDescriptions||0, I=DASH.identity;
     // F5 live loop: while a guided session runs, the next-slot IS the in-progress entry (SSE-updated).
-    if(guidedLive && guidedLive.running)
-      return `<div class="ent hero" id="guided-live"><div class="emeta">now · you</div>
-        <span class="etitle">Guided capture in progress — ${guidedLive.count} captured · the window is yours</span>
-        <div class="edetail">Drive to any state in the browser window and click 📸 Capture. When you're done, ${IS_MAC?'press <b>⌘Q</b> to quit the browser':'fully quit the browser'} — just closing the window may leave it running. Quitting ends the session and updates this ledger.</div></div>`;
+    if(guidedLive && guidedLive.running){
+      const cap = guidedLive.capturing;
+      const title = cap ? `Capturing this page… · ${guidedLive.count} saved` : `Guided capture in progress — ${guidedLive.count} captured · the window is yours`;
+      const detail = cap
+        ? `Snapshotting the page you're on — big pages take a few seconds. The pill in the browser says “Capturing…” too.`
+        : `Drive to any state in the browser window and click 📸 Capture. When you're done, ${IS_MAC?'press <b>⌘Q</b> to quit the browser':'fully quit the browser'} — just closing the window may leave it running.`;
+      return `<div class="ent hero live" id="guided-live"><div class="emeta"><span class="livedot${cap?' hot':''}"></span>now · you</div>
+        <span class="etitle">${title}</span>
+        <div class="edetail">${detail}</div>
+        ${serverMode?`<div class="chiprow"><button type="button" class="gobtn ghost" data-guided-end>End session &amp; save</button></div>`:''}</div>`;
+    }
     if(R && R.score>=100)
       return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
         <div class="edetail">Your library is complete and current. When your product ships something new, check for changes here — the ledger will tell you what moved.</div>

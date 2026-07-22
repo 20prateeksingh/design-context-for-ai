@@ -369,10 +369,14 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
   const dir = path.join(outDir, 'pages', meta.subdir || slug); // states land under pages/<slug>/states/<name>/
   fs.mkdirSync(dir, { recursive: true });
 
-  // 1. screenshot first (pixel truth, before DOM mutation)
+  // 1. screenshot first (pixel truth, before DOM mutation). Hide any guided overlay JUST for the shot
+  // (so the pill never lands in the PNG), then restore it — the designer keeps seeing the "Capturing…"
+  // pill through the slower passes below. No-op for the automated crawl (no such element).
+  await page.evaluate(() => document.querySelectorAll('[id^="__dck"]').forEach(e => { e.dataset.dckVis = e.style.visibility; e.style.visibility = 'hidden'; })).catch(() => {});
   await page.screenshot({ path: path.join(dir, 'screenshot.png'), fullPage: true }).catch(async () => {
     await page.screenshot({ path: path.join(dir, 'screenshot.png') }); // fullPage can fail on huge pages
   });
+  await page.evaluate(() => document.querySelectorAll('[id^="__dck"]').forEach(e => { e.style.visibility = e.dataset.dckVis || ''; delete e.dataset.dckVis; })).catch(() => {});
 
   // 2. verbatim copy + computed tokens + outbound links (read-only DOM passes)
   const [content, tokens, linksOut, title] = [
@@ -385,7 +389,9 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
   // 3. self-contained editable snapshot
   await inlineStylesheets(page, context);
   await inlineImages(page, context);
-  let html = await page.evaluate(() => `<!DOCTYPE html>${document.documentElement.outerHTML}`);
+  // Strip any guided overlay from the SAVED html (never part of the product). Removing it from the live
+  // DOM here is fine — guided mode remounts the pill after writeSnapshot returns. No-op for the crawl.
+  let html = await page.evaluate(() => { document.querySelectorAll('[id^="__dck"]').forEach(e => e.remove()); return `<!DOCTYPE html>${document.documentElement.outerHTML}`; });
   html = prettyHtml(makeStatic(html, finalUrl));
 
   const method = meta.method || 'dom';
@@ -454,42 +460,52 @@ function guidedOverlayInjector() {
     const wrap = document.createElement('div');
     wrap.id = '__dck_overlay';
     wrap.setAttribute('style', 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:center;gap:10px;background:#111;color:#fff;padding:9px 10px 9px 14px;border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.42);font:13px/1.3 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:92vw');
+    // one-time keyframe for the "capturing" pulse (scoped id, harmless if it lands nowhere)
+    if (!document.getElementById('__dck_kf')) { const kf = document.createElement('style'); kf.id = '__dck_kf';
+      kf.textContent = '@keyframes __dckpulse{0%,100%{opacity:1}50%{opacity:.35}}'; document.head && document.head.appendChild(kf); }
     wrap.innerHTML =
       '<span id="__dck_dot" style="width:9px;height:9px;border-radius:50%;background:#888;flex:none"></span>' +
-      '<span id="__dck_status" style="white-space:nowrap;max-width:44vw;overflow:hidden;text-overflow:ellipsis">…</span>' +
+      '<span id="__dck_status" style="white-space:nowrap;max-width:40vw;overflow:hidden;text-overflow:ellipsis">…</span>' +
       '<input id="__dck_state" placeholder="state name" style="display:none;width:140px;padding:6px 9px;border:1px solid #444;border-radius:999px;background:#1c1c1c;color:#fff;font:12px sans-serif">' +
-      '<button id="__dck_btn" style="flex:none;padding:7px 15px;border:0;border-radius:999px;background:#2f6fed;color:#fff;font-weight:600;cursor:pointer">📸 Capture</button>';
+      '<button id="__dck_btn" style="flex:none;padding:7px 15px;border:0;border-radius:999px;background:#2f6fed;color:#fff;font-weight:600;cursor:pointer">📸 Capture</button>' +
+      '<button id="__dck_recap" style="display:none;flex:none;padding:7px 12px;border:1px solid #555;border-radius:999px;background:transparent;color:#ddd;font-weight:600;cursor:pointer">↻ Re-capture page</button>';
     document.body.appendChild(wrap);
     const dot = wrap.querySelector('#__dck_dot'), statusEl = wrap.querySelector('#__dck_status');
-    const stateInput = wrap.querySelector('#__dck_state'), btn = wrap.querySelector('#__dck_btn');
-    let cur = { slug: '', captured: false, at: null }, userEdited = false;
+    const stateInput = wrap.querySelector('#__dck_state'), btn = wrap.querySelector('#__dck_btn'), recapBtn = wrap.querySelector('#__dck_recap');
+    let cur = { slug: '', captured: false, at: null }, userEdited = false, busy = false;
     stateInput.addEventListener('input', () => { userEdited = true; });
+    function setBusy(on) { busy = on; btn.disabled = on; recapBtn.disabled = on;
+      dot.style.background = on ? '#f0a020' : dot.style.background; dot.style.animation = on ? '__dckpulse 1s ease-in-out infinite' : 'none';
+      if (on) { statusEl.style.color = '#ffe6b0'; statusEl.textContent = '⏳ Capturing this page… (big pages take a few seconds)'; } }
     async function refresh() {
+      if (busy) return;                                    // don't clobber the "Capturing…" message mid-shot
       let info; try { info = await window.__dckStatus(location.href); } catch { return; }
       if (!info) return;
-      cur = info;
+      cur = info; dot.style.animation = 'none';
       if (info.captured) {
         dot.style.background = '#4ac36a'; statusEl.style.color = '#d4ecd9';
         statusEl.textContent = `✓ in your library since ${info.at} — Capture adds a state`;
-        stateInput.style.display = '';
+        stateInput.style.display = ''; recapBtn.style.display = '';   // offer overwrite of the existing page
         if (!userEdited) stateInput.value = detectState();
       } else {
         dot.style.background = '#ff5252'; statusEl.style.color = '#ffd5d5';
         statusEl.textContent = `✦ NEW — not in your library yet`;
-        stateInput.style.display = 'none';
+        stateInput.style.display = 'none'; recapBtn.style.display = 'none';
       }
     }
-    btn.addEventListener('click', async () => {
-      btn.disabled = true; statusEl.textContent = 'capturing…';
+    async function doCapture(payload, okLabel) {
+      setBusy(true);
       try {
-        const r = await window.__dckCapture({ url: location.href, state: cur.captured ? (stateInput.value.trim() || detectState()) : '' });
+        const r = await window.__dckCapture(payload);
         statusEl.style.color = r && r.ok ? '#d4ecd9' : '#ffb3b3';
-        statusEl.textContent = r && r.ok ? `✓ saved ${r.label || 'capture'}` : `✗ ${(r && r.error) || 'failed'}`;
+        statusEl.textContent = r && r.ok ? `✓ ${okLabel || 'saved'} ${r.label || ''}`.trim() : `✗ ${(r && r.error) || 'failed'}`;
         userEdited = false;
-        setTimeout(refresh, 1000);
       } catch (e) { statusEl.style.color = '#ffb3b3'; statusEl.textContent = '✗ ' + (e.message || 'failed'); }
-      btn.disabled = false;
-    });
+      setBusy(false);
+      setTimeout(refresh, 1000);
+    }
+    btn.addEventListener('click', () => doCapture({ url: location.href, state: cur.captured ? (stateInput.value.trim() || detectState()) : '' }, 'saved'));
+    recapBtn.addEventListener('click', () => doCapture({ url: location.href, recapture: true }, 're-captured'));
     refresh();
     let last = location.href;
     setInterval(() => { if (location.href !== last) { last = location.href; userEdited = false; refresh(); } }, 700);
@@ -595,33 +611,38 @@ if (require.main === module) (async () => {
       const slug = slugFor(url, url);                 // page slug auto-derived from the URL (no field to fill)
       const isNew = !capturedIndex.has(slug);
       const sname = String(payload.state || '').trim();
-      // New URL → capture as a PAGE. Already-captured URL → this is a variant, capture as a STATE (needs a name).
-      if (!isNew && !sname) return { ok: false, error: 'name the state (this URL is already captured)' };
+      const recapture = !!payload.recapture;          // designer chose to overwrite the existing page
+      // New URL → capture as a PAGE. Already-captured URL → either RE-CAPTURE the page (overwrite) or
+      // capture a variant as a STATE (needs a name). Overwriting an existing page is opt-in, never silent.
+      if (!isNew && !sname && !recapture) return { ok: false, error: 'name the state, or choose “Re-capture page” (this URL is already captured)' };
+      const asPage = isNew || recapture;              // writes into pages/<slug>/ (overwrites if it exists)
       let safeName = sname.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'state';
-      // Collision guard: a name reused WITHIN this session is a distinct new capture → suffix it so it
-      // never silently overwrites (the "5× modal" data-loss bug). A name matching only a PRIOR session's
-      // state is left as-is → deliberate re-capture still overwrites.
-      if (!isNew && sessionNames.has(`${slug}/${safeName}`)) {
+      // Collision guard (states only): a name reused WITHIN this session is a distinct new capture → suffix
+      // it so it never silently overwrites (the "5× modal" data-loss bug). A name matching only a PRIOR
+      // session's state is left as-is → deliberate re-capture still overwrites.
+      if (!asPage && sessionNames.has(`${slug}/${safeName}`)) {
         let i = 2, cand; const statesRoot = path.join(OUT_DIR, 'pages', slug, 'states');
         do { cand = `${safeName}-${i++}`; } while (sessionNames.has(`${slug}/${cand}`) || fs.existsSync(path.join(statesRoot, cand)));
         safeName = cand;
       }
-      if (!isNew) sessionNames.add(`${slug}/${safeName}`);
-      const label = isNew ? slug : `${slug} › ${safeName}`;
-      const meta = isNew
-        ? { slug, label: null, method: 'guided', reachedBy: `guided capture — ${url}`, pattern: routePattern(url) }
+      if (!asPage) sessionNames.add(`${slug}/${safeName}`);
+      const label = asPage ? (recapture && !isNew ? `${slug} (re-captured)` : slug) : `${slug} › ${safeName}`;
+      const meta = asPage
+        ? { slug, label: null, method: 'guided', reachedBy: `guided ${recapture && !isNew ? 're-capture' : 'capture'} — ${url}`, pattern: routePattern(url) }
         : { slug, subdir: path.join(slug, 'states', safeName), label: safeName, method: 'guided', reachedBy: `${new URL(url).pathname} · state: ${safeName}`, pattern: routePattern(url) };
       try {
-        await pageObj.evaluate(() => { const e = document.getElementById('__dck_overlay'); if (e) e.remove(); }); // keep the overlay out of the snapshot
+        // Tell the dashboard a capture is in flight (it shows "Capturing…"); the pill hides itself for the shot.
+        console.log('GUIDED_JSON:' + JSON.stringify({ phase: 'capturing', url }));
         const r = await writeSnapshot(pageObj, gctx, url, meta, OUT_DIR);
         // Update the index BEFORE remounting, so the remounted pill's status reflects this capture (green + now).
         if (r.status === 'ok') {
           const at = new Date().toISOString();
           capturedIndex.set(slug, formatWhen(at));
-          captures.push({ slug, state: sname || null, url, at });
+          const rec = { slug, state: sname || null, url, at, ...(recapture && !isNew ? { recapture: true } : {}) };
+          captures.push(rec);
           // Stable machine line the server parses into live status + SSE (F5). ONLY under --guided —
           // capture.js is imported as a library elsewhere, so this must never print in other modes.
-          console.log('GUIDED_JSON:' + JSON.stringify({ slug, state: sname || null, url, at }));
+          console.log('GUIDED_JSON:' + JSON.stringify(rec));
         }
         await pageObj.evaluate(() => { if (window.__dckMount) window.__dckMount(); }).catch(() => {});
         if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); return { ok: false, error: r.status }; }
@@ -635,6 +656,12 @@ if (require.main === module) (async () => {
     await gctx.addInitScript(guidedOverlayInjector);
     const gp = gctx.pages()[0] || await gctx.newPage();
     await gp.goto(START_URL, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+    // End the session gracefully on a signal (the dashboard's "End session" sends SIGTERM; Ctrl+C sends
+    // SIGINT) — closing the context fires the 'close' below, so persistence + build-index still run. This
+    // is what lets the session be ended from the dashboard, not only by quitting the browser window.
+    let ending = false;
+    const endSession = () => { if (ending) return; ending = true; gctx.close().catch(() => {}); };
+    process.on('SIGTERM', endSession); process.on('SIGINT', endSession);
     await new Promise((resolve) => gctx.on('close', resolve));
     const endedAt = new Date().toISOString();
     console.log(`\n✅  Guided session ended — ${captures.length} state(s) captured.`);
