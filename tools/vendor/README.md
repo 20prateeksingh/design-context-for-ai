@@ -10,11 +10,11 @@ converter fetching public font files from `cdn.jsdelivr.net/fontsource` to embed
 real fonts (so Figma keeps the pasted text); fully-offline text needs those fonts
 vendored locally — a documented follow-up.
 
-- **Package:** [`@figit/dom-to-figma`](https://www.npmjs.com/package/@figit/dom-to-figma) — **v0.2.0, pinned**
+- **Package:** [`@figit/dom-to-figma`](https://www.npmjs.com/package/@figit/dom-to-figma) — **v0.2.1, pinned** (2026-07-26; was 0.2.0)
 - **License:** MIT (see `LICENSE-dom-to-figma`)
 - **Global:** `DomToFigma` (IIFE build), API used: `createFigmaConverter()` →
   `.convert({element, width, height, name})` → `{bytes, toClipboardItem(), toClipboardHtml()}`
-- **Build recipe** (from the v0.2.0 npm tarball's `dist/figma.mjs`):
+- **Build recipe** (from the v0.2.1 npm tarball's `dist/figma.mjs`):
 
   ```
   esbuild dist/figma.mjs --bundle --format=iife --global-name=DomToFigma --minify
