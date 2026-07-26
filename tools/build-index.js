@@ -28,10 +28,12 @@ const PENDING = '_(not yet described — run the describe step)_';
 
 function normalize(u) { try { const x = new URL(u); x.hash = ''; let s = x.href; if (s.endsWith('/') && x.pathname !== '/') s = s.slice(0, -1); return s; } catch { return u; } }
 
-// routeKey — canonical per-page identity with analytics/nav-source params stripped. MIRRORS
-// capture.js's routeKey (kept in sync by hand; both are tiny pure functions). Lets the link graph
-// resolve a nav link that carries a tracking param (e.g. /account/rewards?link=home_rewards) to the
-// page captured under the clean route — so tracked links don't leave real pages looking unlinked.
+// routeKey — canonical per-page identity: host + path with analytics/nav-source params stripped. MIRRORS
+// capture.js's routeKey (kept in sync by hand; both are tiny pure functions — the guard that they still
+// agree is `node tools/test-routekey.js`). Lets the link graph resolve a nav link that carries a tracking
+// param (e.g. /account/rewards?link=home_rewards) to the page captured under the clean route — so tracked
+// links don't leave real pages looking unlinked. The host is part of the key (www. stripped, so
+// www.flipkart.com ≡ flipkart.com) — two same-path pages on different hosts are different pages.
 const TRACKING_PARAM = /^(link|otracker\d*|utm_[a-z]+|gclid|gclsrc|fbclid|dclid|msclkid|mc_eid|mc_cid|igshid|_ga|cmpid|spm|ref_)$/i;
 function routeKey(u) {
   try {
@@ -39,7 +41,7 @@ function routeKey(u) {
     for (const k of [...sp.keys()]) if (TRACKING_PARAM.test(k)) sp.delete(k);
     const kept = [...sp.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     let p = x.pathname; if (p !== '/' && p.endsWith('/')) p = p.slice(0, -1);
-    return p + (kept.length ? '?' + kept.map(([k, v]) => `${k}=${v}`).join('&') : '');
+    return x.host.toLowerCase().replace(/^www\./, '') + p + (kept.length ? '?' + kept.map(([k, v]) => `${k}=${v}`).join('&') : '');
   } catch { return u || '/'; }
 }
 
@@ -650,7 +652,7 @@ function buildIndex(libDir) {
   return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene };
 }
 
-module.exports = { buildIndex };
+module.exports = { buildIndex, routeKey }; // routeKey exported so the mirror test can compare both copies
 
 if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');

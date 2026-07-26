@@ -157,10 +157,16 @@ function cleanSearch(search) {
   const kept = [...sp.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // stable → order-independent
   return kept.length ? '?' + kept.map(([k, v]) => `${k}=${v}`).join('&') : '';
 }
-// Canonical per-page identity: pathname (no trailing slash) + meaningful query (tracking stripped, sorted).
+// Canonical per-page identity: host + pathname (no trailing slash) + meaningful query (tracking stripped, sorted).
 // The one key the crawl and guided both derive the same, so "already captured?" is answered consistently.
+// The HOST is part of the identity: two pages are only "the same route" (safe to overwrite in place) when the
+// host matches too. Without it, a product's signed-out surface and its signed-in app — the shape --login-page
+// captures by design (www.pinterest.com/ → pages/login, in.pinterest.com/ → pages/home) — both key "/" and
+// guided "recognizes" one as the other, overwriting it with the wrong content. www. is stripped so
+// www.flipkart.com ≡ flipkart.com (one product, two spellings), but in.pinterest.com ≢ www.pinterest.com.
+// MIRRORED in build-index.js — the two must agree exactly; guard: node tools/test-routekey.js.
 function routeKey(url) {
-  try { const u = new URL(url); let p = u.pathname; if (p !== '/' && p.endsWith('/')) p = p.slice(0, -1); return p + cleanSearch(u.search); }
+  try { const u = new URL(url); let p = u.pathname; if (p !== '/' && p.endsWith('/')) p = p.slice(0, -1); return stripWww(u.host.toLowerCase()) + p + cleanSearch(u.search); }
   catch { return url || '/'; }
 }
 function slugFor(url, origin) {
@@ -313,6 +319,42 @@ async function inlineStylesheets(page, context) {
   }
 }
 
+const MAX_INLINE_BYTES = 400 * 1024;   // same ceiling for fetched images and resolved blobs — huge media stays remote
+
+// blob: (object URL) images — resolve IN PAGE CONTEXT, before serialization.
+// An object URL is only valid inside the live tab, so Node can never fetch it after the fact; skipping it
+// (what we used to do) shipped a baseline with broken images on every lazy-image product (Pinterest's grid).
+// fetch(blobUrl) → Blob → FileReader data: URL, rewriting the src. Failures leave the src untouched and are
+// COUNTED (and marked in the DOM) — hygiene's blob: check then reports a page we tried and couldn't fix,
+// rather than the fix failing silently.
+async function inlineBlobImages(page) {
+  return await page.evaluate(async (maxBytes) => {
+    const imgs = Array.from(document.querySelectorAll('img')).filter(i => (i.getAttribute('src') || '').startsWith('blob:'));
+    const cache = new Map();   // one fetch per distinct object URL, however many <img> share it
+    let resolved = 0, failed = 0, tooBig = 0;
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      try {
+        if (!cache.has(src)) {
+          const resp = await fetch(src);
+          if (!resp.ok) throw new Error('fetch ' + resp.status);
+          const blob = await resp.blob();
+          if (blob.size > maxBytes) { cache.set(src, { tooBig: true }); }
+          else cache.set(src, { dataUri: await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onloadend = () => res(fr.result); fr.onerror = () => rej(new Error('read failed'));
+            fr.readAsDataURL(blob);
+          }) });
+        }
+        const hit = cache.get(src);
+        if (hit.tooBig) { tooBig++; img.setAttribute('data-dck-blob', 'too-large'); continue; }
+        img.setAttribute('src', hit.dataUri); img.removeAttribute('srcset'); resolved++;
+      } catch (_) { failed++; img.setAttribute('data-dck-blob', 'unresolved'); }
+    }
+    return { resolved, failed, tooBig };
+  }, MAX_INLINE_BYTES).catch(() => ({ resolved: 0, failed: 0, tooBig: 0, error: true }));
+}
+
 async function inlineImages(page, context) {
   const srcs = await page.evaluate(() =>
     [...new Set(Array.from(document.querySelectorAll('img')).map(i => i.src))]);
@@ -322,7 +364,7 @@ async function inlineImages(page, context) {
       const resp = await context.request.get(src);
       if (!resp.ok()) continue;
       const buf = await resp.body();
-      if (buf.length > 400 * 1024) continue; // keep huge media remote
+      if (buf.length > MAX_INLINE_BYTES) continue; // keep huge media remote
       const ct = (resp.headers()['content-type'] || 'image/png').split(';')[0];
       const dataUri = `data:${ct};base64,${buf.toString('base64')}`;
       await page.evaluate(({ src, dataUri }) => {
@@ -405,7 +447,8 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
     await page.title(),
   ];
 
-  // 3. self-contained editable snapshot
+  // 3. self-contained editable snapshot (blobs first — resolved ones become data: and the pass below skips them)
+  const blobs = await inlineBlobImages(page);
   await inlineStylesheets(page, context);
   await inlineImages(page, context);
   // Strip any guided overlay from the SAVED html (never part of the product). Removing it from the live
@@ -433,7 +476,53 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
     ...(meta.loginPage ? { capturedLoggedOut: true, note: 'signed-out surface captured before login existed' } : {}),
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(metaOut, null, 2), 'utf8');
-  return { status: 'ok', slug, meta: metaOut, sizeKb: Math.round(html.length / 1024) };
+  return { status: 'ok', slug, finalUrl, meta: metaOut, sizeKb: Math.round(html.length / 1024), blobImages: blobs };
+}
+
+// Blob-resolution outcome, appended to a capture's status line. Silent when nothing needed resolving or
+// everything resolved; loud (per-page, on the same line) when an object URL could not be recovered.
+function blobNote(r) {
+  const b = r && r.blobImages; if (!b) return '';
+  const left = (b.failed || 0) + (b.tooBig || 0);
+  if (!left) return b.resolved ? ` · ${b.resolved} blob img inlined` : '';
+  const parts = [];
+  if (b.failed) parts.push(`${b.failed} unresolved`);
+  if (b.tooBig) parts.push(`${b.tooBig} over ${Math.round(MAX_INLINE_BYTES / 1024)}KB`);
+  return ` · ⚠ blob img: ${parts.join(', ')}${b.resolved ? `, ${b.resolved} inlined` : ''} (left as-is — hygiene flags this page)`;
+}
+
+// ── Lazy-content settle: step-scroll until the page stops growing, then return to top ─────────
+// Infinite-scroll and lazy-mounted grids keep everything below the fold OUT of the DOM until it scrolls
+// into view, so serializing straight after load ships a mostly-empty baseline of a content-rich page.
+// Step by one viewport, watch document.body.scrollHeight, stop when it stabilises (or the caps hit),
+// then return to the top so the full-page screenshot and the DOM both start where the designer expects.
+//
+// PRODUCT RULE, not an optimization: this is called from capturePage (URL-driven modes — crawl, depth-2,
+// --urls, --state, --login-page) and NEVER from the guided path, which calls writeSnapshot directly. In
+// guided capture a human framed that exact state — an open modal, a mid-wizard step — and auto-scrolling
+// could dismiss or mutate it. Keeping the call here, one level above writeSnapshot, is what makes that
+// separation structural rather than a flag someone can flip by accident.
+async function scrollAndSettle(page) {
+  const MAX_STEPS = 12, HARD_MS = 10000, STEP_WAIT = 450;
+  const startedAt = Date.now();
+  const height = () => page.evaluate(() => (document.body ? document.body.scrollHeight : 0));
+  let steps = 0, stableRounds = 0, grew = 0;
+  try {
+    let last = await height();
+    const startHeight = last;
+    for (; steps < MAX_STEPS; steps++) {
+      if (Date.now() - startedAt > HARD_MS) break;
+      const atBottom = await page.evaluate(() => window.scrollY + window.innerHeight >= (document.body ? document.body.scrollHeight : 0) - 2);
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight));
+      await page.waitForTimeout(STEP_WAIT);
+      const h = await height();
+      if (h > last) { grew += h - last; last = h; stableRounds = 0; }
+      else if (atBottom && ++stableRounds >= 2) break;   // bottom reached twice with no growth → done
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(600);                       // let sticky headers re-settle and lazy images paint
+    return { steps, grewPx: grew, startHeight, endHeight: last };
+  } catch (_) { return { steps, grewPx: grew, error: true }; }
 }
 
 // ── Capture one page → pages/<slug>/ (navigate, settle, then snapshot) ────────
@@ -447,6 +536,7 @@ async function capturePage(page, context, url, meta, outDir, actionLog) {
   if (!meta.loginPage && /\/(login|signin|sign-in|signup|auth)\b/i.test(new URL(finalUrl).pathname) && !/login|signin/i.test(new URL(url).pathname)) {
     return { status: 'auth-redirect', finalUrl };
   }
+  await scrollAndSettle(page);   // lazy content into the DOM — URL-driven modes only, never guided (see above)
   return writeSnapshot(page, context, url, meta, outDir);
 }
 
@@ -541,7 +631,9 @@ function flattenHygiene(f) {
   if (!f || f.error) return [];
   const out = [];
   const push = (it, text) => out.push({ severity: it.severity || 'warn', text, action: it.action || '' });
-  for (const it of f.duplicates || []) push(it, `${(it.pages || []).join(', ')} — ${it.issue}`);
+  let renderDuplicate; try { ({ renderDuplicate } = require('./hygiene.js')); } catch (_) {}
+  if (!renderDuplicate) renderDuplicate = (it) => `${(it.pages || []).join(', ')} — ${it.issue}`;
+  for (const it of f.duplicates || []) push(it, renderDuplicate(it));
   for (const it of f.orphans || []) push(it, `${it.page} (${it.route}) — ${it.issue}`);
   for (const it of f.identicalStates || []) push(it, `${it.page} › ${it.state} — ${it.issue}`);
   for (const it of f.quality || []) push(it, `${it.target} — ${it.issue}`);
@@ -568,7 +660,7 @@ if (require.main === module) (async () => {
     process.stdout.write(`⤷ login page … `);
     try {
       const r = await capturePage(page, context, START_URL, { slug: 'login', label: 'Login', loginPage: true }, OUT_DIR, actionLog);
-      console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB) — captured logged-out` : `skipped (${r.status})`);
+      console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)} — captured logged-out` : `skipped (${r.status})`);
     } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
     await context.close(); await browser.close();
     // Refresh the consumption layer only if a prior full capture exists (fresh workspace has none yet;
@@ -672,7 +764,7 @@ if (require.main === module) (async () => {
         }
         await pageObj.evaluate(() => { if (window.__dckMount) window.__dckMount(); }).catch(() => {});
         if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); return { ok: false, error: r.status }; }
-        console.log(`  ✓ ${label}  (${r.sizeKb} KB)`);
+        console.log(`  ✓ ${label}  (${r.sizeKb} KB)${blobNote(r)}`);
         return { ok: true, label, sizeKb: r.sizeKb };
       } catch (e) {
         console.log(`  ✗ ${label}: ${e.message.split('\n')[0]}`);
@@ -771,20 +863,48 @@ if (require.main === module) (async () => {
       try {
         const r = await capturePage(page, context, START_URL,
           { slug: pslug, subdir: path.join(pslug, 'states', sname.replace(/[^A-Za-z0-9-]+/g, '-')), label: sname }, OUT_DIR, actionLog);
-        console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)` : `skipped (${r.status})`);
+        console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)}` : `skipped (${r.status})`);
       } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
     } else {
       const urls = ONLY_URLS.split(',').map(s => s.trim()).filter(Boolean);
       console.log(`🎯 Selective capture — ${urls.length} url(s) from the frontier`);
-      const seen = new Set(fs.existsSync(path.join(OUT_DIR, 'pages')) ? fs.readdirSync(path.join(OUT_DIR, 'pages')) : []);
+      // "Already captured?" is answered by ROUTE, exactly as guided answers it (the routeIndex pattern) —
+      // not by a disk listing of slug names. A listing can only ever say "that folder name is taken", so
+      // re-supplying an already-captured URL forked <slug>-2 forever, breaking the kit's own promise that
+      // re-running refreshes the library in place. Now: same route → overwrite THAT page's folder (keeping
+      // its nav label / template facts, which --urls can't rediscover); genuinely new route → new folder,
+      // with the -2 suffix kept only for a true slug collision between two DIFFERENT routes.
+      const pagesDir = path.join(OUT_DIR, 'pages');
+      const routeIndex = new Map();   // routeKey → { slug, meta }
+      const takenSlugs = new Set();
+      if (fs.existsSync(pagesDir)) {
+        const dirs = fs.readdirSync(pagesDir).filter(s => { try { return fs.statSync(path.join(pagesDir, s)).isDirectory(); } catch { return false; } });
+        for (const s of dirs) takenSlugs.add(s);
+        // Two passes so finalUrl always wins over the requested url it redirected from (a page is identified
+        // by where it landed; the requested URL is only an alias for reaching it).
+        for (const field of ['url', 'finalUrl']) for (const s of dirs) {
+          const mp = path.join(pagesDir, s, 'meta.json');
+          if (!fs.existsSync(mp)) continue;
+          try { const m = JSON.parse(fs.readFileSync(mp, 'utf8')); if (m[field]) routeIndex.set(routeKey(m[field]), { slug: s, meta: m }); } catch (_) {}
+        }
+      }
       for (const u of urls) {
-        let slug = slugFor(u, u);
-        while (seen.has(slug)) slug += '-2';
-        seen.add(slug);
-        process.stdout.write(`  ${slug} … `);
+        const rk = routeKey(u);
+        const existing = routeIndex.get(rk);
+        let slug;
+        if (existing) slug = existing.slug;                     // refresh in place
+        else { slug = slugFor(u, u); while (takenSlugs.has(slug)) slug += '-2'; }
+        takenSlugs.add(slug);
+        const prev = existing ? existing.meta : {};
+        process.stdout.write(`  ${slug}${existing ? ' (refresh)' : ''} … `);
         try {
-          const r = await capturePage(page, context, u, { slug, label: null, pattern: routePattern(u) }, OUT_DIR, actionLog);
-          console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)` : `skipped (${r.status})`);
+          const r = await capturePage(page, context, u, {
+            slug, label: prev.navLabel || null,                 // preserve the facts a URL alone can't carry
+            pattern: prev.pattern || routePattern(u),
+            template: prev.template || null, collapsed: prev.collapsed || 0,
+          }, OUT_DIR, actionLog);
+          console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)}` : `skipped (${r.status})`);
+          if (r.status === 'ok') routeIndex.set(routeKey(r.finalUrl || u), { slug, meta: r.meta });
         } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
       }
     }
@@ -872,7 +992,7 @@ if (require.main === module) (async () => {
     try {
       const r = await capturePage(page, context, cand.url, { ...cand, slug }, OUT_DIR, actionLog);
       if (r.status === 'ok') {
-        console.log(`✓ (${r.sizeKb} KB)`);
+        console.log(`✓ (${r.sizeKb} KB)${blobNote(r)}`);
         results.ok.push(slug);
         navEntries.push({ label: cand.label, url: cand.url, route: r.meta.route, pattern: r.meta.pattern,
           slug, template: cand.template, collapsed: cand.collapsed || 0 });
@@ -925,7 +1045,7 @@ if (require.main === module) (async () => {
       try {
         const r = await capturePage(page, context, rep, { url: rep, label: null, pattern, slug, template: pattern, collapsed: g.urls.size - 1 }, OUT_DIR, actionLog);
         if (r.status === 'ok') {
-          console.log(`✓ (${r.sizeKb} KB, collapsed ${g.urls.size - 1})`);
+          console.log(`✓ (${r.sizeKb} KB, collapsed ${g.urls.size - 1})${blobNote(r)}`);
           results.ok.push(slug);
           navEntries.push({ label: null, url: rep, route: r.meta.route, pattern, slug, template: pattern, collapsed: g.urls.size - 1 });
         } else { console.log(`skipped (${r.status})`); results.skipped.push({ slug, reason: r.status }); }
