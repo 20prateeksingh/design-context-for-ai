@@ -198,6 +198,60 @@ function aggregateTokens(pagesDir, slugs) {
   };
 }
 
+// ── F2 (v2.4): the whitelabel accent — the dashboard wears the captured product's own color. ─────
+// A pure, deterministic function of tokens.json contents (no clock, no randomness; stable sort with a
+// lower-hex tiebreaker), so build-twice is byte-identical. The color is OBSERVED data: no qualifying
+// candidate → no brand entry at all, and the dashboard keeps its CSS fallback (indigo #4F46E5) —
+// measured-or-absent applies to color.
+const DARK_PANEL = '#131316'; // must match the dashboard's :root --panel (contrast guard surface)
+const DARK_BG = '#08090A';    // must match --bg (button-text candidate)
+function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgbToHex(r, g, b) { return '#' + [r, g, b].map(x => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0').toUpperCase()).join(''); }
+function hexToHsl(hex) {
+  const [R, G, B] = hexToRgb(hex).map(x => x / 255);
+  const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn, l = (mx + mn) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d) { if (mx === R) h = 60 * (((G - B) / d) % 6); else if (mx === G) h = 60 * ((B - R) / d + 2); else h = 60 * ((R - G) / d + 4); }
+  if (h < 0) h += 360;
+  return { h, s, l };
+}
+function hslToHex(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0]; else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c]; else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+  return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+function relLum(hex) {
+  const lin = hexToRgb(hex).map(x => { const c = x / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+}
+function contrastRatio(a, b) { const la = relLum(a), lb = relLum(b); const [hi, lo] = la >= lb ? [la, lb] : [lb, la]; return (hi + 0.05) / (lo + 0.05); }
+function deriveBrand(tokens) {
+  // §2.1 candidates: opaque, saturated (s ≥ .35), mid-lightness (l in [.20, .75]), never the error-red
+  // band (h ≤ 15° or ≥ 345° with s ≥ .5 — the brand must not impersonate --bad). Score = count × pages;
+  // ties break to the lower hex (stable, documented).
+  const cands = ((tokens.colors && tokens.colors.top) || [])
+    .filter(c => !c.alpha && /^#[0-9A-F]{6}$/i.test(c.value))
+    .map(c => ({ ...c, hsl: hexToHsl(c.value), score: c.count * c.pages }))
+    .filter(c => c.hsl.s >= 0.35 && c.hsl.l >= 0.20 && c.hsl.l <= 0.75)
+    .filter(c => !((c.hsl.h <= 15 || c.hsl.h >= 345) && c.hsl.s >= 0.5));
+  if (!cands.length) return null;
+  cands.sort((a, b) => (b.score - a.score) || (a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
+  const seed = cands[0];
+  // §2.2a dark-contrast guard: the accent as text/border on --panel must reach ≥ 3.0:1 — lighten
+  // stepwise in HSL (hue/sat kept) until it does. On dark, "stronger" = LIGHTER (+8% L).
+  let { h, s, l } = hexToHsl(seed.value);
+  let accent = seed.value.toUpperCase();
+  let guard = 0;
+  while (contrastRatio(accent, DARK_PANEL) < 3.0 && l < 0.98 && guard++ < 50) { l = Math.min(0.98, l + 0.02); accent = hslToHex(h, s, l); }
+  const accentStrong = hslToHex(h, s, Math.min(0.98, l + 0.08));
+  // §2.2b button text on an accent fill: whichever of white/near-black reads stronger, stored per brand.
+  const buttonText = contrastRatio('#FFFFFF', accent) >= contrastRatio(DARK_BG, accent) ? '#FFFFFF' : DARK_BG;
+  return { seed: seed.value.toUpperCase(), applied: { accent, accentStrong, buttonText }, source: 'observed', basis: { count: seed.count, pages: seed.pages } };
+}
+
 function buildIndex(libDir) {
   const pagesDir = path.join(libDir, 'pages');
   const sitemap = JSON.parse(fs.readFileSync(path.join(libDir, 'ia', 'sitemap.json'), 'utf8'));
@@ -329,6 +383,7 @@ function buildIndex(libDir) {
     || ordered[0];
   const depths = computeDepths(pages, rootSlug);
   const tokens = aggregateTokens(pagesDir, ordered);
+  const brand = deriveBrand(tokens); // F2 (v2.4): whitelabel accent — null when nothing qualifies
 
   // display labels (F4): designer override (annotations.displayLabel) wins verbatim; otherwise the
   // usual label; on collision between two auto-labels, append the distinguishing route → deterministic.
@@ -402,6 +457,12 @@ function buildIndex(libDir) {
   if (tokensPresent) events.push({ at: capAt, dateOnly: true, seq: 2, actor: 'the kit', kind: 'tokens',
     title: 'Extracted the visual language',
     detail: `${tokens.colors.top.length} colors · ${tokens.typography.ramp.length} type sizes${tokens.spacing.baseUnit ? ` · ${tokens.spacing.baseUnit}px base` : ''}`,
+    link: { tab: 'design' } });
+  // F2 (v2.4): the brand event — same `at` as the tokens event, next seq. Derived from tokens.json
+  // contents (build-twice identical); ABSENT when no brand qualifies (no fake entry). Canon §7 wording.
+  if (brand) events.push({ at: capAt, dateOnly: true, seq: 3, actor: 'the kit', kind: 'brand',
+    title: "Borrowed your product's color",
+    detail: `${brand.seed} — the dashboard now wears it · observed across ${brand.basis.pages} pages`,
     link: { tab: 'design' } });
   if (describedCount > 0) {
     // No embedded timestamp for the describe step → anchor to the latest capture (describing can't
@@ -589,7 +650,8 @@ function buildIndex(libDir) {
   try { hygiene = require('./hygiene.js').runHygiene(libDir); } catch (_) {}
 
   // 4b. tokens.json + dashboard.html — Map · Home · Design language (self-contained; live via tools/map.js)
-  fs.writeFileSync(path.join(libDir, 'tokens.json'), JSON.stringify(tokens, null, 2), 'utf8');
+  // F2: `brand` is strictly additive (appended after every existing field) and only present when derived.
+  fs.writeFileSync(path.join(libDir, 'tokens.json'), JSON.stringify(brand ? { ...tokens, brand } : tokens, null, 2), 'utf8');
   const tplPath = path.join(__dirname, 'dashboard-template.html');
   if (fs.existsSync(tplPath)) {
     const mapData = {
@@ -629,6 +691,7 @@ function buildIndex(libDir) {
       pendingDescriptions: ordered.filter(s => !pages[s].description).length,
       // dashboard-v2 additions
       identity, readiness, events, patternsPresent, productSummaryPresent };
+    if (brand) dash.brand = brand; // F2 (v2.4): same object as tokens.json.brand — boot applies it to :root
     const html = fs.readFileSync(tplPath, 'utf8')
       .replace('/*__DASHDATA__*/null', JSON.stringify(dash).replace(/</g, '\\u003c'));
     fs.writeFileSync(path.join(libDir, 'dashboard.html'), html, 'utf8');
@@ -676,7 +739,7 @@ function buildIndex(libDir) {
   return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene };
 }
 
-module.exports = { buildIndex, routeKey }; // routeKey exported so the mirror test can compare both copies
+module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl }; // routeKey for the mirror test; deriveBrand & helpers for test-brand.js
 
 if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');
