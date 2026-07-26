@@ -22,6 +22,27 @@ const path = require('path');
 
 const NEAR_EMPTY_CHARS = 200;   // content.md shorter than this = suspiciously thin
 const MIDLOAD_CHARS = 500;      // + loading markers below this = probably captured mid-render
+const SPARSE_BUT_REAL = 5;      // …unless the DOM has this many controls: a real screen, just short (see below)
+
+// Interactive elements in the captured DOM. A login screen is ~147 chars of text and a complete, working
+// page — thin text alone doesn't mean "bad capture", so the near-empty flag is suppressed when the page
+// carries real controls. Counted off the serialized page.html (regex, no DOM dependency — hygiene stays
+// dependency-free); these are elements that were present in the rendered DOM at capture time.
+const INTERACTIVE_TAG = /<(?:button|input|select|textarea|form)\b|<a\b[^>]*\shref\s*=/gi;
+function interactiveCount(html) { const m = html.match(INTERACTIVE_TAG); return m ? m.length : 0; }
+
+// blob: URLs that an offline page.html actually tries to LOAD, split by what they're loading. Text that
+// merely contains "blob:" — a Content-Security-Policy meta header, inline JSON — is not a broken asset.
+const ASSET_TAG = /<(img|video|audio|source|iframe)\b[^>]*>/gi;
+function blobAssetRefs(html) {
+  const out = { img: 0, media: 0, css: 0 };
+  for (const m of html.match(ASSET_TAG) || []) {
+    if (!/\s(?:src|srcset|poster)\s*=\s*["']?blob:/i.test(m)) continue;
+    if (/^<img\b/i.test(m)) out.img++; else out.media++;
+  }
+  out.css = (html.match(/url\(\s*['"]?blob:/gi) || []).length;   // background-image: url(blob:…)
+  return out;
+}
 
 // crude, dependency-free route → pattern (mirror of capture.js's intent): id-like segments → :id
 const looksLikeId = (seg) =>
@@ -33,6 +54,9 @@ function patternize(route) {
     return '/' + segs.join('/');
   } catch { return route || '/'; }
 }
+
+// "a and b" / "a, b and c" — the finding names the pages inside its own sentence.
+function andList(items) { return items.length < 2 ? (items[0] || '') : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]; }
 
 function readJSON(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 function fileText(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
@@ -56,8 +80,25 @@ function qualityChecks(dir, label) {
   const content = fileText(path.join(dir, 'content.md'));
   const contentBody = content.replace(/^#.*$/m, '').replace(/^Source:.*$/m, '').trim();
   if (!fileSize(path.join(dir, 'screenshot.png'))) out.push({ kind: 'quality', severity: 'warn', target: label, issue: 'missing or empty screenshot', action: 're-capture' });
-  if (contentBody.length < NEAR_EMPTY_CHARS) out.push({ kind: 'quality', severity: 'warn', target: label, issue: `near-empty content (${contentBody.length} chars)`, action: 'confirm this state has real content, or re-capture' });
-  if (/\bblob:/.test(html)) out.push({ kind: 'quality', severity: 'warn', target: label, issue: 'contains blob: URLs (won\'t render offline)', action: 're-capture; blob assets don\'t inline' });
+  // Near-empty = thin text AND nothing to interact with. Sparse-but-real screens (login, empty states) have
+  // few words and plenty of controls — flagging those was crying wolf on healthy captures.
+  if (contentBody.length < NEAR_EMPTY_CHARS && interactiveCount(html) < SPARSE_BUT_REAL)
+    out.push({ kind: 'quality', severity: 'warn', target: label, issue: `near-empty content (${contentBody.length} chars)`, action: 'confirm this state has real content, or re-capture' });
+  // blob: in an ASSET-REFERENCE position only. A page whose CSP header merely mentions `blob:` (Pinterest,
+  // Amazon) has nothing broken in it — the old any-occurrence match flagged those pages forever with an
+  // action that couldn't help. Images are the actionable case: capture resolves them in page context, so a
+  // leftover one was revoked or oversized (`data-dck-blob` marks what we tried). Video/audio streams are
+  // live-only by nature — a snapshot can never carry them, so that's information, not a defect.
+  const blob = blobAssetRefs(html);
+  if (blob.img || blob.css) {
+    const tried = /data-dck-blob=/.test(html);
+    out.push({ kind: 'quality', severity: 'warn', target: label,
+      issue: `${blob.img + blob.css} blob: image reference(s) — those images won't render offline${tried ? ' (capture tried to inline them; the browser had already dropped them)' : ''}`,
+      action: 're-capture (blob images inline while the tab is live; a revoked one only comes back with a fresh capture)' });
+  }
+  if (blob.media) out.push({ kind: 'quality', severity: 'info', target: label,
+    issue: `${blob.media} video/audio element(s) stream from a live-only blob: URL — a snapshot can't carry video`,
+    action: 'nothing to do — the poster frame is what the baseline shows' });
   if (contentBody.length < MIDLOAD_CHARS && /role="progressbar"|class="[^"]*(skeleton|shimmer|spinner|loading)/i.test(html))
     out.push({ kind: 'quality', severity: 'warn', target: label, issue: 'loading markers + thin content — possibly captured mid-render', action: 'wait for load, re-capture' });
   return out;
@@ -72,12 +113,16 @@ function runHygiene(outDir) {
   const pages = registry.pages;
   const slugs = Object.keys(pages);
 
-  // 1. DUPLICATES — identical content across top-level pages, and same-template-not-collapsed
+  // 1. DUPLICATES — same content captured twice under different routes, and same-template-not-collapsed.
+  // The comparison is EXACT contentHash equality: two routes that serve the same page (a landing reachable
+  // as both `/` and `/homepage`) burn two slots and show as two map nodes. Near-equal is deliberately NOT
+  // compared — a "looks similar" heuristic breeds false positives, and hygiene's standing rule is report +
+  // recommend, never delete: the designer decides which one to keep.
   const byHash = {};
   for (const s of slugs) { const h = pages[s].contentHash; if (!h) continue; (byHash[h] = byHash[h] || []).push(s); }
   for (const [h, group] of Object.entries(byHash)) {
-    if (group.length > 1) findings.duplicates.push({ kind: 'duplicate-content', severity: 'warn', pages: group,
-      issue: `identical content (hash ${h}) across ${group.length} pages`, action: 'keep one representative; drop or fold the rest' });
+    if (group.length > 1) findings.duplicates.push({ kind: 'duplicate-content', severity: 'warn', pages: group, contentHash: h,
+      issue: `duplicate content: ${andList(group)} capture the same page`, action: 'consider removing one' });
   }
   const templatePatterns = new Set(slugs.filter(s => pages[s].template).map(s => pages[s].template.pattern));
   const byPattern = {};
@@ -134,6 +179,13 @@ function runHygiene(outDir) {
   return findings;
 }
 
+// One line for a duplicates-section finding. duplicate-content already names its pages in the sentence
+// ("duplicate content: home and homepage capture the same page"), so it isn't prefixed with them again.
+// capture.js's flattenHygiene mirrors this — keep the two in step.
+function renderDuplicate(it) {
+  return it.kind === 'duplicate-content' ? it.issue : `${(it.pages || []).join(', ')} — ${it.issue}`;
+}
+
 function formatHygiene(f) {
   if (f.error) return `\n🔎 Hygiene: ${f.error}`;
   const total = f.duplicates.length + f.orphans.length + f.identicalStates.length + f.quality.length;
@@ -141,14 +193,14 @@ function formatHygiene(f) {
   if (total === 0) return `\n🔎 Hygiene: clean — no duplicates, orphans, identical states, or quality flags.`;
   const lines = [`\n🔎 Hygiene report — ${warns} to review${total > warns ? `, ${total - warns} info` : ''} (nothing changed; confirm each):`];
   const section = (title, items, render) => { if (!items.length) return; lines.push(`\n  ${title} (${items.length}):`); for (const it of items) lines.push(`   • ${render(it)}  → ${it.action}`); };
-  section('Duplicates / same-template', f.duplicates, it => `${(it.pages || []).join(', ')} — ${it.issue}`);
+  section('Duplicates / same-template', f.duplicates, renderDuplicate);
   section('Orphans (not linked into the map)', f.orphans, it => `${it.page} (${it.route}) — ${it.issue}`);
   section('Identical states', f.identicalStates, it => `${it.page} › ${it.state} — ${it.issue}`);
   section('Capture quality', f.quality, it => `${it.target} — ${it.issue}`);
   return lines.join('\n');
 }
 
-module.exports = { runHygiene, formatHygiene };
+module.exports = { runHygiene, formatHygiene, renderDuplicate };
 
 if (require.main === module) {
   const outDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');
