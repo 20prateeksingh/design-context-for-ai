@@ -26,6 +26,19 @@ const AI_BEGIN = '<!-- ai:begin method=ai — written by the describe step, NOT 
 const AI_END = '<!-- ai:end -->';
 const PENDING = '_(not yet described — run the describe step)_';
 
+// journal actor canon — CLOSED set. The dashboard's journal filter chips (All/You/The kit/Your AI)
+// assume every event's actor is exactly one of these three, so each entry matches exactly one filter.
+// Any unrecognized actor string (future event kind, typo) coerces to the nearest canonical one instead
+// of leaking a 4th value into the UI.
+const ACTORS = ['you', 'the kit', 'your AI'];
+function canonicalActor(a) {
+  if (ACTORS.includes(a)) return a;
+  const s = String(a || '').toLowerCase();
+  if (s.includes('kit')) return 'the kit';
+  if (s.includes('ai')) return 'your AI';
+  return 'you';
+}
+
 function normalize(u) { try { const x = new URL(u); x.hash = ''; let s = x.href; if (s.endsWith('/') && x.pathname !== '/') s = s.slice(0, -1); return s; } catch { return u; } }
 
 // routeKey — canonical per-page identity: host + path with analytics/nav-source params stripped. MIRRORS
@@ -413,7 +426,7 @@ function buildIndex(libDir) {
         if (!e.isDirectory() || !/^round-/i.test(e.name)) continue;
         const rdir = path.join(base, e.name); const n = e.name.replace(/^round-/i, '');
         const approaches = countHtml(rdir);
-        events.push({ at: fs.statSync(rdir).mtime.toISOString(), dateOnly: false, seq: 6, actor: 'you + your AI', kind: 'wireframe',
+        events.push({ at: fs.statSync(rdir).mtime.toISOString(), dateOnly: false, seq: 6, actor: 'your AI', kind: 'wireframe',
           title: `Wireframes — ${label}, round ${n}${approaches ? ` · ${approaches} approach${approaches === 1 ? '' : 'es'}` : ''}`,
           detail: `${isNew ? 'wireframes/new/' : 'wireframes/'}${isNew ? label : (pages[label] ? label : label)}/${e.name} · library untouched`,
           link: (!isNew && pages[label]) ? { page: label } : null });
@@ -447,14 +460,22 @@ function buildIndex(libDir) {
         const statePages = new Set(caps.filter(c => c.state).map(c => c.slug)).size;
         const pg = (n) => `${n} page${n === 1 ? '' : 's'}`;
         const st = (n) => `${n} state${n === 1 ? '' : 's'}`;
+        // F3: a session where every single capture re-captured an already-captured page (recapture is
+        // only ever set on page-level writes, never states — see capture.js) gets its own adaptive
+        // title; a mixed session keeps the existing title and marks just the affected detail lines.
+        const recaptureOnly = caps.every(c => c.recapture);
         let title;
-        if (stateCount === 0) title = `Guided capture — ${pg(pageCount)}`;
+        if (recaptureOnly) title = `Guided capture — ${pg(caps.length)} re-captured`;
+        else if (stateCount === 0) title = `Guided capture — ${pg(pageCount)}`;
         else if (pageCount === 0) title = `Guided capture — ${st(stateCount)} across ${pg(statePages)}`;
         else title = `Guided capture — ${pg(pageCount)} + ${st(stateCount)}`;
         events.push({ at: s.endedAt || s.startedAt, dateOnly: false, seq: 5, actor: 'you', kind: 'guided',
           title,
           detail: null,
-          detailLines: caps.map(c => c.state ? `${pageLabelOf(c.slug)} › ${c.state}` : pageLabelOf(c.slug)),
+          detailLines: caps.map(c => {
+            const base = c.state ? `${pageLabelOf(c.slug)} › ${c.state}` : pageLabelOf(c.slug);
+            return (c.recapture && !recaptureOnly) ? `${base} (re-captured)` : base;
+          }),
           link: null });
       }
     }
@@ -492,6 +513,9 @@ function buildIndex(libDir) {
         link: pages[c.slug] ? { page: c.slug } : null });
     }
   } catch (_) {}
+
+  // F1: coerce every event's actor to the closed canonical set before it ever reaches the dashboard.
+  for (const e of events) e.actor = canonicalActor(e.actor);
 
   // ascending by time, stable tiebreak (seq, then kind, then title) → identical across re-runs
   events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0) || (a.seq - b.seq) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
@@ -589,7 +613,7 @@ function buildIndex(libDir) {
     };
     const overview = {
       health: { skipped: manifest.skipped || [], failed: manifest.failed || [], actions: manifest.actions || [], capped: manifest.capped || 0 },
-      nav: ordered.filter(s => !pages[s].meta.template).map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title, route: pages[s].meta.route,
+      nav: ordered.filter(s => !pages[s].meta.template).map(s => ({ slug: s, label: pages[s].meta.navLabel || pages[s].meta.title, displayLabel: displayLabelOf(s), route: pages[s].meta.route,
         desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null, descPending: !pages[s].description })),
       templates: ordered.filter(s => pages[s].meta.template).map(s => ({ slug: s, pattern: pages[s].meta.pattern, standsFor: pages[s].meta.collapsed + 1,
         screenshot: `pages/${s}/screenshot.png`, desc: pages[s].description ? pages[s].description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null })),
