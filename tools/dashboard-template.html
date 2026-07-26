@@ -11,7 +11,8 @@
   :root { --bg:#F8FAFC; --panel:#FFFFFF; --card:#FFFFFF; --line:#E6EAF1; --txt:#101828; --dim:#667085;
           --primary:#4F46E5; --primary-strong:#4338CA; --accent:#B45309; --ok:#15803D; --bad:#B91C1C; --tpl:#7C3AED;
           --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
-          --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+          --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+          --fb-h:0px; /* F7: file:// banner height — 0 unless mounted, so server mode never shifts layout */ }
   * { box-sizing:border-box; margin:0; }
   html,body { height:100%; }
   body { background:var(--bg); color:var(--txt); font:14px/1.55 var(--sans); overflow:hidden; }
@@ -21,8 +22,20 @@
   :focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
   @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition:none!important; animation:none!important; } }
 
+  /* ── file:// banner (F7) — mounted only when detected; --fb-h stays 0px in server mode so this
+     block changes nothing there (no reflow, no reserved space). ── */
+  .filebanner { position:fixed; top:0; left:0; right:0; z-index:30; display:flex; align-items:flex-start; gap:12px;
+                background:rgba(180,83,9,.06); border-bottom:1px solid #F0D399; color:#7A4A08; font-size:13px;
+                padding:10px 16px; line-height:1.5; }
+  .filebanner b { font-weight:650; }
+  .filebanner code { font-family:var(--mono); background:rgba(180,83,9,.12); border-radius:4px; padding:0 4px; }
+  .filebanner .fb-body { flex:1; }
+  .filebanner .fb-close { flex:none; background:none; border:0; color:#7A4A08; font-size:18px; line-height:1;
+                           padding:2px 6px; border-radius:6px; }
+  .filebanner .fb-close:hover { background:rgba(180,83,9,.12); }
+
   /* ── shell ── */
-  #shell { position:fixed; top:0; left:0; right:0; height:52px; display:flex; align-items:center; gap:10px;
+  #shell { position:fixed; top:var(--fb-h); left:0; right:0; height:52px; display:flex; align-items:center; gap:10px;
            padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); z-index:20; }
   #shell h1 { font-size:14px; font-weight:650; margin-right:8px; white-space:nowrap; }
   #shell h1 .mono { font-family:var(--mono); color:var(--dim); font-weight:400; font-size:12px; }
@@ -49,7 +62,7 @@
   #shell.onboarding #readypop { display:none; }
 
   /* ── tab panes ── */
-  .pane { position:fixed; inset:52px 0 0 0; display:none; }
+  .pane { position:fixed; inset:calc(52px + var(--fb-h)) 0 0 0; display:none; }
   .pane.active { display:block; }
   .scrollpane { overflow-y:auto; padding:22px clamp(16px,4vw,44px) 60px; }
 
@@ -91,7 +104,7 @@
   .lg i { flex:none; display:inline-block; }
 
   /* ── detail panel (map) ── */
-  #panel { position:fixed; top:52px; right:0; bottom:0; width:364px; background:var(--panel); border-left:1px solid var(--line);
+  #panel { position:fixed; top:calc(52px + var(--fb-h)); right:0; bottom:0; width:364px; background:var(--panel); border-left:1px solid var(--line);
            padding:16px; overflow-y:auto; transform:translateX(100%); transition:transform .2s ease; z-index:22; }
   #panel.open { transform:none; }
   #panel .close { position:absolute; top:10px; right:12px; background:none; border:0; color:var(--dim); font-size:18px; }
@@ -462,10 +475,13 @@
   .maparclbl { transform:translate(-50%,-50%); font-size:10px; color:#9AA0AC; text-transform:uppercase; letter-spacing:.6px;
                background:rgba(252,253,254,.85); padding:1px 7px; border-radius:10px; white-space:nowrap; }
   #mapzoom { position:absolute; right:16px; bottom:14px; z-index:7; display:flex; gap:4px; background:rgba(255,255,255,.97);
-             border:1px solid var(--line); border-radius:8px; padding:3px; }
+             border:1px solid var(--line); border-radius:8px; padding:3px; transition:right .2s ease; }
   #mapzoom button { width:26px; height:26px; border:0; background:none; color:var(--dim); font-size:15px; border-radius:6px; }
   #mapzoom button:hover { background:#EEF1F6; color:var(--txt); }
   #mapzoom .zlbl { min-width:34px; text-align:center; font-size:10px; color:var(--dim); align-self:center; font-family:var(--mono); }
+  /* F8 (UAT #16): the detail panel (364px, right:0) would otherwise sit on top of the zoom controls at
+     every zoom tier — slide the controls left, clear of the panel, whenever it's open. */
+  #pane-map:has(~ #panel.open) #mapzoom { right:calc(364px + 16px); }
   .mapnode.mono-disc { background:rgba(79,70,229,.10) !important; }
   .mapnode.mono-disc.tpl { background:rgba(124,58,237,.12) !important; }
 </style>
@@ -589,7 +605,9 @@ function showWizard(prefill){
       <div class="seg" id="w-seg">
         <button type="button" class="segbtn" data-v="yes">Yes, I sign in</button>
         <button type="button" class="segbtn" data-v="no">No, it’s public</button>
-      </div></div>
+      </div>
+      <div class="hint">Skipping sign-in captures your product's signed-out face — marketing pages, the login screen. If the real product lives behind a login, sign in first: the kit captures what you can see.</div>
+    </div>
     <label class="fld"><span id="w-url-label">Product URL</span>
       <input type="text" id="w-url" value="${esc(OB.url)}" placeholder="https://app.example.com" autocomplete="off" spellcheck="false"></label>
     <div class="hint" id="w-url-hint"></div>
@@ -665,10 +683,21 @@ function feed(line){
   updateCounters();
 }
 
+// F5 (UAT #14): bare domains ("pinterest.com") get a scheme prepended so the wizard accepts them; an
+// explicit http:// is never upgraded to https. Mirrors tools/wizard-url.js by hand (kept in sync the
+// same way routeKey is — see test-wizard-url.js) since this dashboard stays a single self-contained file.
+function normalizeWizardUrl(raw){
+  const trimmed = String(raw==null?'':raw).trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try { new URL(withScheme); } catch { return null; }
+  return withScheme;
+}
 async function startFlow(){
-  const url = document.getElementById('w-url').value.trim();
+  const raw = document.getElementById('w-url').value.trim();
   const errEl = document.getElementById('w-err');
-  if (!/^https?:\/\//i.test(url)) { errEl.textContent = 'Enter a URL that starts with http:// or https://'; return; }
+  const url = normalizeWizardUrl(raw);
+  if (!url) { errEl.textContent = 'Enter a URL that starts with http:// or https://'; return; }
   errEl.textContent=''; OB.url=url;
   const r = await api('/api/onboard', { url, loggedIn:OB.loggedIn, productType:OB.productType });
   if (!r.ok) { errEl.textContent = 'Could not save: ' + (r.error||''); return; }
@@ -787,9 +816,34 @@ async function onCaptureDone(info){
   document.getElementById('ob-open').onclick = ()=>{ location.hash=''; location.reload(); };
 }
 
+// F7 (UAT #18) — non-blocking, dismissible banner when the dashboard has no server behind it: either
+// opened straight from disk (file:) or served some other way where /api/status doesn't answer. Mounted
+// ONLY on detection (never in server mode) so server mode never reflows — see --fb-h in the CSS above.
+// Dismissal is in-memory only (no storage), so it lasts this page view, not across a reload.
+function mountFileBanner(){
+  if (location.protocol !== 'file:' && serverMode) return; // server answered → never show
+  const el = document.createElement('div');
+  el.className = 'filebanner';
+  el.innerHTML = `<div class="fb-body"><b>Browsing only — the dashboard is open as a file.</b><br>`
+    + `Everything captured is readable here, but capturing, guided sessions, and Copy for Figma need `
+    + `the kit's tiny local server. From this folder, run: <code>bash tools/start.sh</code> — nothing `
+    + `leaves your machine.</div>`
+    + `<button type="button" class="fb-close" aria-label="dismiss this notice">×</button>`;
+  document.body.insertBefore(el, document.body.firstChild);
+  const setH = () => document.documentElement.style.setProperty('--fb-h', el.offsetHeight + 'px');
+  setH();
+  window.addEventListener('resize', setH);
+  el.querySelector('.fb-close').onclick = () => {
+    el.remove();
+    document.documentElement.style.setProperty('--fb-h', '0px');
+    window.removeEventListener('resize', setH);
+  };
+}
+
 // ═════════════════════════ BOOT ══════════════════════════════════════════════
 (async function boot(){
   try { STATUS = await (await fetch('/api/status')).json(); serverMode = true; } catch(_){ serverMode = false; }
+  mountFileBanner();
   if (serverMode && STATUS.capture && STATUS.capture.running){ mountOnboard(); showProgress(true); attachStream(); return; } // kill-resilience resume
   if (serverMode && STATUS.firstRun){ mountOnboard(); showWizard(); return; }
   if (DASH) initDashboard();
@@ -1528,10 +1582,14 @@ function initDashboard(){
 
   function journalFeed(filter){
     const evs=DASH.events.slice().reverse();
-    const match=(a)=> filter==='all' || (filter==='you'&&/you/i.test(a)) || (filter==='kit'&&a==='the kit') || (filter==='ai'&&/your AI/i.test(a));
+    // Actor set is closed (F1: {you, the kit, your AI}) — exact match only, so an entry never
+    // satisfies two filters at once (e.g. "your AI" no longer double-matches "you" via substring).
+    const match=(a)=> filter==='all' || (filter==='you'&&a==='you') || (filter==='kit'&&a==='the kit') || (filter==='ai'&&a==='your AI');
     let html=nextSlot(), lastDay='';
     for(const e of evs){ if(!match(e.actor)) continue; const day=fmtDate(e.at); if(day&&day!==lastDay){ html+=`<div class="jday">${esc(day)}</div>`; lastDay=day; } html+=ledgerEntry(e,false); }
-    html+=`<div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Re-capture &amp; drift checks land here too</span><div class="edetail">"3 pages changed since your last accepted capture — review side by side" — same feed, same grammar.</div></div>`;
+    // F2: the dormant-feature teaser is unfiltered-view only — an active actor filter (You/The kit/Your
+    // AI) never shows it, since it belongs to no single actor.
+    if(filter==='all') html+=`<div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Re-capture &amp; drift checks land here too</span><div class="edetail">"3 pages changed since your last accepted capture — review side by side" — same feed, same grammar.</div></div>`;
     return `<section class="led">${html}</section>`;
   }
   function renderJournal(){
@@ -1676,7 +1734,7 @@ function initDashboard(){
     const wsPath = (serverMode && STATUS && STATUS.workspacePath) ? STATUS.workspacePath : null;
     const firstSlug = (DATA.nodes.find(n=>n.kind!=='template') || DATA.nodes[0] || {}).id || '<slug>';
     const cdCmd = wsPath ? `cd "${wsPath}" && claude` : 'Open your AI coding tool in this workspace folder.';
-    const pageOpts = DATA.nodes.map(n=>`<option value="${esc(n.id)}">${esc(short(n.label||n.id,44))}</option>`).join('');
+    const pageOpts = DATA.nodes.map(n=>`<option value="${esc(n.id)}">${esc(short(n.displayLabel||n.label||n.id,44))}</option>`).join('');
 
     // Assemble a self-contained context bundle for a chat-only AI (no file access), client-side.
     async function buildBundle(slug){
@@ -1684,7 +1742,7 @@ function initDashboard(){
       L.push(`# Design context — ${M.product}`);
       L.push(`Origin: ${M.origin} · captured ${(M.generatedAt||'').slice(0,10)} · ${M.nodes.length} pages captured, ~${O.standsForTotal} represented.`);
       L.push('', "## Pages (the product's own navigation)");
-      O.nav.forEach(n=>L.push(`- **${n.label||n.slug}** (\`${n.route}\`)${n.desc?` — ${n.desc}`:''}`));
+      O.nav.forEach(n=>L.push(`- **${n.displayLabel||n.label||n.slug}** (\`${n.route}\`)${n.desc?` — ${n.desc}`:''}`));
       if (O.templates.length){ L.push('', '## Repeating layouts (one example stands for many)');
         O.templates.forEach(t=>L.push(`- \`${t.pattern}\` — 1 of ${t.standsFor}${t.desc?` — ${t.desc}`:''}`)); }
       L.push('', '## Observed design tokens (method: heuristic — how it looks today, not authored tokens)');

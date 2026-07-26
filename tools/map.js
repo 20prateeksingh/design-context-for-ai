@@ -47,6 +47,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
+const { normalizeWizardUrl } = require('./wizard-url.js'); // F5: same bare-domain acceptance as the client wizard
 
 const args = process.argv.slice(2);
 const PORT = parseInt((args[args.indexOf('--port') + 1] || ''), 10) || 4173;
@@ -262,8 +263,8 @@ const server = http.createServer((req, res) => {
       if (err) return json(res, 400, { ok: false, error: 'bad JSON' });
 
       if (url === '/api/onboard') {
-        const u = (data.url || '').trim();
-        if (!/^https?:\/\//.test(u)) return json(res, 400, { ok: false, error: 'need a URL starting with http:// or https://' });
+        const u = normalizeWizardUrl(data.url);
+        if (!u) return json(res, 400, { ok: false, error: 'need a URL starting with http:// or https://' });
         const type = PRESETS[data.productType] ? data.productType : 'notsure';
         const p = PRESETS[type];
         const product = {
@@ -276,8 +277,8 @@ const server = http.createServer((req, res) => {
       }
 
       if (url === '/api/login/start') {
-        const u = (data.url || '').trim();
-        if (!/^https?:\/\//.test(u)) return json(res, 400, { ok: false, error: 'need a valid URL' });
+        const u = normalizeWizardUrl(data.url);
+        if (!u) return json(res, 400, { ok: false, error: 'need a valid URL' });
         if (busy) return json(res, 409, { ok: false, error: 'a capture is running — wait for it to finish' });
         if (loginJob && loginJob.running) return json(res, 200, { ok: true, already: true });
         loginJob = { running: true, code: null, startedAt: new Date().toISOString() };
