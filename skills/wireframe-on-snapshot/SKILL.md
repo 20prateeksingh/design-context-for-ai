@@ -26,6 +26,8 @@ wireframes/<page-slug>/round-1/
 
 `design-context/` is captured fact and stays untouched. Copy `page.html`, edit the copy.
 
+A fresh exploration of an already-wireframed page (a different goal, not the next iteration) still takes the next round number, and its `notes.md` opens by saying so: `This round is a new exploration (‹goal›), not an iteration of round-‹N›.`
+
 ## 4. Put the copy in wireframe mode FIRST — before any design edit
 
 **Golden rule: the shell is a fixed reference frame, not part of the exploration — carried structurally, but at wireframe fidelity.** A brand-fidelity shell (real logo, brand colors, promo cards) next to gray sketch boxes makes every new element look broken by contrast. Reduce the *whole page* to lo-fi, then design in that same language.
@@ -60,6 +62,14 @@ Inject this once into every copy, just before `</body>` (verbatim — both block
   .lofi-steps .dot.todo { background: #fff; border: 2px dashed #9ca3af; }
   .lofi-steps .bar { flex: 1; height: 2px; background: #9ca3af; }
   .lofi-steps .bar.todo { background: repeating-linear-gradient(90deg, #9ca3af 0 6px, transparent 6px 12px); }
+  .lofi-spine { position: relative; padding-left: 28px; }
+  .lofi-spine::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px;
+                        width: 2px; background: #9ca3af; }
+  .lofi-spine .node { position: relative; padding-bottom: 20px; }
+  .lofi-spine .node:last-child { padding-bottom: 0; }
+  .lofi-spine .node::before { content: ""; position: absolute; left: -28px; top: 4px;
+                              width: 12px; height: 12px; border-radius: 50%; background: #6b7280; }
+  .lofi-spine .node.todo::before { background: #fff; border: 2px dashed #9ca3af; }
 </style>
 ```
 
@@ -68,6 +78,7 @@ Inject this once into every copy, just before `</body>` (verbatim — both block
 - **Never redraw the shell, never drop it, never leave it in brand color.** Nav, header, footer stay as captured (now lo-fi). If the change itself is about the shell, still inject lofi-mode — then edit the shell region like any other target area.
 - Gotcha: `filter` on `html` re-anchors `position:fixed` elements to the page instead of the viewport — harmless (usually better) in full-page screenshots; if a page's chrome lands oddly in the render, screenshot at viewport height instead of `--full`.
 - **Hi-fi is a different request.** If the designer explicitly asks for a shipped-look mock, skip lofi-mode — but name it a prototype, not a wireframe, and confirm that's what they want.
+- **Status that survives grayscale.** When the captured page distinguishes states by hue alone (e.g. a green "delivered" vs an amber "returned" with no other visual difference), `grayscale(1)` flattens that to one gray and the page loses its only status signal. Keep the real hex **and** add a shape difference (filled dot / ring / double ring) so the states stay distinguishable lo-fi — and note the substitution in `notes.md`.
 
 ## 5. Produce 2–3 genuinely different approaches
 
@@ -98,6 +109,95 @@ Open each screenshot and actually look at it: wrapped or colliding labels, clipp
 ## 6. Show, then iterate
 
 Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
+
+## 7. Designing a page the product doesn't have yet
+
+Same discipline as §§3–6 — lofi mode, the kit primitives, provenance tags, real data, swap tests,
+rounds. What changes: there is no snapshot *of this page* to work on, so you build one out of the
+pages next to it.
+
+**7.1 Find the shell donor first.** A new page in a real product is never new all the way down: it
+sits inside a header, a nav, a breadcrumb, a footer. Pick the captured page whose shell this page
+would share — usually a sibling in the same section — and work on a copy of **its** `page.html`. You
+inherit the real shell *and* its real CSS for free, which is most of what makes the result look like
+the product.
+
+```
+wireframes/new/<concept-slug>/round-1/
+├── 01-<approach-name>.html     ← a COPY of the donor page's page.html, content column replaced
+├── 02-<approach-name>.html
+├── *.preview.png               ← node tools/shot.js <file> --full
+└── notes.md                    ← per approach: model + rationale + swap tests + the assumption log
+```
+
+`<concept-slug>` is kebab-case, like a page slug (`order-tracking`, not `Order Tracking`).
+
+**Never start from a blank HTML file.** A page built from `tokens.json` alone gets the colors right
+and everything else wrong — no shell, no real type stack, no real grid, no breadcrumb. If genuinely
+no captured page shares this page's shell, say so and offer to capture one first; that is a better
+next step than designing in a vacuum.
+
+**7.2 Replace the content column, not a region.** §5's hide-and-replace rule scales up: find the
+donor's main content container, hide its children
+(`<style>.CONTAINER > *:not(.lofi-wire){display:none!important}</style>`), and build your page as a
+`.lofi-wire` sibling. Hide the parts of the shell that belong to the donor and not to you — a filters
+rail, a page-specific promo card — and say so in `notes.md`. Keep header, nav, breadcrumb and footer.
+
+**7.3 Extend the breadcrumb.** The donor's breadcrumb still says the donor's name. Clone its last
+crumb element and change the label, so the page announces what it is
+(`Home > My Account > My Orders > Track order`). This is a two-line edit and it is the difference
+between a screen and a page.
+
+**7.4 Set the `<title>`.** The Figma converter names the pasted frame from `document.title`. Leave it
+alone and every wireframe lands in Figma with the donor page's title, indistinguishable from the
+captured original. Set it to something a designer can find: `Track order · <product>`.
+
+**7.5 Assemble the vocabulary before you draw, and write down where each piece came from.** There is
+no single source page, so name the source of each pattern you reuse — in `notes.md`, as a table:
+what you needed, which captured page it came from, and the measured values. Do this before designing;
+it is what stops the page drifting into generic.
+
+**A component cannot be imported across pages.** Each snapshot carries only its own inlined CSS, so
+writing another page's class name into your donor produces an unstyled element. Reuse means *measure
+the source page's computed styles and re-implement*: open the source page, read the real padding,
+radius, type and color off the element you want, and rebuild it. Pull anything you still cannot source
+from `tokens.json`'s observed ladders — never from your own taste.
+
+**7.6 Ground the data, and never invent plausible-looking identifiers.** Use the library's real
+content: real product names, real prices, real dates, real addresses, real status strings. Where the
+library records a count but not the contents ("Minutes Basket - 5 Items"), draw `.lofi-line`
+placeholders rather than inventing five product names. The same goes for order IDs, tracking numbers,
+courier names, and timestamps: a placeholder bar is honest, `OD4127839912` is a lie that survives into
+someone's deck.
+
+**7.7 Tag every assumption; keep the prose out of the canvas.** A new page always outruns the library.
+Each region the library cannot ground gets `class="lofi-region"` plus **one** `.lofi-tag` chip
+starting with `ASSUMED:` — `ASSUMED: STEP NAMES`, `ASSUMED: LIVE DATA`, `ASSUMED: ITEM NAMES`. That
+chip is the whole in-canvas annotation; the explanation goes in `notes.md` under an "What the library
+could not tell me" heading, one line per assumption. Distinguish the two kinds and say which is which:
+invented **structure** (a layout the product has never shown) is normal design work; invented
+**content** (data the library does not contain) is a liability and should be listed item by item.
+
+**7.8 Approaches must still differ in model, and still get swap-tested.** 2–3 approaches, written
+swap-test lines in `notes.md` before you present. For a from-scratch page the model is usually *what
+the page is organised around* — one shipment with many events vs many items with one shipment; a
+timeline vs a summary; a single flow vs a set of tabs.
+
+**7.9 Draw the state the page exists for.** New pages are usually built for a live or in-progress
+state, and that is exactly the state the library does not have (capture is read-only, and it catches
+whatever the account happened to be showing). Design the grounded state as the main artifact, then
+give the live state its own frame below it, tagged — and say plainly in `notes.md` that the frame's
+content is invented. If the state is reachable by URL, offer the capture instead:
+`node tools/capture.js --state <slug>:<state-name> --url "<url>"`.
+
+#### Pre-render checklist — additions for a new page
+
+- [ ] Built on a copy of a real donor page; shell, nav, breadcrumb, footer intact
+- [ ] Breadcrumb extended and `<title>` set to this page's name
+- [ ] `notes.md` carries the vocabulary table (what · which captured page · measured values)
+- [ ] Every ungrounded region tagged `ASSUMED: …`; invented content listed line by line in `notes.md`
+- [ ] No invented identifiers (order IDs, tracking numbers, courier names) — placeholders instead
+- [ ] The state the page exists for is drawn as its own frame, not described
 
 ## Notes
 

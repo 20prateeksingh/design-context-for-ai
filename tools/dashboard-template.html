@@ -186,7 +186,7 @@
      explored at all. 5px tall, which keeps the weight the old 4px+2×1px-border box had.
      The card's text line above it remains the exact record; the bar is its shape, not its substitute. */
   .mapdistrict .dbar { display:block; height:5px; padding:0; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden; }
-  .mapdistrict .dbar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+  .mapdistrict .dbar i { display:block; height:100%; background:var(--accent-strong); border-radius:3px; }
   /* #mapnote is the one bare line on the canvas (the reference keeps it bare too) — its halo goes with
      the rest of the hack; --dim on --canvas clears 4.5:1 unaided. */
   #mapnote { position:absolute; top:14px; left:16px; font-size:10.5px; color:var(--dim); font-style:italic; z-index:7; max-width:44%; }
@@ -891,8 +891,8 @@ const PROMPTS = {
   auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
   recaptureCheck: () => "The product may have changed. Re-run `node tools/capture.js --config design-context/product.json`, then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
   bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/INDEX.md` to learn this product, and ask me what I want to work on.",
-  // A.8 (ux-copy.md — verbatim, thin-library degrade clause included)
-  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. Build it in this product's own language — reuse its real patterns, spacing, and components; work in `wireframes/new/‹concept›/round-1/`, never in `design-context/`. If the library is too thin to know this product's grammar for some part, say so plainly and mark that part as an assumption — never invent house style. Render previews with `node tools/shot.js`.",
+  // A.8 (ux-copy.md — revised 2026-07-27: skill pointer + shell instruction, evidence: create-chain run)
+  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. **Per `skills/wireframe-on-snapshot/SKILL.md` §7:** start from the captured page whose shell this new page would share, work on a COPY in `wireframes/new/‹concept›/round-1/` (never in `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi. If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style. Render previews with `node tools/shot.js`.",
   askQuestion: () => "Read `design-context/registry.json` and `INDEX.md` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.",
   // A.10 (ux-copy.md — verbatim) — the Figma exit: convert a captured page/state to editable Figma layers
   figma: () => "Open the dashboard, go to the page you want, click ⧉ Copy for Figma, and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
