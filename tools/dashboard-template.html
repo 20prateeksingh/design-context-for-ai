@@ -15,6 +15,13 @@
   :root { color-scheme:dark;
           --bg:#08090A; --bg-deep:#050506; --panel:#131316; --panel-2:#1C1C1F; --card:var(--panel);
           --line:#26262B; --txt:#F5F6F7; --dim:#8A8F98; --rail:var(--panel-2); --link:var(--accent-strong);
+          /* (v2.5 §2.1) THE LUMINOUS CANVAS. The map is not a void in dark chrome — it is a lit surface
+             INSET in dark chrome (Figma's own dark-mode relationship). --canvas is that surface's base:
+             lighter than --bg (so the pane reads as an inset canvas, Δ≥8/channel) and darker than
+             --panel-2 (so a floating legend/card still reads as chrome ON it). --canvas-lit is the same
+             surface where the lamp is — the base the accent is mixed into around home. Two tokens, not
+             one, so the lighting gradient carries no raw hex outside :root (§1). */
+          --canvas:#171A20; --canvas-lit:#1B1F26;
           --accent:#4F46E5; --accent-strong:#918BEE; --accent-text:#FFFFFF;
           --ok:#33B074; --bad:#E85D5D; --tpl:#9D7BF5; --warn:#D99A3D;
           /* (v2.4.2 F3) the brighter hairline the mock's top-bar pills wear — measured off
@@ -99,9 +106,14 @@
   .pane.active { display:block; }
   .scrollpane { overflow-y:auto; padding:22px var(--pad) 60px; }
 
-  /* ── map pane: M22 orbital under fog (v2.4: dark canvas + unified right rail, F4/F5) ── */
+  /* ── map pane: M22 orbital on the luminous canvas (v2.5 F1; rail from v2.4 F4) ──
+     The SHELL stays --bg: #pane-map, the rail, the top bar. #maparea is the canvas — one radially lit
+     --canvas surface, painted as this element's own background so it sits UNDER everything in the world
+     (v2.4.1's separate .mappool + .mapfog + .mapgrain overlay stack is retired: an overlay that darkens
+     discs is the "wall" Prateek rejected; a lit ground is atmosphere). applyMapView() writes the
+     gradient in screen space, centred on home. */
   #pane-map { background:var(--bg); overflow:hidden; }
-  #maparea { position:absolute; inset:0 340px 0 0; overflow:hidden; }
+  #maparea { position:absolute; inset:0 340px 0 0; overflow:hidden; background:var(--canvas); }
   #maprail { position:absolute; right:0; top:0; bottom:0; width:340px; border-left:1px solid var(--line);
              overflow-y:auto; padding:24px 20px 40px; z-index:8; }
   @media (max-width:1080px){ /* = --stack-bp */ #maparea { inset:0 300px 0 0; } #maprail { width:300px; } }
@@ -109,52 +121,64 @@
   #maplines { position:absolute; inset:0; z-index:1; pointer-events:none; }
   #maplines .eout { stroke:color-mix(in srgb, var(--accent-strong) 60%, transparent); stroke-width:1.4; }
   #maplines .ein { stroke:color-mix(in srgb, var(--dim) 45%, transparent); stroke-width:1.4; }
-  .mapring { position:absolute; border:1.5px dashed var(--line); border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; }
-  .maprlbl { position:absolute; transform:translate(-50%,-50%); font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; background:var(--bg); padding:0 5px; pointer-events:none; z-index:2; }
+  .mapring { position:absolute; border:1.5px dashed color-mix(in srgb, var(--txt) 11%, transparent); border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; }
+  /* ── labels are PILLS (v2.5 §2.4, the reference's signature) ──
+     Every label carries its own surface + hairline, so it is readable on the lit centre, on the mid
+     canvas and on the vignette alike — which is what lets the text-halo hack go (a halo is a fake
+     surface, and on a lit ground it smears). One shared recipe; only radius and type size differ:
+     multi-line node/home labels take the reference's rounded-rect, single-line ring/arc/ghost labels
+     take the full capsule the reference gives `DEEP FOG …`. */
+  /* The surface is OPAQUE and one step brighter than --panel-2, and the hairline is --line-2 (the
+     brighter one :root already keeps for the top-bar pills). Both follow from the ground being a
+     GRADIENT: a translucent pill inherits whatever is under it, so it reads as a raised chip at the rim
+     and as a hole punched in the lamp at the centre — and plain --line vanishes against a lit canvas
+     (Δ≈4/channel). One fixed surface + a hairline that always reads = one pill, everywhere.
+     The mix is 96/4 and not brighter for a measured reason: the sub-line inside every pill is --dim, and
+     --dim needs 4.5:1. --panel-2 lifted 4% toward --txt measures 4.70:1 on the render; at 10% it drops to
+     3.93:1 and the pill would ship a failing caption. So the pill stays a NEUTRAL chip — which is what the
+     reference does too: measured on mock-map-luminous.png, its pills are darker than its own lit centre
+     (244 vs 254) and are read by their hairline, not by out-shining the lamp. */
+  .mapnlbl, .maphomelbl, .maprlbl, .maparclbl, .mapghostlbl {
+             background:color-mix(in srgb, var(--panel-2) 96%, var(--txt)); border:1px solid var(--line-2); }
+  .maprlbl { position:absolute; transform:translate(-50%,-50%); font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; border-radius:999px; padding:2px 9px; pointer-events:none; z-index:2; }
   .maphomelbl { position:absolute; transform:translate(-50%,0); text-align:center; font-size:12px; font-weight:650; color:var(--txt); z-index:3; pointer-events:none; white-space:nowrap;
-                text-shadow:0 0 4px var(--bg), 0 0 2px var(--bg); }
+                border-radius:9px; padding:3px 9px 4px; }
   .maphomelbl small { display:block; font-weight:400; font-size:9.5px; color:var(--dim); }
+  /* discs SIT ON the canvas instead of glaring against it (v2.5 §2.3): a soft --canvas-tinted rim
+     feathers the jump from a bright thumbnail to the ground, and a real drop shadow finally works now
+     that the ground is lighter than the shadow. Hover swaps the rim to accent, keeps the shadow. */
   .mapnode { position:absolute; transform:translate(-50%,-50%); border-radius:50%; border:2.5px solid var(--accent);
-             background:var(--panel-2) center/cover no-repeat; z-index:3; padding:0; cursor:pointer; }
-  .mapnode:hover { box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+             background:var(--panel-2) center/cover no-repeat; z-index:3; padding:0; cursor:pointer;
+             box-shadow:0 0 0 3px color-mix(in srgb, var(--canvas) 82%, transparent), 0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); }
+  .mapnode:hover { box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); }
   .mapnode.tpl { border-color:var(--tpl); }
   .mapnode.dorm { border-color:var(--dim); }
-  .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--bg); }
+  .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--canvas); }
   .mapnlbl { position:absolute; transform:translate(-50%,0); text-align:center; font-size:10px; color:var(--txt); z-index:3; pointer-events:none;
-             background:color-mix(in srgb, var(--bg) 82%, transparent); border-radius:4px; padding:0 3px; white-space:nowrap;
-             text-shadow:0 0 4px var(--bg), 0 0 2px var(--bg); }
+             border-radius:8px; padding:3px 8px; white-space:nowrap; }
   .mapnlbl small { color:var(--dim); font-size:9px; }
   .mapghost { position:absolute; transform:translate(-50%,-50%); z-index:5; text-align:center; cursor:pointer; background:none; border:0; padding:0; }
-  /* ghosts live INSIDE the haze band, so their dashed stroke is mixed against --bg (an opaque mid-grey)
-     rather than faded to transparent — a transparent dash disappears the moment the haze lifts it. */
-  .mapghost .gc { display:block; margin:0 auto; border:2px dashed color-mix(in srgb, var(--dim) 72%, var(--bg)); border-radius:50%; background:color-mix(in srgb, var(--bg) 78%, transparent); }
+  /* ghosts read against the LOCAL canvas value (they orbit between the play field and the vignette), so
+     the dashed stroke is mixed into --canvas rather than faded to transparent — a transparent dash
+     disappears the moment the ground lightens. */
+  .mapghost .gc { display:block; margin:0 auto; border:2px dashed color-mix(in srgb, var(--dim) 80%, var(--canvas)); border-radius:50%; background:color-mix(in srgb, var(--canvas) 55%, transparent); }
   .mapghost b { font-size:9.5px; color:var(--dim); display:block; margin-top:3px; font-weight:600; }
   .mapghost small { font-size:8px; color:var(--dim); display:block; }
-  /* ── the three depths of fog (v2.4.1 §5) ──
-     v2.4 made fog literal darkness on a near-black base (Δ≈3/channel) — invisible. The model is now
-     lit pool → haze → deep dark. .mappool is the lit pool and lives inside #mapworld (z 2: over the
-     region fills, UNDER the page discs, so no captured screenshot is ever tinted). .mapfog paints the
-     haze band and the deep edge in screen space; .mapgrain is the one decoration measured-or-absent
-     permits — a fixed-seed feTurbulence texture, masked to the haze band only. */
-  .mappool { position:absolute; left:0; top:0; transform:translate(-50%,-50%); border-radius:50%; z-index:2; pointer-events:none;
-             background:radial-gradient(circle closest-side, color-mix(in srgb, var(--accent) 8%, transparent) 0,
-                        color-mix(in srgb, var(--accent) 6%, transparent) 45%, transparent 100%); }
-  .mapfog { position:absolute; inset:0; z-index:4; pointer-events:none; }
-  .mapgrain { position:absolute; inset:0; z-index:4; pointer-events:none; opacity:.04; mix-blend-mode:screen;
-              background-size:200px 200px; background-repeat:repeat;
-              background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E"); }
   .mapdistrict { position:absolute; transform:translate(-50%,-50%); z-index:6; background:var(--panel-2); border:1px solid var(--line);
-                 border-radius:10px; padding:8px 12px; min-width:150px; pointer-events:none; }
+                 border-radius:10px; padding:8px 12px; min-width:150px; pointer-events:none; box-shadow:0 6px 20px color-mix(in srgb, var(--bg-deep) 55%, transparent); }
   .mapdistrict h4 { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); margin-bottom:2px; }
   .mapdistrict p { font-size:9.5px; color:var(--dim); }
   .mapdistrict .bar { height:4px; background:var(--bg); border:1px solid var(--line); border-radius:2px; margin-top:5px; overflow:hidden; }
   .mapdistrict .bar i { display:block; height:100%; background:var(--dim); }
-  #mapnote { position:absolute; top:14px; left:16px; font-size:10.5px; color:var(--dim); font-style:italic; z-index:7; max-width:44%;
-             text-shadow:0 0 4px var(--bg), 0 0 2px var(--bg); }
-  #mapstats { position:absolute; left:16px; bottom:14px; background:color-mix(in srgb, var(--panel) 94%, transparent); border:1px solid var(--line); border-radius:10px;
+  /* #mapnote is the one bare line on the canvas (the reference keeps it bare too) — its halo goes with
+     the rest of the hack; --dim on --canvas clears 4.5:1 unaided. */
+  #mapnote { position:absolute; top:14px; left:16px; font-size:10.5px; color:var(--dim); font-style:italic; z-index:7; max-width:44%; }
+  /* the floating chrome on the canvas: OPAQUE --panel-2 + --line, the same surface as the district card
+     — a 94%-of--panel wash let the lit canvas bleed through and muddied them (v2.5 §2.6). */
+  #mapstats { position:absolute; left:16px; bottom:14px; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
               padding:9px 14px; font-size:11px; color:var(--dim); z-index:7; max-width:62%; }
   #mapstats b { color:var(--txt); }
-  #maplegend { position:absolute; top:14px; right:16px; background:color-mix(in srgb, var(--panel) 94%, transparent); border:1px solid var(--line); border-radius:10px;
+  #maplegend { position:absolute; top:14px; right:16px; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
                padding:10px 12px; font-size:10.5px; color:var(--dim); display:flex; flex-direction:column; gap:6px; z-index:7; }
   .lg { display:flex; gap:7px; align-items:center; }
   .lg i { flex:none; display:inline-block; }
@@ -589,32 +613,44 @@
 
   /* ── v2.1: F2 map — zoom controls, regions, arc ── */
   #mapworld { transform-origin:0 0; }
-  /* F5 (v2.4) — the fog/region fix. Region fills are fully OPAQUE, pre-mixed with the background:
-     regions sit at z-index 0 over plain --bg and each other only, so two overlapping same-color opaque
-     shapes render as the same color — alpha stacking (the lavender blobs) is geometrically impossible.
-     .hot rises above sibling regions (still under lines/nodes/fog) so the hover wash reads whole. */
-  .mapregion { position:absolute; z-index:0; border-radius:44% 56% 52% 48% / 50%; background:color-mix(in srgb, var(--accent) 4%, var(--bg));
-               border:1px solid color-mix(in srgb, var(--accent) 10%, var(--bg)); transition:background .15s,border-color .15s; pointer-events:auto; }
-  .mapregion.hot { background:color-mix(in srgb, var(--accent) 11%, var(--bg)); border-color:color-mix(in srgb, var(--accent) 35%, var(--bg)); z-index:1; }
+  /* ── whisper regions on a LIT ground (v2.5 §2.5) ──
+     v2.4 killed the stacked-alpha lavender blobs by pre-mixing region fills opaquely against a FLAT
+     --bg. The canvas is no longer flat, so a pre-mixed opaque fill would paint a dark patch across the
+     lit centre. The mechanism that keeps both properties: ONE opacity group. #mapregions carries the
+     opacity; every child is a FULLY OPAQUE var(--accent) shape inside it. Two opaque same-colour shapes
+     that overlap render as that colour — so the group composites exactly once, at exactly one alpha,
+     over whatever the local canvas value is. Stacking stays geometrically impossible AND the whisper
+     tracks the lighting. Rest lands at ≈4.5% accent over the local ground; the border goes (the
+     reference has none at rest — "barely-there" means barely-there).
+     The hover wash cannot live inside the group (the group's alpha is uniform by construction), so it
+     is one separate shape, #maphot, drawn just above it: a single element, so it cannot stack either. */
+  #mapregions { position:absolute; left:0; top:0; z-index:0; opacity:.035; pointer-events:none; }
+  .mapregion { position:absolute; border-radius:44% 56% 52% 48% / 50%; background:var(--accent); pointer-events:auto; }
+  #maphot { position:absolute; z-index:0; border-radius:44% 56% 52% 48% / 50%; pointer-events:none;
+            background:color-mix(in srgb, var(--accent) 7%, transparent); border:1px solid color-mix(in srgb, var(--accent) 26%, transparent); }
   #maplabels { position:absolute; inset:0; z-index:5; pointer-events:none; }
   #maplabels .mapnlbl, #maplabels .maprlbl, #maplabels .maphomelbl, #maplabels .mapghostlbl, #maplabels .maparclbl { position:absolute; transform:none; }
   .mapghostlbl { transform:translate(-50%,0); text-align:center; font-size:9px; color:var(--dim); white-space:nowrap;
-                 text-shadow:0 0 4px var(--bg), 0 0 2px var(--bg); }
+                 border-radius:999px; padding:2px 8px; }
   .mapghostlbl small { display:block; color:var(--dim); font-size:8px; }
-  /* the `deep fog …N more` arc sits ON the haze/deep boundary — the pill is near-opaque --bg so the
-     label reads identically against the lighter haze and the black beyond it (§5.4). */
+  /* the `deep fog …N more` arc sits where the play field turns into the vignette — the pill surface is
+     what makes it read identically on both grounds (v2.5 §2.4; the reference draws it as a capsule). */
   .maparclbl { transform:translate(-50%,-50%); font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px;
-               background:color-mix(in srgb, var(--bg) 93%, transparent); padding:2px 8px; border-radius:10px; white-space:nowrap;
-               text-shadow:0 0 4px var(--bg), 0 0 2px var(--bg); }
-  #mapzoom { position:absolute; right:16px; bottom:14px; z-index:7; display:flex; gap:4px; background:color-mix(in srgb, var(--panel) 94%, transparent);
+               padding:2px 10px; border-radius:999px; white-space:nowrap; }
+  #mapzoom { position:absolute; right:16px; bottom:14px; z-index:7; display:flex; gap:4px; background:var(--panel-2);
              border:1px solid var(--line); border-radius:8px; padding:3px; }
   #mapzoom button { width:26px; height:26px; border:0; background:none; color:var(--dim); font-size:15px; border-radius:6px; }
-  #mapzoom button:hover { background:var(--panel-2); color:var(--txt); }
+  /* the shell is now --panel-2, so hover steps DOWN to --panel (the surface ramp inverts inside a
+     panel-coloured container — the same move the rail makes on Home). */
+  #mapzoom button:hover { background:var(--panel); color:var(--txt); }
   #mapzoom .zlbl { min-width:34px; text-align:center; font-size:10px; color:var(--dim); align-self:center; font-family:var(--mono); }
   /* (v2.4) F8's panel-offset rule is retired with the floating panel itself — the rail owns the right
      edge and #mapzoom lives inside #maparea, so the zoom controls can never be covered. */
-  .mapnode.mono-disc { background:color-mix(in srgb, var(--accent) 14%, var(--panel-2)) !important; }
-  .mapnode.mono-disc.tpl { background:color-mix(in srgb, var(--tpl) 16%, var(--panel-2)) !important; }
+  /* (v2.5 §2.3) a disc with no thumbnail is a plain --panel-2 well inside its ring. The v2.4 accent-tinted
+     fill existed to stop small discs vanishing into near-black; on the lit canvas --panel-2 already reads,
+     and the tint now competes with the accent RING that carries the meaning. The ring keeps its encoding
+     (accent = explored · --dim = dormant caption · --tpl = template) — only the fill changed. */
+  .mapnode.mono-disc { background-color:var(--panel-2); }
 </style>
 </head>
 <body>
@@ -638,8 +674,6 @@
 <section class="pane" id="pane-map">
   <div id="maparea">
     <div id="mapworld"></div>
-    <div class="mapfog" id="mapfog"></div>
-    <div class="mapgrain" id="mapgrain"></div>
     <svg id="maplines"></svg>
     <div id="maplabels"></div>
     <div class="mapdistrict" id="mapdcard" style="display:none"></div>
@@ -1066,14 +1100,34 @@ function initDashboard(){
   const root = nodes.find(n=>!n.locked && (n.id===DATA.rootSlug || n.route==='/')) || nodes.find(n=>!n.locked) || nodes[0];
 
   const selected = new Set(); let activeNode = null;
-  const world=document.getElementById('mapworld'), fogEl=document.getElementById('mapfog'), grainEl=document.getElementById('mapgrain'), linesEl=document.getElementById('maplines'),
+  const world=document.getElementById('mapworld'), areaEl=document.getElementById('maparea'), linesEl=document.getElementById('maplines'),
         labelsEl=document.getElementById('maplabels'), dcardEl=document.getElementById('mapdcard');
   const capNodes = nodes.filter(n=>!n.locked && n!==root);
   const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...DATA.frontier.map(f=>f.inboundCount||0));
   const secList0 = (DATA.sections||[]).filter(s=>s!=='Home');
   const secList = secList0.length ? secList0 : ['Other'];
-  const bearing = {}; secList.forEach((s,i)=> bearing[s] = -Math.PI/2 + (i/secList.length)*2*Math.PI);
+  // ── F2 (v2.5 §3) — SECTOR WIDTH IS PROPORTIONAL TO MEMBERSHIP ──────────────────────────────────
+  // UAT #17: a sector used to be a FIXED 1/n slice of the circle, so a product whose pages concentrate
+  // in one or two nav sections (wikipedia: 23 of 24 pages under `Wiki`) piled every node into a single
+  // arc and left the rest of the world empty. The encoding survives intact because what a sector
+  // honestly claims is GROUPING, not absolute compass position: same section ⇒ same wedge, adjacency ⇒
+  // same neighbourhood. Nothing ever claimed that north means anything. So the wedges now get the width
+  // their membership earns — every sector keeps a SECTOR_FLOOR so a 1-page section stays findable, and
+  // the remainder is split by member count. Pure function of (section order, member counts): the
+  // section order is DATA.sections' own stable order and the counts are integers, so no randomness and
+  // no float accumulation beyond a single left-to-right sweep — build-twice identical.
+  const SECTOR_FLOOR = 18 * Math.PI/180;                        // ≥18° per sector, however small it is
+  const secWeight = {}; secList.forEach(s=>secWeight[s]=0);
+  capNodes.forEach(n=>{ const s=n.section; if(secWeight[s]!=null) secWeight[s]++; });
+  const bearing = {}, sectorW = {};
+  { const total = secList.reduce((a,s)=>a+secWeight[s], 0);
+    const floor = Math.min(SECTOR_FLOOR, 2*Math.PI/secList.length);   // n×floor can't exceed the circle
+    const rem = 2*Math.PI - floor*secList.length;
+    let cur = -Math.PI/2;                                        // the first sector still opens at north
+    secList.forEach(s=>{ const w = total ? floor + rem*secWeight[s]/total : 2*Math.PI/secList.length;
+      sectorW[s] = w; bearing[s] = cur + w/2; cur += w; }); }
   const bearingOf = (s)=> bearing[s]!=null ? bearing[s] : 0;
+  const sectorOf  = (s)=> sectorW[s]!=null ? sectorW[s] : 2*Math.PI/secList.length;
 
   // ---- layout state (world coords, home at 0,0) ----
   let VW=0, VH=0, minD=0, maxDepth=1, ringR1=0, ringRmax=0, nullR=0, ghostR=0;
@@ -1091,16 +1145,24 @@ function initDashboard(){
     maxDepth=Math.max(1, ...capNodes.map(n=> n.clickDepth==null?1:n.clickDepth));
     ringR1=minD*0.22; ringRmax=minD*0.40; nullR=minD*0.45; ghostR=minD*0.56;
     const groups={}; capNodes.forEach(n=>{ const k=(n.section||'Other')+'|'+(n.clickDepth==null?'x':n.clickDepth); (groups[k]=groups[k]||[]).push(n); });
-    const gap=2*Math.PI/secList.length;
+    // each (section, ring) group spreads inside ITS OWN sector's arc (F2) — a populous sector is wide, so
+    // its members fan out across the world instead of stacking into one bearing. How MUCH of the wedge a
+    // group uses scales with its size: a lone page sits dead centre, a pair stays compact around the
+    // centre, and only a genuinely crowded group opens out to (almost) the full wedge. That is what keeps
+    // "same section ⇒ same neighbourhood" legible while still filling the circle — spreading every group
+    // to its wedge ends would fling a 2-page section as far apart as the layout allows.
     Object.values(groups).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
-      const w=gap*Math.min(0.92, 0.34+0.10*g.length);
-      g.forEach((n,i)=>{ const b=bearingOf(n.section); const off=g.length>1?(i-(g.length-1)/2)*(w/g.length):0;
+      const w=sectorOf(g[0].section)*Math.min(0.94, 0.30+0.16*(g.length-1));
+      g.forEach((n,i)=>{ const b=bearingOf(n.section); const off=g.length>1?(-w/2 + i*w/(g.length-1)):0;
         const rad=n.clickDepth==null?nullR:ringRadius(n.clickDepth);
         P[n.id]={x:Math.cos(b+off)*rad, y:Math.sin(b+off)*rad, r:sizeOf(n)/2, node:n}; }); });
     const ghosts=DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
     ghostShown=ghosts.slice(0, Math.min(ghosts.length,14));
     const gg={}; ghostShown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
-    Object.values(gg).forEach(g=>g.forEach((f,i)=>{ const b=bearingOf(f.section)+(i-(g.length-1)/2)*0.18; const rad=ghostR+(i%2)*minD*0.05;
+    // ghosts fan out inside their own section's sector too (F2), so a populous section's frontier
+    // follows its wedge instead of bunching at one bearing; the alternating radius stays.
+    Object.values(gg).forEach(g=>g.forEach((f,i)=>{ const gw=Math.min(sectorOf(f.section)*0.7, 0.20*Math.max(1,g.length-1));
+      const b=bearingOf(f.section)+(g.length>1?(-gw/2 + i*gw/(g.length-1)):0); const rad=ghostR+(i%2)*minD*0.05;
       P[f.id]={x:Math.cos(b)*rad, y:Math.sin(b)*rad, r:(Math.round(12+18*Math.min(1,(f.inboundCount||1)/maxIn)))/2, node:f, ghost:true}; }));
     deepCount=Math.max(0, lockedTotal - ghostShown.reduce((s,f)=>s+(f.count||1),0));
     unreachCount=capNodes.filter(n=>n.clickDepth==null).length;
@@ -1143,10 +1205,11 @@ function initDashboard(){
   // ---- camera ----
   const toScreen = (p)=> [VW/2 + p.x*mapView.zoom + mapView.panX, VH/2 + p.y*mapView.zoom + mapView.panY];
   function renderWorld(){
-    let html='';
+    // regions live in ONE opacity group (§2.5) — that is what makes the whisper track the lit canvas
+    // while keeping alpha stacking geometrically impossible. #maphot is the single hover shape above it.
+    let html='<div id="mapregions">';
     regions.forEach((rg,i)=>{ html+=`<div class="mapregion" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
-    // §5.1 the lit pool, in WORLD space and centred on home (world 0,0) so zoom scales it for free.
-    { const pr=Math.round(minD*0.48); html+=`<div class="mappool" style="width:${pr*2}px;height:${pr*2}px"></div>`; }
+    html+='</div><div id="maphot" style="display:none"></div>';
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
     // discs
     const disc=(id)=>{ const p=P[id]; if(!p) return ''; const n=p.node; const px=Math.round(p.x), py=Math.round(p.y), dia=Math.round(p.r*2);
@@ -1164,28 +1227,39 @@ function initDashboard(){
   }
   function applyMapView(){
     world.style.transform=`translate(${(VW/2+mapView.panX)}px, ${(VH/2+mapView.panY)}px) scale(${mapView.zoom})`;
-    // fog: screen-space, centered on home, radii scaled with zoom so it tracks the orbits.
-    // v2.4.1 §5 — fog-as-pure-darkness on a near-black base was invisible (Δ≈3/channel). Three depths
-    // now: the LIT POOL (drawn in world space by .mappool), the HAZE band — lighter than the base, so
-    // the frontier reads as weather rather than as nothing — and the DEEP EDGE, which darkens through
-    // the haze to --bg-deep past the ghost ring. Radii and geometry are the v2.4 ones; only the paint
-    // moved. The grain texture is masked to the haze band so the clear zone stays pin-sharp.
+    // ── THE LUMINOUS CANVAS, one gradient system (v2.5 §2.1) ──────────────────────────────────────
+    // v2.4.1 stacked three layers to tell the fog story — a world-space lit pool, a haze donut, a grain
+    // texture — and the reading Prateek rejected came from the last of them: an overlay ABOVE the discs
+    // darkens the world, so the frontier looked like a wall and the discs looked pasted on. Here the
+    // whole ramp is ONE background on #maparea, i.e. GROUND. Nothing in the world is ever dimmed by it;
+    // depth comes from the surface the world sits on. Screen-space, centred on home, radii × zoom so it
+    // tracks the orbits exactly as the old fog did.
+    //   · the lamp   — accent mixed into --canvas-lit, brightest at home, the v2.4.1 lit pool folded in
+    //   · the field  — plain --canvas across the play area (every ring ≤0.40 and the arc at 0.45)
+    //   · the rim    — a LONG easing to --bg-deep starting past the ghost orbit (0.56–0.61): atmosphere,
+    //                  not a wall, which is why the ramp runs over ~0.30·minD instead of snapping.
     const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY, z=mapView.zoom;
-    // radii: the clear zone still holds every ring (≤0.40) and the not-linked arc (0.45); the ghost
-    // orbit (0.56–0.61) sits INSIDE the haze; the `deep fog` arc (0.65) lands on the haze/deep boundary;
-    // full --bg-deep by 0.74 so the deep zone is on screen at rest, not only in the far corners.
-    const clear=minD*0.44*z, hazeIn=minD*0.50*z, hazeOut=minD*0.62*z, deep=minD*0.74*z;
-    const HAZE='color-mix(in srgb, var(--dim) 10%, transparent)';
-    fogEl.style.background=`radial-gradient(circle at ${cx}px ${cy}px, transparent ${clear}px, ${HAZE} ${hazeIn}px, ${HAZE} ${hazeOut}px, color-mix(in srgb, var(--bg-deep) 92%, transparent) ${deep}px, var(--bg-deep) ${deep+50}px)`;
-    // a mask consumes only alpha — the stop colour is discarded, so any opaque token stands for "keep".
-    if(grainEl){ const K='var(--txt)'; const m=`radial-gradient(circle at ${cx}px ${cy}px, transparent ${clear}px, ${K} ${hazeIn}px, ${K} ${hazeOut}px, transparent ${deep}px)`;
-      grainEl.style.webkitMaskImage=m; grainEl.style.maskImage=m; }
+    const LIT='color-mix(in srgb, var(--accent) 11%, var(--canvas-lit))';
+    // the lamp falls off over FIVE stops, not two: a radial-gradient interpolates linearly between
+    // stops, so a 3-stop ramp puts a visible crease in the field exactly where the derivative jumps —
+    // which is what made the lit area read as a hard-edged disc instead of light.
+    const lampR=r=>minD*r*z, L=p=>`color-mix(in srgb, ${LIT} ${p}%, var(--canvas))`;
+    // the rim is world-tied (it belongs past the ghost orbit, §2.1) but FLOORED to the pane: zoomed out,
+    // a purely world-tied vignette collapses onto the shrinking world and the pane goes black — the pane
+    // must always read as a canvas (§2.2), so the vignette can never come closer than its own corners.
+    const hd=Math.hypot(VW,VH)/2;
+    const rimIn=Math.max(minD*0.72*z, hd*0.66), deep=Math.max(minD*1.00*z, hd*1.20);
+    areaEl.style.backgroundImage=`radial-gradient(circle at ${cx}px ${cy}px, ${LIT} 0, `
+      + `${L(84)} ${lampR(0.10)}px, ${L(56)} ${lampR(0.22)}px, ${L(30)} ${lampR(0.34)}px, `
+      + `${L(14)} ${lampR(0.45)}px, ${L(5)} ${lampR(0.56)}px, var(--canvas) ${lampR(0.66)}px, `
+      + `var(--canvas) ${rimIn}px, color-mix(in srgb, var(--bg-deep) 60%, var(--canvas)) ${(rimIn+deep)/2}px, var(--bg-deep) ${deep}px)`;
     const zl=document.getElementById('zlbl'); if(zl) zl.textContent=Math.round(mapView.zoom*100)+'%';
     placeLabels();
     if(hoverId) drawLinks(hoverId);
     if(hotRegion) positionCard(hotRegion.rg, hotRegion.el);
   }
   const ovl=(a,b)=>{ const ox=Math.min(a.right,b.right)-Math.max(a.left,b.left), oy=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top); return ox>4 && oy>4; };
+  const FAR_ANCHORS = 8;   // how many pills survive the far tier (§4) — one constant, tune here
   function placeLabels(){
     labelsEl.innerHTML='';
     const z=mapView.zoom, level = z<0.9?'far': z<1.7?'mid':'near';
@@ -1193,6 +1267,12 @@ function initDashboard(){
     const committed=[];
     world.querySelectorAll('.mapnode, .mapghost .gc').forEach(el=>{ const r=el.getBoundingClientRect();
       committed.push({left:r.left-paneRect.left, top:r.top-paneRect.top, right:r.right-paneRect.left, bottom:r.bottom-paneRect.top}); });
+    // (v2.5) the floating chrome is committed geometry too. Bare labels used to tuck under the legend
+    // almost invisibly; a PILL sliding under it is unmissable — and a label the chrome hides is a label
+    // that isn't placed, so it belongs in the same pass rather than in a caveat.
+    ['maplegend','mapstats','mapzoom','mapnote'].forEach(id=>{ const el=document.getElementById(id);
+      if(!el || !el.offsetWidth) return; const r=el.getBoundingClientRect();
+      committed.push({left:r.left-paneRect.left-4, top:r.top-paneRect.top-4, right:r.right-paneRect.left+4, bottom:r.bottom-paneRect.top+4}); });
     const specs=[];
     { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(dlabel(root))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d)*z; const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY;
@@ -1203,6 +1283,12 @@ function initDashboard(){
     if(level==='near') set=capNodes.slice();
     else if(level==='mid'){ const bySec={}; capNodes.forEach(n=>{(bySec[n.section||'Other']=bySec[n.section||'Other']||[]).push(n)});
       Object.values(bySec).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)); set.push(...g.slice(0,2)); }); }
+    // F3 (v2.5 §4, UAT #4) — the far tier used to drop EVERY label, so zooming out lost all orientation:
+    // a field of anonymous discs. The most linked-to pages keep their pills as anchors; the rest stay
+    // dots. Ranked by inboundCount (observed), ties by id, so the anchor set is deterministic.
+    else if(level==='far') set=capNodes.slice()
+      .sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0) || String(a.id).localeCompare(String(b.id)))
+      .slice(0, FAR_ANCHORS);
     set.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
     set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}<br><small>from ${n.inboundCount||0}</small>`}); });
     if(level==='near') ghostShown.forEach(f=>{ const [sx,sy]=toScreen(P[f.id]); specs.push({pri:3, ax:sx, ay:sy, dr:P[f.id].r*z, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}); });
@@ -1211,8 +1297,17 @@ function initDashboard(){
     const placed=[...committed];
     specs.forEach((s,i)=>{ const e=els[i]; const w=e.offsetWidth, h=e.offsetHeight; let cands=[];
       if(s.ring){ for(const a of [0,-0.35,0.35,-0.7,0.7,Math.PI]) cands.push([s.cx+Math.cos(a)*s.rr - w/2, s.cy+Math.sin(a)*s.rr - h/2]); }
-      else if(s.center){ cands=[[s.ax-w/2, s.ay-h/2]]; }
-      else { const dr=s.dr||0; cands=[[s.ax-w/2, s.ay+dr+3],[s.ax-w/2, s.ay-dr-3-h],[s.ax+dr+4, s.ay-h/2],[s.ax-dr-4-w, s.ay-h/2],[s.ax-w/2, s.ay+dr+18],[s.ax-w/2, s.ay+dr+34]]; }
+      // the two arc labels (`not linked from home`, `deep fog …`) used to get exactly ONE candidate, so a
+      // single disc in the way dropped them outright — the map then lost a whole caption with no fallback.
+      // They now walk outward along their own bearing, which keeps them on their arc.
+      else if(s.center){ const ux=s.ax-(VW/2+mapView.panX), uy=s.ay-(VH/2+mapView.panY);
+        for(const k of [0, 0.08, -0.08, 0.17, -0.17, 0.27]) cands.push([s.ax+ux*k-w/2, s.ay+uy*k-h/2]); }
+      // (v2.5) pills are bigger than the bare labels these six candidates were tuned for, so the ladder
+      // gains four diagonals — placement odds matter most at the far tier, where §4's anchors have to
+      // survive a crowded little world.
+      else { const dr=s.dr||0, d=0.72; cands=[[s.ax-w/2, s.ay+dr+3],[s.ax-w/2, s.ay-dr-3-h],[s.ax+dr+4, s.ay-h/2],[s.ax-dr-4-w, s.ay-h/2],
+          [s.ax+dr*d+4, s.ay+dr*d+3],[s.ax-dr*d-4-w, s.ay+dr*d+3],[s.ax+dr*d+4, s.ay-dr*d-3-h],[s.ax-dr*d-4-w, s.ay-dr*d-3-h],
+          [s.ax-w/2, s.ay+dr+18],[s.ax-w/2, s.ay+dr+34]]; }
       let ok=false;
       for(const [lx,ly] of cands){ const box={left:lx,top:ly,right:lx+w,bottom:ly+h};
         if(box.left<2||box.top<2||box.right>VW-2||box.bottom>VH-2) continue;
@@ -1241,11 +1336,16 @@ function initDashboard(){
     dcardEl.style.left='0'; dcardEl.style.top='0'; const w=dcardEl.offsetWidth||170, h=dcardEl.offsetHeight||64;
     x=Math.max(w/2+6, Math.min(VW-w/2-6, x)); y=Math.max(60, Math.min(VH-h-10, y-h));
     dcardEl.style.left=x+'px'; dcardEl.style.top=y+'px'; dcardEl.style.transform='translate(-50%,0)'; }
-  function showRegion(rg, el){ hotRegion={rg,el}; el.classList.add('hot');
+  // the hover wash is #maphot — ONE shape moved onto the hovered territory, outside the region opacity
+  // group so it can be stronger than the whisper without any two washes ever compositing (§2.5).
+  function showRegion(rg, el){ hotRegion={rg,el};
+    const hot=world.querySelector('#maphot');
+    if(hot){ hot.style.left=rg.x+'px'; hot.style.top=rg.y+'px'; hot.style.width=rg.w+'px'; hot.style.height=rg.h+'px'; hot.style.display='block'; }
     dcardEl.innerHTML=`<h4>${esc(rg.name)}</h4><p>${rg.explored} explored${rg.fog?` · ${rg.fog} in the fog`:''}${rg.states?` · ${rg.states} ${rg.states===1?'page has':'pages have'} states`:''}</p>
       <div class="bar"><i style="width:${rg.explored+rg.fog?Math.round(100*rg.explored/(rg.explored+rg.fog)):100}%"></i></div>`;
     dcardEl.style.display='block'; positionCard(rg, el); }
-  function hideRegion(){ if(hotRegion&&hotRegion.el) hotRegion.el.classList.remove('hot'); hotRegion=null; dcardEl.style.display='none'; }
+  function hideRegion(){ const hot=world.querySelector('#maphot'); if(hot) hot.style.display='none';
+    hotRegion=null; dcardEl.style.display='none'; }
 
   // ---- hover links + peek + click ----
   let hoverId=null;
