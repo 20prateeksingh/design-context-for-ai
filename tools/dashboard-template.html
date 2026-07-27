@@ -17,10 +17,19 @@
           --line:#26262B; --txt:#F5F6F7; --dim:#8A8F98; --rail:var(--panel-2); --link:var(--accent-strong);
           --accent:#4F46E5; --accent-strong:#918BEE; --accent-text:#FFFFFF;
           --ok:#33B074; --bad:#E85D5D; --tpl:#9D7BF5; --warn:#D99A3D;
+          /* (v2.4.2 F3) the brighter hairline the mock's top-bar pills wear — measured off
+             mock-topbar.png at ≈#3D3D3E, expressed as a mix of the frozen palette, not a new colour. */
+          --line-2:color-mix(in srgb, var(--txt) 22%, var(--bg));
           --elev:0 12px 34px rgba(0,0,0,.55);
           --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
           --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
           --pad:clamp(16px,4vw,44px); /* the one horizontal page gutter — header band and body share it */
+          /* (v2.4.2 F4) THE stacking breakpoint: below it the Home rail wraps under the content, so a
+             rail swap would change something off-screen — selections navigate to the full page doc
+             instead. This declaration is the token; JS reads it from here. CSS cannot resolve a custom
+             property inside a media query, so every `@media (max-width:1080px)` block below is slaved
+             to this value — change them together. */
+          --stack-bp:1080px;
           --fb-h:0px; /* F7: file:// banner height — 0 unless mounted, so server mode never shifts layout */ }
   * { box-sizing:border-box; margin:0; }
   html,body { height:100%; }
@@ -57,23 +66,29 @@
   .tab.active { background:var(--panel-2); color:var(--txt); }
   .tab:hover:not(.active) { color:var(--txt); }
   .spacer { flex:1; }
-  .pill { font-size:12px; font-family:var(--mono); color:var(--dim); background:var(--panel); border:1px solid var(--line);
-          border-radius:20px; padding:3px 10px; white-space:nowrap; }
+  /* ── the right cluster, matched to mock-topbar.png (v2.4.2 F3) ──
+     Measured off the mock at 1600px: every item in the cluster is a 28px-tall FULL pill; the two chips
+     carry NO fill (the bar's own --bg shows through) and are drawn by a hairline brighter than the
+     body's --line (≈#3D3D3E → --line-2); inside padding ~10-11px; the leading dot is 13px and WHITE.
+     The previous build filled both chips with --panel and dimmed the Journal dot/label — that filled
+     grey chip is the difference Prateek flagged. Buttons keep display:block (JS toggles it) and centre
+     their label with line-height, so no flex/display conflict can hide them. */
+  .pill { font-size:12px; color:var(--txt); background:transparent; border:1px solid var(--line-2);
+          border-radius:999px; height:28px; padding:0 11px; display:inline-flex; align-items:center; white-space:nowrap; }
   .pill b { color:var(--txt); }
-  /* the Journal pill's leading dot (mock-topbar.png) — a quiet --dim mark, not a second accent */
-  .jpill { display:inline-flex; align-items:center; gap:7px; padding-left:7px; }
-  .jpill::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--dim); flex:none; }
-  .jpill.on::before { background:var(--txt); }
+  .jpill { gap:8px; padding-left:10px; }
+  .jpill::before { content:""; width:13px; height:13px; border-radius:50%; background:var(--txt); flex:none; }
   #server-pill.on { color:var(--ok); border-color:color-mix(in srgb, var(--ok) 40%, var(--bg)); }
-  #capbtn { font-size:13px; font-weight:600; background:var(--accent); color:var(--accent-text); border:0;
-            border-radius:8px; padding:7px 14px; display:none; transition:filter .2s; }
+  #capbtn { font-size:12px; font-weight:600; background:var(--accent); color:var(--accent-text); border:0;
+            border-radius:999px; height:28px; line-height:28px; padding:0 13px; display:none; transition:filter .2s; }
   #capbtn:hover { filter:brightness(1.12); }
   #capbtn:disabled { opacity:.5; cursor:wait; }
   /* (v2.4.1 §4) the one GLOBAL action is neutral-white, not accent: per the mock, accent is reserved for
      contextual ledger/content CTAs, and a white button stops the top bar double-accenting next to the
-     readiness ring. Dark text on a --txt fill is ~19:1 by construction. */
+     readiness ring. Dark text on a --txt fill is ~19:1 by construction. (v2.4.2 F3: pill radius + the
+     cluster's shared 28px box — the mock's button is the same capsule as the chips beside it.) */
   #recapbtn { font-size:12px; font-weight:600; background:var(--txt); color:var(--bg); border:0;
-              border-radius:8px; padding:7px 12px; display:none; transition:background .2s; }
+              border-radius:999px; height:28px; line-height:28px; padding:0 13px; display:none; transition:background .2s; }
   #recapbtn:hover { background:color-mix(in srgb, var(--txt) 88%, var(--bg)); }
   /* onboarding: the tabs and their chrome don't exist yet — hide until the library does */
   #shell.onboarding .tabs, #shell.onboarding .pill, #shell.onboarding .rchip, #shell.onboarding #capbtn, #shell.onboarding #recapbtn { display:none; }
@@ -89,7 +104,7 @@
   #maparea { position:absolute; inset:0 340px 0 0; overflow:hidden; }
   #maprail { position:absolute; right:0; top:0; bottom:0; width:340px; border-left:1px solid var(--line);
              overflow-y:auto; padding:24px 20px 40px; z-index:8; }
-  @media (max-width:1080px){ #maparea { inset:0 300px 0 0; } #maprail { width:300px; } }
+  @media (max-width:1080px){ /* = --stack-bp */ #maparea { inset:0 300px 0 0; } #maprail { width:300px; } }
   #mapworld { position:absolute; inset:0; }
   #maplines { position:absolute; inset:0; z-index:1; pointer-events:none; }
   #maplines .eout { stroke:color-mix(in srgb, var(--accent-strong) 60%, transparent); stroke-width:1.4; }
@@ -305,14 +320,18 @@
   /* ── dashboard v2 ── */
   .hatch { background:repeating-linear-gradient(45deg,var(--panel),var(--panel) 6px,var(--bg) 6px,var(--bg) 12px); }
 
-  /* readiness chip + breakdown popover (ring stroke = --accent, on the --bg shell) */
-  .rchip { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--txt); background:var(--panel);
-           border:1px solid var(--line); border-radius:20px; padding:3px 12px 3px 5px; white-space:nowrap; }
-  .rchip:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
-  .rring { width:20px; height:20px; border-radius:50%; flex:none; position:relative;
-           background:conic-gradient(var(--accent) calc(var(--pct,0)*1%), var(--line) 0); }
-  .rring::after { content:""; position:absolute; inset:3px; background:var(--panel); border-radius:50%; }
-  .rchip.quiet .rring { background:conic-gradient(var(--ok) calc(var(--pct,0)*1%), var(--line) 0); }
+  /* readiness chip + breakdown popover (ring stroke = --accent, on the --bg shell).
+     v2.4.2 F3: the SHELL is the mock's — unfilled 28px capsule, --line-2 hairline, 10/11px padding, the
+     mark sitting where the mock's dot sits. Prateek's explicit exception: the RING stays (the mock shows
+     a plain dot; the ring encodes measured progress), sized down to the mock's 13px dot footprint + 3px
+     so the arc still reads. Its punch-out follows the pill's new fill — --bg, not --panel. */
+  .rchip { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--txt); background:transparent;
+           border:1px solid var(--line-2); border-radius:999px; height:28px; padding:0 11px 0 10px; white-space:nowrap; }
+  .rchip:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
+  .rring { width:16px; height:16px; border-radius:50%; flex:none; position:relative;
+           background:conic-gradient(var(--accent) calc(var(--pct,0)*1%), var(--line-2) 0); }
+  .rring::after { content:""; position:absolute; inset:3px; background:var(--bg); border-radius:50%; }
+  .rchip.quiet .rring { background:conic-gradient(var(--ok) calc(var(--pct,0)*1%), var(--line-2) 0); }
   #readypop { position:absolute; top:48px; right:14px; width:308px; background:var(--panel-2); border:1px solid var(--line);
               border-radius:12px; box-shadow:var(--elev); padding:14px 16px; z-index:40; display:none; }
   #readypop.open { display:block; }
@@ -356,7 +375,9 @@
   .ent .edlines { margin:6px 0 0; padding:0; list-style:none; }
   .ent .edlines li { font-size:11.5px; color:var(--dim); line-height:1.5; padding-left:12px; position:relative; }
   .ent .edlines li::before { content:"·"; position:absolute; left:2px; color:var(--line); font-weight:700; }
-  .jpill.on { background:var(--panel-2); color:var(--txt); border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  /* the Journal pill's active state — the dot is white at rest now (mock), so the state is carried by the
+     surface + accent edge instead of by the dot. */
+  .jpill.on { background:var(--panel-2); border-color:color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
 
   /* ── home, matched to the v2.4.1 mock (prds/dashboard-v2.4-mock/) ──
      The page is a HEADER BAND above a BODY, split by a full-width --line rule, with the working ledger
@@ -380,6 +401,7 @@
      4.5:1 — so --link steps up wherever the surface does (rail, peek, readiness popover). */
   .rail, #maprail, #peek, #readypop, .mode .badge, .stt.guided { --link:color-mix(in srgb, var(--accent-strong) 85%, var(--txt)); }
   .rail { width:340px; flex:none; border-left:1px solid var(--line); overflow-y:auto; padding:24px 20px 40px; }
+  /* = --stack-bp — THE stacking point: the rail leaves the right edge and wraps under the content. */
   @media (max-width:1080px){
     #pane-home.scrollpane { overflow-y:auto; }
     .homecols { flex-direction:column; height:auto; }
@@ -402,14 +424,24 @@
   .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .filt { font-size:12px; color:var(--dim); background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:4px 11px; }
   .filt.on { background:var(--panel-2); color:var(--txt); border-color:var(--line); }
-  /* atlas: 4-col, uniform 16:9 thumbnail window that the screenshot fills edge-to-edge (no letterbox,
-     no inner padding), then a two-part caption — one ellipsized title line + a 2-line description.
-     The mono route line is gone from the card face; the route lives in the rail panel and page doc. */
-  .atlas { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
-  @media (max-width:1180px){ .atlas { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-  @media (max-width:820px){ .atlas { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  /* atlas: a uniform 16:9 thumbnail window that the screenshot fills edge-to-edge (no letterbox, no
+     inner padding), then a two-part caption — one ellipsized title line + a 2-line description. The
+     mono route line is gone from the card face; the route lives in the rail panel and page doc.
+     (v2.4.2 F1) The column COUNT is no longer fixed at 4 — a fixed 4-col grid ballooned each card to
+     ~515px on a 2560 monitor. auto-fill + a 236px floor keeps the card in the mock's size family and
+     lets the count follow the viewport. Derivation: the grid's usable width is
+     `vw − 340 (rail) − 2 × --pad`, so with the 18px gutters kept, cols = ⌊(W+18)/(236+18)⌋ →
+     1280:3 (272px) · 1440:4 (240px) · 1600:4 (280px — the mock's own card width) · 1920:5 (284px) ·
+     2560:8 (249px). 236 rather than the brief's 250–270: at 1440 a 4-col row can only be 240px wide
+     (the mock's 270px is a 1600px-viewport measurement), and a floor above 239 drops 1440 to 3 columns
+     — the brief's own column targets win over its estimated floor. The old 1180/820 breakpoint
+     overrides are gone: auto-fill subsumes them. */
+  .atlas { display:grid; grid-template-columns:repeat(auto-fill,minmax(236px,1fr)); gap:18px; }
+  /* padding:0 is load-bearing (v2.4.2 F2): .pg is a <button>, and the UA's default button padding
+     (1px block / 6px inline in Chromium) was inset the thumbnail from the card edge — the --panel
+     gutter Prateek could see down the left and right of every screenshot. */
   .pg { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--card); position:relative;
-        text-align:left; transition:border-color .15s, background .15s; display:flex; flex-direction:column; width:100%; color:inherit; }
+        padding:0; text-align:left; transition:border-color .15s, background .15s; display:flex; flex-direction:column; width:100%; color:inherit; }
   .pg:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); background:var(--panel-2); }
   .pg .shot { width:100%; aspect-ratio:16/9; height:auto; border-bottom:1px solid var(--line); display:block;
               object-fit:cover; object-position:top; background:var(--panel-2); flex:none; }
@@ -515,6 +547,11 @@
   .pshot { display:block; width:100%; height:170px; border:1px solid var(--line); border-radius:8px; margin:10px 0; }
   .mono-logo { display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--dim);
                background:var(--panel-2); text-transform:uppercase; }
+  /* (v2.4.2 F5) an image that never loads falls back to a skel-free monogram tile — a shimmer must never
+     be left running over a dead image. Wrappers with intrinsic size (.shot, .pshot, .pk-shot, .stt-shot)
+     keep it; the page doc's hero has none once its <img> is gone, so it holds the skeleton's height. */
+  .imgfail { font-size:20px; }
+  .dleft .shotwrap.imgfail { min-height:320px; }
 
   /* ── v2.1: peek hover card (portal to body, never clipped) ── */
   #peek { position:fixed; z-index:60; width:252px; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
@@ -548,7 +585,7 @@
   .dleft .dshot.capped { max-height:70vh; object-fit:cover; object-position:top; }
   .stt-shot { display:block; width:150px; height:92px; border:1px solid var(--line); border-radius:6px; margin-bottom:4px; }
   .shot-expand { margin-top:6px; font-size:12px; background:none; border:0; color:var(--link); cursor:pointer; text-decoration:underline; }
-  @media (max-width:1080px){ .dright { position:static; max-height:none; overflow:visible; } }
+  @media (max-width:1080px){ /* = --stack-bp */ .dright { position:static; max-height:none; overflow:visible; } }
 
   /* ── v2.1: F2 map — zoom controls, regions, arc ── */
   #mapworld { transform-origin:0 0; }
@@ -982,9 +1019,18 @@ function initDashboard(){
     ? `<span class="${cls} skel imgwrap"><img class="fadeimg fade" data-src="${esc(src)}" alt="${esc(alt||'')}"></span>`
     : `<span class="${cls} skel"></span>`; }
   function wireThumbs(root){ (root||document).querySelectorAll('img.fade[data-src]:not([data-wired])').forEach(img=>{
-    img.setAttribute('data-wired','1'); const wrap=img.parentNode;
-    const done=()=>{ img.classList.add('in'); if(wrap&&wrap.classList) wrap.classList.remove('skel'); };
-    img.onload=done; img.onerror=()=>{ if(wrap&&wrap.classList) wrap.classList.remove('skel'); img.remove(); };
+    img.setAttribute('data-wired','1');
+    // (v2.4.2 F5) The skeleton is the nearest .skel ANCESTOR, not necessarily the direct parent. The page
+    // doc's hero is `<div class="shotwrap skel"><a><img></a></div>`, so `img.parentNode` resolved to the
+    // <a>: `remove('skel')` hit an element that never had the class and the hero shimmered forever, over
+    // and under the loaded screenshot. closest() fixes every current and future nesting.
+    const wrap=img.closest('.skel');
+    const done=()=>{ img.classList.add('in'); if(wrap) wrap.classList.remove('skel'); };
+    // error → skel-free monogram tile (never a live shimmer over an image that will never arrive)
+    const fail=()=>{ if(wrap){ wrap.classList.remove('skel'); wrap.classList.add('imgfail','mono-logo');
+                       wrap.textContent = ((DATA.product||'?').trim()[0]||'?'); }
+                     else img.remove(); };
+    img.onload=done; img.onerror=fail;
     img.src=img.getAttribute('data-src'); if(img.complete && img.naturalWidth) done(); }); }
   function monogram(cls, name){ return `<span class="${cls} mono-logo">${esc(((name||DATA.product||'?').trim()[0]||'?'))}</span>`; }
 
@@ -1210,7 +1256,7 @@ function initDashboard(){
   world.addEventListener('mouseover', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n){ hoverId=n.id; drawLinks(n.id); showPeek(n, e.clientX, e.clientY); } } });
   world.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
   world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ hoverId=null; linesEl.innerHTML=''; hidePeek(); } });
-  world.addEventListener('click', e=>{ if(mapDragged) return; const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) openPanel(n); } });
+  world.addEventListener('click', e=>{ if(mapDragged) return; const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) selectPage(n); } });
 
   // ---- zoom + pan (listeners live on #maparea so the rail scrolls/clicks like a normal column, F4) ----
   const clampZoom=z=>Math.max(0.45, Math.min(3, z));
@@ -1247,6 +1293,22 @@ function initDashboard(){
   // page-detail panel; × / ESC / empty-canvas click return the ledger; a tab switch resets; "Expand"
   // opens the full page doc and "← Back to map" restores zoom/pan/selection AND this rail panel.
   let railSel = null;   // slug whose detail the rail shows; null → the ledger
+  // (v2.4.2 F4) Below the stacking breakpoint the Home rail wraps UNDER the content, so swapping it to a
+  // page detail changes something the user cannot see. One token governs it: --stack-bp in :root, read
+  // here so the number lives in exactly one place (the @media blocks are slaved to the same value).
+  const STACK_BP = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stack-bp')) || 1080;
+  const isStacked = () => innerWidth <= STACK_BP;
+  // The one entry point for "a page was selected" — atlas card (Home) and map node (Map) both come here.
+  // Stacked: go straight to the full page doc (the same view Expand opens; its back button returns to the
+  // originating tab, and the map's camera is restored by mapReopen). Locked nodes have no page doc — the
+  // unlock list only exists in the rail panel — so they keep the rail and it is scrolled into view.
+  function selectPage(n){
+    if(isStacked()){
+      if(!n.locked) return openFullDoc(n.id);
+      openPanel(n); const r=railTarget(); if(r && r.scrollIntoView) r.scrollIntoView({block:'start'}); return;
+    }
+    openPanel(n);
+  }
   function railTarget(){
     return document.getElementById('pane-map').classList.contains('active')
       ? document.getElementById('maprail-body')
@@ -1725,7 +1787,7 @@ function initDashboard(){
     atlas.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
     atlas.addEventListener('mouseout', e=>{ if(e.target.closest('.pg[data-card]')) hidePeek(); });
     atlas.querySelectorAll('.pg[data-card]').forEach(c=>{
-      c.onclick=()=>{ const n=byId[c.dataset.card]; if(n) openPanel(n); };
+      c.onclick=()=>{ const n=byId[c.dataset.card]; if(n) selectPage(n); };
       c.addEventListener('focus', ()=>{ const n=byId[c.dataset.card]; const r=c.getBoundingClientRect(); if(n) showPeek(n, r.right-40, r.top); });
       c.addEventListener('blur', hidePeek);
     });
@@ -1832,8 +1894,10 @@ function initDashboard(){
     const jp=document.getElementById('journalpill'); if(jp) jp.classList.toggle('on', name==='journal');
     if(name==='map'){ resize(); if(!window.__fitted){ fit(); window.__fitted=true; }
       renderRail(); // F4·1: the map rail defaults to the ledger on every entry
-      // F1 restore: reopen the rail panel we expanded from + reapply camera on return (F4·5)
-      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; applyMapView(); if(nn) openPanel(nn); } }
+      // F1 restore: reopen the rail panel we expanded from + reapply camera on return (F4·5). v2.4.2 F4:
+      // stacked, the camera still restores but the rail must NOT swap — there is no rail-swap below the
+      // breakpoint, in either direction.
+      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; applyMapView(); if(nn && !isStacked()) openPanel(nn); } }
     const sp=document.querySelector('.pane.active.scrollpane'); if(sp) sp.scrollTop=0;
   }
   let lastPane=null;
