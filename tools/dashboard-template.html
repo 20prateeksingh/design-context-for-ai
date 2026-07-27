@@ -220,8 +220,6 @@
   .kpi.blue .n { color:var(--link); } .kpi.amber .n { color:var(--warn); }
   .kpi.purple .n { color:var(--tpl); } .kpi.green .n { color:var(--ok); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
-  @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
   table.digest { width:100%; border-collapse:collapse; font-size:13px; }
   table.digest td { padding:7px 8px; border-top:1px solid var(--line); vertical-align:top; }
   table.digest tr:hover td { background:color-mix(in srgb, var(--accent) 6%, transparent); }
@@ -255,6 +253,39 @@
   .sw .c { height:44px; }
   .sw .i { padding:6px 8px; font-family:var(--mono); font-size:10.5px; color:var(--dim); }
   .sw .i b { color:var(--txt); display:block; font-weight:550; }
+
+  /* (v2.6 F3) COLOR — Palette ⇄ Proportions. One dataset (tokens.colors.top), two readings: the
+     palette grid answers "which values", the treemap answers "how much". The switcher wears the
+     existing .filt pill so it reads as a filter, not a new control species. State is per-session
+     (a JS variable) — no persistence machinery for a two-way view toggle. */
+  .cviews { margin-bottom:10px; }
+  .tmapwrap { position:relative; }
+  .tmap { position:relative; width:100%; height:clamp(280px,36vh,420px); border:1px solid var(--line);
+          border-radius:10px; overflow:hidden; background:var(--card); }
+  /* Tiles butt against each other — the area IS the datum, so no gap may eat it. The rest seam and the
+     hover outline are both `inset` box-shadows, which paint inside the box without changing its
+     geometry, so a measured tile area stays exactly proportional to its count. The .c fill renders an
+     OBSERVED product color (data, never themed) — same rule as the .sw swatch block. */
+  .tmt { position:absolute; cursor:pointer; overflow:hidden; border:0; padding:0; display:block;
+         box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bg) 45%, transparent); }
+  .tmt:hover, .tmt:focus-visible { box-shadow:inset 0 0 0 1px var(--accent-strong); }
+  .tmt:focus-visible { outline:2px solid var(--accent-strong); outline-offset:-3px; }
+  /* `display:block` is not decoration — a tile is a <button>, and Chromium lays a button's children
+     out through an anonymous flex box, which swallows the <br> and puts the share back on the hex's
+     line. Declaring the display takes the box out of that machinery. */
+  .tmt .l { display:block; position:absolute; left:6px; top:4px; right:4px; font-family:var(--mono);
+            font-size:10.5px; line-height:1.35; text-align:left; pointer-events:none; white-space:nowrap; }
+  .tmt .l i { font-style:normal; opacity:.82; }
+  /* fallback for the ~4% of observed swatches where NEITHER --txt nor --bg reaches 4.5:1 (the mid-grey
+     band): the label takes the product's own established pill treatment (v2.5 map labels) so contrast
+     is guaranteed by construction rather than by luck of the swatch. */
+  /* the pill must hug its text, so it releases `right` — an abspos box with BOTH left and right set
+     fills the gap between them (that is the spec, not shrink-to-fit), which on a wide tile drew a
+     bar instead of a chip. With right:auto it shrink-to-fits its longest line, capped to the tile. */
+  .tmt .l.pill { background:color-mix(in srgb, var(--bg) 90%, transparent); border-radius:5px;
+                 padding:1px 5px; left:4px; right:auto; max-width:calc(100% - 8px); }
+  .tmfoot { font-size:11.5px; color:var(--dim); font-family:var(--mono); margin-top:8px; }
+
   /* type/spacing/radius/shadow cards share the hover elevation (no copy action — nothing obvious to copy) */
   #pane-design .card { transition:transform .14s ease-out, background .14s ease-out; }
   #pane-design .card:hover { transform:translateY(-3px); background:var(--panel-2); }
@@ -265,15 +296,58 @@
   .bar { display:flex; align-items:center; gap:10px; padding:4px 0; }
   .bar .rect { height:14px; background:var(--accent); border-radius:3px; opacity:.85; }
   .bar .m { font-family:var(--mono); font-size:11px; color:var(--dim); white-space:nowrap; }
-  .radrow { display:flex; gap:14px; flex-wrap:wrap; }
-  .rad { text-align:center; }
-  .rad .sq { width:52px; height:52px; background:var(--card); border:2px solid var(--accent-strong); margin-bottom:4px; }
-  .rad .m { font-family:var(--mono); font-size:10.5px; color:var(--dim); }
-  .shrow { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; }
+
+  /* (v2.6 F2) THE BENTO. Type ramp left (allowed to be tall); right column stacks spacing → radius →
+     shadows → components. Both columns stretch to the taller one, and each column's last tenant takes
+     the slack (`margin-top:auto` on the ramp's footnote, `flex:1` on the dormant Components slot), so
+     neither a long ramp nor a sparse product leaves a void. Min-heights keep the right column's shape
+     when a product has almost no radii or shadows (wikipedia, kit-dashboard). */
+  .bento { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:stretch; }
+  .bento > * { min-width:0; }
+  /* Slack goes to an absorber on BOTH sides, so neither column can end in a hole: the right column's
+     is the dormant Components slot (flex:1), the left's is the ramp itself — its rows share the extra
+     space and simply breathe, up to a cap that stops a one-row ramp from becoming one giant row.
+     A ramp that cannot absorb the slack within that cap keeps .natural (balanceBento() decides, by
+     measurement) and takes its content height — an empty page gutter beside a short column beats a
+     bordered hole inside it. */
+  .bento > .card:first-child .typerow { flex:1 1 auto; max-height:54px; }
+  .bento > .card.natural { align-self:start; }
+  .bento > .card.natural .typerow { flex:none; }
+  .bcol { display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .bcol > .card, .bcol > .compslot { flex:none; }
+  .bcol > .compslot { flex:1 1 auto; }
+  .bento .card { display:flex; flex-direction:column; }
+  .bento .card .foot { margin-top:auto; padding-top:8px; font-family:var(--mono); font-size:10.5px; color:var(--dim); }
+  .bento .card.c-space, .bento .card.c-rad, .bento .card.c-sh { min-height:112px; }
+  .bnone { font-size:12px; color:var(--dim); }
+  @media (max-width:900px){ .bento { grid-template-columns:minmax(0,1fr); } }
+
+  /* (v2.6 F1) RADIUS — one tile size for every value, so the grid keeps one row height. The observed
+     value is applied VERBATIM (no clamp): an asymmetric `2px 0px 0px 2px` lands per-corner on the same
+     square, which is exactly what makes it scannable next to a symmetric neighbour. */
+  .radgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; }
+  .rad { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:9px 6px 7px;
+         text-align:center; min-width:0; }
+  .rad .sq { width:64px; height:64px; margin:0 auto 7px; background:var(--card);
+             border:2px solid var(--accent-strong); }
+  .rad .m { display:block; font-family:var(--mono); font-size:10px; color:var(--dim);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rad .m b { display:block; color:var(--txt); font-weight:550; overflow:hidden; text-overflow:ellipsis; }
+
+  .shgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:12px; }
   /* allowlisted literal: the tile renders an OBSERVED shadow (data) — a shadow is invisible on a dark
      surface, so the preview keeps a light one. The shadow value itself is the artifact, like a swatch. */
-  .sh { background:#FFFFFF; border:1px solid var(--line); border-radius:10px; height:64px; }
+  .sh { background:#FFFFFF; border:1px solid var(--line); border-radius:10px; height:52px; }
   .sh + .m { font-family:var(--mono); font-size:9.5px; color:var(--dim); word-break:break-all; margin-top:5px; }
+
+  /* (v2.6 F2.3) the dormant Components slot — the journal's "someday" teaser, moved into the bento.
+     Dashed + --dim says "not a thing yet"; it fills the bento today and is where pattern mining lands. */
+  .compslot { border:1px dashed var(--line); border-radius:10px; padding:14px 16px; min-height:96px;
+              background:color-mix(in srgb, var(--panel) 50%, var(--bg));
+              display:flex; flex-direction:column; justify-content:center; gap:4px; }
+  .compslot .cmeta { font-size:10.5px; font-family:var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.5px; }
+  .compslot .ctitle { font-size:14px; font-weight:600; color:var(--dim); }
+  .compslot .cdetail { font-size:12px; color:var(--dim); }
   .secgap { margin-top:26px; }
 
   /* ── onboarding (wizard · login wait · live progress · completion) ── */
@@ -547,11 +621,8 @@
   .hi { position:relative; font-size:12px; color:var(--txt); padding:5px 0; }
   .hi:before { content:""; position:absolute; left:-16px; top:10px; width:7px; height:7px; border-radius:50%; background:var(--dim); }
   .hi small { display:block; color:var(--dim); font-size:10px; }
-  .dormcard { border:1px dashed var(--line); border-radius:10px; padding:18px; background:color-mix(in srgb, var(--panel) 50%, var(--bg)); }
-  .dormcard h3 { color:var(--dim); font-size:14px; text-transform:none; letter-spacing:0; margin-bottom:5px; }
-  .dormcard p { font-size:12px; color:var(--dim); max-width:640px; margin-bottom:12px; }
-  .dormcard .comps { display:flex; gap:10px; flex-wrap:wrap; }
-  .dormcard .comps i { width:120px; height:60px; border:1px dashed var(--line); border-radius:6px; display:block; }
+  /* (v2.6) .dormcard retired — the one dormant section it dressed (Components) is now a bento
+     tenant and wears .compslot, the journal's "someday" teaser at card scale. */
   .create { border:1px solid color-mix(in srgb, var(--accent-strong) 55%, var(--line)); border-radius:12px; padding:18px; background:color-mix(in srgb, var(--accent) 7%, var(--panel)); margin-bottom:16px; display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
   .create .t { flex:1; min-width:280px; }
   .create .kick { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--dim); display:block; margin-bottom:4px; }
@@ -1998,6 +2069,9 @@ function initDashboard(){
       // stacked, the camera still restores but the rail must NOT swap — there is no rail-swap below the
       // breakpoint, in either direction.
       if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; applyMapView(); if(nn && !isStacked()) openPanel(nn); } }
+    // v2.6 F2.4: the bento can only be measured once its pane is on screen (a hidden pane has no
+    // geometry), so the balance decision is (re)taken on every reveal.
+    if(name==='design' && window.__bentoBalance) window.__bentoBalance();
     const sp=document.querySelector('.pane.active.scrollpane'); if(sp) sp.scrollTop=0;
   }
   let lastPane=null;
@@ -2017,7 +2091,10 @@ function initDashboard(){
     showPane('home'); renderHome();
   }
 
-  // ═════════ DESIGN LANGUAGE TAB (tokens; Components section added in renderDesignExtras) ═════════
+  // ═════════ DESIGN LANGUAGE TAB (tokens) ═════════
+  // Everything on this tab renders OBSERVED data (tokens.json). Nothing here invents a value: the
+  // swatch fills, the treemap areas, the radius previews and the shadow tiles are all the product's
+  // own measurements, painted at 1:1. The chrome around them is tokens (v2.4 §1).
   (function renderTokens(){
     const T = DASH.tokens, el = document.getElementById('pane-design');
     const lum = h => { const n = parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255)); };
@@ -2036,35 +2113,53 @@ function initDashboard(){
         They are evidence of how the product is styled today, <b>not</b> its authored design tokens. Filter: seen on 2+ pages
         (${(T.colors.droppedSinglePage||0)+(T.typography.droppedSinglePage||0)+(T.shadows.droppedSinglePage||0)} single-page values kept in <a href="tokens.json" target="_blank">tokens.json</a>).</div>
       <h3>Color — ${T.colors.top.length} recurring values</h3>
-      <div class="swatches">${T.colors.top.map(sw).join('')}</div>
-      <div class="grid2 secgap">
-        <div class="card">
+      <div class="filters cviews" role="tablist" aria-label="color view">
+        <button class="filt on" data-cview="palette" role="tab" aria-selected="true">Palette</button>
+        <button class="filt" data-cview="proportions" role="tab" aria-selected="false">Proportions</button>
+      </div>
+      <div id="cv-palette" role="tabpanel">
+        <div class="swatches">${T.colors.top.map(sw).join('')}</div>
+      </div>
+      <div id="cv-proportions" role="tabpanel" hidden>
+        <div class="tmap" id="tmap"></div>
+        <div class="tmfoot">area = how often each color appears across ${DASH.identity.downloaded} captured pages · observed</div>
+      </div>
+      <div class="bento secgap">
+        <div class="card natural">
           <h3 style="margin-top:0">Type ramp — size / weight / family</h3>
           ${T.typography.ramp.map(t=>`<div class="typerow">
             <span class="sample" style="font-size:${Math.min(t.size,34)}px;font-weight:${esc(t.weight)};line-height:1.1">Ag</span>
             <span class="m">${esc(t.value)}</span><span class="m">×${t.count.toLocaleString()} · ${t.pages}p</span></div>`).join('')}
-          <div class="m" style="font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:8px">samples rendered in a system font; family names are as observed</div>
+          ${T.typography.ramp.length?'':'<div class="bnone">No repeating type sizes observed yet.</div>'}
+          <div class="foot">samples rendered in a system font; family names are as observed</div>
         </div>
-        <div>
-          <div class="card">
+        <div class="bcol">
+          <div class="card c-space">
             <h3 style="margin-top:0">Spacing ladder ${spacing.baseUnit?`— base unit <span style="color:var(--warn);font-family:var(--mono)">${spacing.baseUnit}px</span> (${Math.round(spacing.baseUnitShare*100)}% of values fit)`:''}</h3>
             ${spacing.steps.slice(0,16).map(s=>`<div class="bar"><div class="rect" style="width:${Math.min(s.px*3,280)}px"></div><span class="m">${esc(s.value)} ×${s.count.toLocaleString()} · ${s.pages}p</span></div>`).join('')}
+            ${spacing.steps.length?'':'<div class="bnone">No repeating spacing values observed yet.</div>'}
           </div>
-          <div class="card" style="margin-top:12px">
+          <div class="card c-rad">
             <h3 style="margin-top:0">Corner radius ${radius.baseUnit?`— base ${radius.baseUnit}px`:''}</h3>
-            <div class="radrow">${radius.steps.slice(0,8).map(r=>`<div class="rad"><div class="sq" style="border-radius:${Math.min(r.px,26)}px"></div><div class="m">${esc(r.value)}<br>×${r.count.toLocaleString()}</div></div>`).join('')}</div>
+            <div class="radgrid">${radius.steps.map(r=>`<div class="rad" title="${esc(r.value)} — ×${r.count.toLocaleString()} on ${r.pages} pages"><div class="sq" style="border-radius:${esc(r.value)}"></div><div class="m"><b>${esc(r.value)}</b>×${r.count.toLocaleString()}</div></div>`).join('')}</div>
+            ${radius.steps.length?'':'<div class="bnone">No repeating corner radii observed yet.</div>'}
           </div>
+          <div class="card c-sh">
+            <h3 style="margin-top:0">Shadows — ${T.shadows.top.length} recurring</h3>
+            <div class="shgrid">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m" title="${esc(s.value)}">${esc(short(s.value,44))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>
+            ${T.shadows.top.length?'':'<div class="bnone">No repeating shadows observed yet.</div>'}
+          </div>
+          ${DASH.patternsPresent
+            ? `<div class="card"><h3 style="margin-top:0">Components — the product's repeating parts</h3>
+                <div class="meta">Mined components are in <a href="patterns.json" target="_blank">patterns.json</a>.</div></div>`
+            : `<div class="compslot">
+                <div class="cmeta">someday</div>
+                <div class="ctitle">Components</div>
+                <div class="cdetail">repeating patterns mined from your pages will land here</div>
+                <div style="margin-top:8px">${pchip('Learn what pattern mining will do', "Explain what 'pattern mining' would add to this design-context library: analyzing the captured page.html files for repeating components (buttons, cards, rows) so new designs reuse the product's real parts. Describe what the Components section would then show. Don't run anything yet — just explain.", true)}</div>
+              </div>`}
         </div>
-      </div>
-      <h3 class="secgap">Shadows — ${T.shadows.top.length} recurring</h3>
-      <div class="shrow">${T.shadows.top.map(s=>`<div><div class="sh" style="box-shadow:${esc(s.value)}"></div><div class="m">${esc(short(s.value,80))} ×${s.count.toLocaleString()}</div></div>`).join('')}</div>
-      <h3 class="secgap">Components — the product's repeating parts <span class="ai">${DASH.patternsPresent?'':'coming'}</span></h3>
-      ${DASH.patternsPresent
-        ? `<div class="card"><div class="meta">Mined components are in <a href="patterns.json" target="_blank">patterns.json</a>.</div></div>`
-        : `<div class="dormcard"><h3>Not mined yet</h3>
-            <p>The kit can analyze the captured HTML for repeating components — the real buttons, cards, and rows this product is built from — so new designs reuse them instead of approximating. This section fills in when that runs.</p>
-            ${pchip('Learn what pattern mining will do', "Explain what 'pattern mining' would add to this design-context library: analyzing the captured page.html files for repeating components (buttons, cards, rows) so new designs reuse the product's real parts. Describe what the Components section would then show. Don't run anything yet — just explain.", true)}
-            <div class="comps"><i></i><i></i><i></i><i></i></div></div>`}`;
+      </div>`;
 
     // F6 — click / Enter / Space on a color card copies its hex. Works in server AND file:// modes:
     // navigator.clipboard first, hidden-textarea execCommand fallback (both trace to the click gesture).
@@ -2082,9 +2177,139 @@ function initDashboard(){
         navigator.clipboard.writeText(hex).then(done).catch(()=>fallbackCopyHex(hex, done));
       else fallbackCopyHex(hex, done);
     }
-    el.addEventListener('click', e=>{ const c=e.target.closest && e.target.closest('.sw[data-hex]'); if(c) copyHex(c.getAttribute('data-hex')); });
+    // Parity (v2.6 F3.3): copy works from EITHER view. The treemap tiles are real <button>s, so the
+    // browser turns Enter/Space into a click for them — the keydown handler stays scoped to .sw (the
+    // div-with-role cards), or a tile would copy twice per keypress.
+    el.addEventListener('click', e=>{ const c=e.target.closest && e.target.closest('[data-hex]'); if(c) copyHex(c.getAttribute('data-hex')); });
     el.addEventListener('keydown', e=>{ if(e.key!=='Enter' && e.key!==' ') return;
       const c=e.target.closest && e.target.closest('.sw[data-hex]'); if(c){ e.preventDefault(); copyHex(c.getAttribute('data-hex')); } });
+
+    // ── F3: Proportions — a squarified treemap of the SAME data the palette cards show ──────────────
+    // Neutrals dominate every real product; that is the honest picture, so nothing is filtered out.
+    // Deterministic by construction: the input is sorted (count desc → hex asc → opaque before alpha),
+    // squarify() has no randomness, and the layout is a pure function of (counts, rect).
+    const TM = T.colors.top.slice().sort((a,b)=>
+      b.count-a.count || (a.value<b.value?-1:a.value>b.value?1:0) || ((a.alpha?1:0)-(b.alpha?1:0)));
+    const TMSUM = TM.reduce((s,c)=>s+c.count,0);
+
+    // Bruls / Huizing / van Wijk (1999). Strips run along the shorter side of the remaining rect; a
+    // strip closes when adding the next value would make its worst aspect ratio worse.
+    function worstAR(areas, side){
+      let s=0, mx=0, mn=Infinity;
+      for(const a of areas){ s+=a; if(a>mx)mx=a; if(a<mn)mn=a; }
+      if(!(s>0) || !(mn>0)) return Infinity;
+      const w2=side*side, s2=s*s;
+      return Math.max(w2*mx/s2, s2/(w2*mn));
+    }
+    function squarify(items, X, Y, W, H){
+      const out=[]; let rest=items.slice(), x=X, y=Y, w=W, h=H;
+      let remaining=rest.reduce((a,i)=>a+i.count,0);
+      if(!(remaining>0)) return out;
+      while(rest.length && w>1e-6 && h>1e-6){
+        const scale=(w*h)/remaining, vertical=(w>=h), side=vertical?h:w;
+        let row=[], best=Infinity;
+        while(rest.length){
+          const trial=row.concat([rest[0]]);
+          const r=worstAR(trial.map(i=>i.count*scale), side);
+          if(row.length && r>best) break;
+          row=trial; best=r; rest.shift();
+        }
+        const rowSum=row.reduce((a,i)=>a+i.count,0), thick=(rowSum*scale)/side;
+        let off = vertical ? y : x;
+        row.forEach(it=>{
+          const len = side*(it.count/rowSum);
+          out.push(vertical ? {it,x:x,y:off,w:thick,h:len} : {it,x:off,y:y,w:len,h:thick});
+          off+=len;
+        });
+        if(vertical){ x+=thick; w-=thick; } else { y+=thick; h-=thick; }
+        remaining-=rowSum;
+      }
+      return out;
+    }
+
+    // Label ink: whichever of --txt / --bg clears 4.5:1 ON THAT SWATCH — read off the tokens
+    // themselves, not off copies of their hex values (v2.4 §1). ~4% of observed swatches sit in the
+    // mid-grey band where NEITHER clears; those take the pill (see .tmt .l.pill).
+    const srgb = v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); };
+    function relLum(hex){
+      let s=(hex||'').trim().replace('#','');
+      if(s.length===3) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+      const n=parseInt(s.slice(0,6),16); if(!isFinite(n)) return 0;
+      return 0.2126*srgb(n>>16&255)+0.7152*srgb(n>>8&255)+0.0722*srgb(n&255);
+    }
+    const ratio = (a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+    const rootCS = getComputedStyle(document.documentElement);
+    const L_TXT = relLum(rootCS.getPropertyValue('--txt')), L_BG = relLum(rootCS.getPropertyValue('--bg'));
+    const MONO  = (rootCS.getPropertyValue('--mono')||'monospace').trim();
+    const measure = document.createElement('canvas').getContext('2d');
+    const pc = v => (v*100).toFixed(4)+'%';
+
+    function layoutTreemap(){
+      const box = document.getElementById('tmap'); if(!box) return;
+      const W = box.clientWidth, H = box.clientHeight;
+      if(!(W>2 && H>2) || !TM.length || !(TMSUM>0)){ if(!TM.length) box.innerHTML=''; return; }
+      measure.font = '10.5px ' + MONO;
+      box.innerHTML = squarify(TM, 0, 0, W, H).map(c=>{
+        const it=c.it, share=100*it.count/TMSUM;
+        const pctTxt = (share>=0.1 ? share.toFixed(1) : share.toFixed(2)) + '%';
+        const lTxt = ratio(relLum(it.value), L_TXT), lBg = ratio(relLum(it.value), L_BG);
+        const pill = Math.max(lTxt, lBg) < 4.5;
+        const ink  = pill ? 'var(--txt)' : (lTxt >= lBg ? 'var(--txt)' : 'var(--bg)');
+        const padX = pill ? 18 : 12, padY = pill ? 10 : 8;
+        const wHex = measure.measureText(it.value).width, wPct = measure.measureText(pctTxt).width;
+        const showHex = (wHex + padX) <= c.w && (15 + padY) <= c.h;
+        const showPct = showHex && (Math.max(wHex,wPct) + padX) <= c.w && (29 + padY) <= c.h;
+        const label = showHex
+          ? `<span class="l${pill?' pill':''}" style="color:${ink}">${esc(it.value)}${showPct?`<br><i>${pctTxt}</i>`:''}</span>` : '';
+        const geom = `left:${pc(c.x/W)};top:${pc(c.y/H)};width:${pc(c.w/W)};height:${pc(c.h/H)}`;
+        return `<button type="button" class="tmt" data-hex="${esc(it.value)}"
+          title="${esc(it.value)} · ${pctTxt} of observed color use — ×${it.count.toLocaleString()} on ${it.pages} pages"
+          aria-label="copy ${esc(it.value)}, ${pctTxt} of observed color use"
+          style="${geom};background:${esc(it.value)}">${label}</button>`;
+      }).join('');
+    }
+
+    // The switcher. Per-session state — a class on the buttons and `hidden` on the panels, nothing
+    // written anywhere. The treemap can only be measured once its panel is on screen, so it lays out
+    // on reveal (and on resize while revealed — squarified layout depends on the rect's aspect).
+    const cvBtns = el.querySelectorAll('.cviews .filt[data-cview]');
+    const cvPanes = { palette: el.querySelector('#cv-palette'), proportions: el.querySelector('#cv-proportions') };
+    function showColorView(name){
+      cvBtns.forEach(b=>{ const on = b.dataset.cview===name;
+        b.classList.toggle('on', on); b.setAttribute('aria-selected', on?'true':'false'); });
+      Object.keys(cvPanes).forEach(k=>{ if(cvPanes[k]) cvPanes[k].hidden = (k!==name); });
+      if(name==='proportions') layoutTreemap();
+    }
+    cvBtns.forEach(b=>b.addEventListener('click', ()=>showColorView(b.dataset.cview)));
+
+    // (F2.4) Bento balance. Which column is taller depends on the product's own data — a 24-row ramp
+    // beats four sparse tenants, a 10-row ramp loses to them — so the decision is measured, not
+    // guessed from a row count. The ramp stretches ONLY if its rows can swallow the difference inside
+    // the 54px cap; otherwise it stays natural and the column just ends. Pure function of the
+    // rendered layout, idempotent, so re-running it (reveal, resize) can't oscillate.
+    const RAMP_ROW_MAX = 54;
+    function balanceBento(){
+      const bento = el.querySelector('.bento'); if(!bento) return;
+      const ramp = bento.firstElementChild, right = bento.lastElementChild;
+      if(!ramp || !right) return;
+      ramp.classList.add('natural');                       // measure both columns at rest
+      const rows = ramp.querySelectorAll('.typerow');
+      if(!rows.length || !bento.getBoundingClientRect().height) return;
+      // rows are NOT uniform (a 27px sample makes a taller band than a 14px one), so headroom is the
+      // sum of what each row can still take before it hits the cap — which is exactly what flexbox
+      // will redistribute, since a row that hits its max-height freezes and passes the rest along.
+      let headroom = 0;
+      rows.forEach(r=>{ headroom += Math.max(0, RAMP_ROW_MAX - r.getBoundingClientRect().height); });
+      const slack = right.getBoundingClientRect().height - ramp.getBoundingClientRect().height;
+      if(slack > 0 && slack <= headroom) ramp.classList.remove('natural');
+    }
+    window.__bentoBalance = balanceBento;
+    balanceBento();
+
+    let tmRz=null;
+    window.addEventListener('resize', ()=>{
+      clearTimeout(tmRz); tmRz=setTimeout(()=>{ balanceBento();
+        if(cvPanes.proportions && !cvPanes.proportions.hidden) layoutTreemap(); }, 120); });
   })();
 
   // ═════════ USE-IT TAB ═════════
