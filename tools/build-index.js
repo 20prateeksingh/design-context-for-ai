@@ -277,9 +277,40 @@ function buildIndex(libDir) {
     byUrl.set(normalize(p.meta.url), slug); byUrl.set(normalize(p.meta.finalUrl), slug);
     byRouteKey.set(routeKey(p.meta.finalUrl || p.meta.url), slug);
   }
+  const patternOf = (u) => { try { const segs = new URL(u).pathname.split('/').filter(Boolean); return '/' + segs.map(s => (/^\d+$/.test(s) || /^[0-9a-f]{12,}$/i.test(s) || (/\d/.test(s) && s.length >= 8 && /^[A-Za-z0-9_-]+$/.test(s))) ? ':id' : s).join('/'); } catch { return null; } };
+
+  // 2a. the raw frontier (every discovered-but-not-captured URL) — built early so the additive
+  // representative-first patch below (bug 8) can see it before byPattern locks in "who's a template".
+  const capturedUrlSet = new Set(byUrl.keys());
+  const fro = new Map(); // url -> {url, pattern, via:Set, label}
+  const noteFrontier = (rawUrl, via, label) => {
+    const n = normalize(rawUrl); if (!n || capturedUrlSet.has(n)) return;
+    if (!fro.has(n)) fro.set(n, { url: n, pattern: patternOf(n), via: new Set(), label: null });
+    fro.get(n).via.add(via); if (label) fro.get(n).label = label;
+  };
+  for (const [slug, p] of Object.entries(pages)) for (const link of p.meta.linksOut || []) noteFrontier(link, slug);
+  for (const h of manifest.frontierHints?.overCapNav || []) noteFrontier(h.url, 'nav', h.label);
+
+  // Representative-first (bug 8): capture.js's selective `--urls` pull only preserves template/collapsed
+  // on a REFRESH (same route as before) — a brand-new URL downloaded as "the one example" of a frontier
+  // shape gets template:null like any ordinary page (verified: tools/capture.js selective-pull branch).
+  // Reuse the crawl's own rule (3+ same-pattern URLs = a template) additively here, in the derived view
+  // only — meta.json (ground truth) is never touched. If this page's raw route pattern still has ≥2
+  // OTHER urls sitting in the frontier, this page is standing in for all of them.
+  // Earliest-captured first, so if two separate "get one example" pulls ever land on the same pattern
+  // (unusual — the offer stops suggesting more once one exists) exactly ONE claims the remaining pool;
+  // zeroing its count after claiming stops a second untemplated sibling double-claiming the same pages.
+  const frontierPatternCounts = new Map();
+  for (const f of fro.values()) frontierPatternCounts.set(f.pattern, (frontierPatternCounts.get(f.pattern) || 0) + 1);
+  const byCaptureOrder = Object.values(pages).slice().sort((a, b) => (a.meta.capturedAt || '') < (b.meta.capturedAt || '') ? -1 : 1);
+  for (const p of byCaptureOrder) {
+    if (p.meta.template) continue;
+    const remaining = frontierPatternCounts.get(p.meta.pattern) || 0;
+    if (remaining >= 2) { p.meta.template = p.meta.pattern; p.meta.collapsed = remaining; frontierPatternCounts.set(p.meta.pattern, 0); }
+  }
+
   const byPattern = new Map();
   for (const [slug, p] of Object.entries(pages)) if (p.meta.template) byPattern.set(p.meta.pattern, slug);
-  const patternOf = (u) => { try { const segs = new URL(u).pathname.split('/').filter(Boolean); return '/' + segs.map(s => (/^\d+$/.test(s) || /^[0-9a-f]{12,}$/i.test(s) || (/\d/.test(s) && s.length >= 8 && /^[A-Za-z0-9_-]+$/.test(s))) ? ':id' : s).join('/'); } catch { return null; } };
 
   for (const [slug, p] of Object.entries(pages)) {
     const to = new Set();
@@ -314,17 +345,7 @@ function buildIndex(libDir) {
     p.states = states;
   }
 
-  // 2c. the FRONTIER — every discovered-but-not-captured URL, template-grouped.
-  // Reconstructed from captured pages' linksOut + capture's over-cap hints; deterministic.
-  const capturedUrlSet = new Set(byUrl.keys());
-  const fro = new Map(); // url -> {url, pattern, via:Set, label}
-  const noteFrontier = (rawUrl, via, label) => {
-    const n = normalize(rawUrl); if (!n || capturedUrlSet.has(n)) return;
-    if (!fro.has(n)) fro.set(n, { url: n, pattern: patternOf(n), via: new Set(), label: null });
-    fro.get(n).via.add(via); if (label) fro.get(n).label = label;
-  };
-  for (const [slug, p] of Object.entries(pages)) for (const link of p.meta.linksOut || []) noteFrontier(link, slug);
-  for (const h of manifest.frontierHints?.overCapNav || []) noteFrontier(h.url, 'nav', h.label);
+  // 2c. the FRONTIER — group the raw per-URL map (`fro`, built in 2a) by pattern.
   // group by id-pattern → merge one-segment-different patterns (same rule as capture's
   // mergeTemplateGroups) → fold prefix-sharing singles into /prefix/:slug groups →
   // overflow-fold whatever's left so the map never becomes a hairball.
@@ -351,10 +372,14 @@ function buildIndex(libDir) {
   }
   const singles = [];
   const frontier = []; let gi = 0;
-  const pushGroup = (pattern, items) => { const viaAll = new Set(items.flatMap(i => [...i.via])); frontier.push({
+  // repUrl (bug 8, representative-first): the URL "Get one example" downloads by default when the
+  // designer hasn't picked a specific one — highest-inbound item, ties broken by original (stable) order.
+  const pushGroup = (pattern, items) => { const viaAll = new Set(items.flatMap(i => [...i.via]));
+    const repUrl = items.slice().sort((a, b) => b.via.size - a.via.size)[0].url;
+    frontier.push({
     id: 'f' + (gi++), kind: 'frontier-group', pattern, count: items.length,
     urls: items.slice(0, 30).map(i => i.url), via: [...viaAll].slice(0, 6), inboundCount: viaAll.size, // inbound-from-captured (uncapped) → honest ghost sizing
-    underTemplate: repByWild.get(wildNorm(pattern)) || null }); };
+    repUrl, underTemplate: repByWild.get(wildNorm(pattern)) || null }); };
   for (const [pat, items] of groupsByPat) { if (items.length >= 3) pushGroup(pat, items); else singles.push(...items); }
   const byPrefix = new Map();
   for (const f of singles) {

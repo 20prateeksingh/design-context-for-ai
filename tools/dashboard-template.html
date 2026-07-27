@@ -207,6 +207,12 @@
   .btn:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
   .btn.primary { background:var(--accent); color:var(--accent-text); border:0; }
   .btn.primary:hover { filter:brightness(1.12); }
+  /* representative-first offer (bug 8): one big primary CTA, a demoted --dim secondary below it */
+  .repcta .btn.primary { width:100%; padding:10px; font-size:14px; }
+  .dlall-wrap { margin-top:12px; }
+  .btn.dlall { font-size:11px; font-weight:600; padding:5px 9px; color:var(--dim); background:transparent; border:1px solid var(--line); }
+  .btn.dlall:hover { border-color:color-mix(in srgb, var(--dim) 60%, var(--line)); color:var(--txt); }
+  .dlall-wrap .warn { font-size:11.5px; color:var(--dim); margin-top:5px; line-height:1.4; max-width:340px; }
   #stateform input { width:100%; margin-bottom:6px; background:var(--panel-2); border:1px solid var(--line); color:var(--txt);
                      border-radius:6px; padding:6px 8px; font-size:13px; }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel-2); color:var(--txt); border:1px solid var(--line);
@@ -1485,6 +1491,16 @@ function initDashboard(){
       ? document.getElementById('maprail-body')
       : document.getElementById('homerail');
   }
+  // Shared selective-pull trigger — the global capbtn (manual checkbox picking) and the shape offer's
+  // "Get one example" / "Download all" both funnel through this so there's one capture path, not three.
+  async function runCapture(urls, btn){
+    if (!urls || !urls.length) return;
+    if (serverMode){ if(btn) btn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
+      const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); if(btn) btn.disabled=false; } }
+    else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
+      try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
+      catch(_){ prompt('Run this in the terminal:', cmd); } }
+  }
   function renderRail(){
     const el = railTarget(); if(!el) return;
     const n = railSel ? byId[railSel] : null;
@@ -1497,17 +1513,35 @@ function initDashboard(){
     const CLOSE = '<button class="rclose" data-rail-close aria-label="close — back to the ledger">×</button>';
     if (n.locked){
       const urls = n.urls || [n.url];
+      const isShape = n.kind==='frontier-group';
+      // representative-first (bug 8): a shape offers ONE example by default (coverage copy, canon) with
+      // "download all" demoted below it, dim and warned — downloading every sibling is rarely what the
+      // designer wants (near-duplicates flooding a capped library) and the kit already knows they share a
+      // layout. Picking specific pages (the checkbox list) stays available beneath, for when it isn't.
+      const shapeOffer = `<div class="desc"><b>${n.count}</b> pages share this layout — one example covers the shape for your AI.</div>
+        ${n.via&&n.via.length?`<span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}
+        <div class="repcta"><button class="btn primary" id="getone">Get one example</button>
+        <div class="dlall-wrap"><button class="btn dlall" id="dlall">Download all ${n.count}</button>
+        <div class="warn">usually near-duplicates — they'll crowd your library and your AI learns nothing new.</div></div></div>`;
+      const plainOffer = `<div class="desc">Discovered during capture, not downloaded.
+        ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>`;
       el.innerHTML = `<div class="railpanel">${CLOSE}<h2>Locked — not downloaded yet</h2>
         <div class="route">${esc(n.pattern||'')}</div>
-        <div class="desc">${n.kind==='frontier-group' ? `<b>${n.count}</b> discovered pages share this URL shape.` : 'Discovered during capture, not downloaded.'}
-        ${n.via&&n.via.length?`<br><span class="meta">found on: ${n.via.slice(0,4).map(esc).join(', ')}</span>`:''}</div>
+        ${isShape ? shapeOffer : plainOffer}
         <div class="chiprow" style="margin:10px 0">${pchip("Ask your AI what's worth unlocking", PROMPTS.whatsMissing(), true)}</div>
-        <h3>Pick pages to unlock ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
+        <h3>${isShape?'Or pick specific pages':'Pick pages to unlock'} ${n.count>urls.length?`(showing ${urls.length} of ${n.count})`:''}</h3>
         ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-u="${esc(u)}" ${selected.has(u)?'checked':''}>
           <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}
         <div style="margin-top:10px"><button class="btn" id="selall">Select all shown</button></div></div>`;
       el.querySelectorAll('input[data-u]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.u):selected.delete(cb.dataset.u); n.someSelected=[...selected].some(u=>urls.includes(u)); syncCapBtn(); });
       el.querySelector('#selall').onclick=()=>{ urls.forEach(u=>selected.add(u)); n.someSelected=true; openPanel(n); syncCapBtn(); };
+      if (isShape){
+        // "the specific URL the designer clicked" = a single box already checked in the list below;
+        // otherwise the server-computed highest-inbound representative (n.repUrl).
+        el.querySelector('#getone').onclick=()=>{ const checkedHere=urls.filter(u=>selected.has(u));
+          runCapture(checkedHere.length===1 ? checkedHere : [n.repUrl || urls[0]]); };
+        el.querySelector('#dlall').onclick=()=>runCapture(urls);
+      }
     } else {
       const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
       const depthTxt = n.clickDepth==null ? 'not linked from home' : `${n.clickDepth} click${n.clickDepth===1?'':'s'} from home`;
@@ -1746,14 +1780,7 @@ function initDashboard(){
   const capbtn = document.getElementById('capbtn');
   function syncCapBtn(){ capbtn.style.display = selected.size?'block':'none';
     capbtn.textContent = serverMode ? `Unlock ${selected.size} selected` : `Copy capture command (${selected.size})`; }
-  capbtn.onclick = async ()=>{
-    const urls=[...selected];
-    if (serverMode){ capbtn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
-      const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); capbtn.disabled=false; } }
-    else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
-      try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
-      catch(_){ prompt('Run this in the terminal:', cmd); } }
-  };
+  capbtn.onclick = ()=>runCapture([...selected], capbtn);
 
   // server chrome (pill removed in v2 shell; guarded for safety)
   const sp=document.getElementById('server-pill');
