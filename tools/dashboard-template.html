@@ -1888,7 +1888,19 @@ function initDashboard(){
       // width = max(documentElement.scrollWidth, body.scrollWidth, 1440) — the spike's crop is the regression test
       const width = Math.max(doc.documentElement.scrollWidth||0, doc.body.scrollWidth||0, 1440);
       if (Math.abs(width - 1440) > 1){ frame.style.width = width + 'px'; await sleep(80); }   // reflow at natural width, then re-measure height
-      const height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);
+      let height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);
+      // F1 — a `loading="lazy"` image only decodes once it enters the iframe's OWN rendered viewport,
+      // and the frame was left at its initial 900px height, so nothing below the fold on a long page
+      // ever got there. Grow the frame to the full content height, force every image eager as a
+      // belt-and-braces backstop, then wait for each to actually decode before converting — settle-guarded
+      // (allSettled) so one broken image can't hang the whole convert.
+      frame.style.height = height + 'px';
+      const imgs = [...doc.images];
+      imgs.forEach(img => { if (img.loading === 'lazy') img.loading = 'eager'; });
+      await sleep(80);   // let the now-full-height frame settle before decoding
+      await Promise.allSettled(imgs.map(img => img.decode ? img.decode() : Promise.resolve()));
+      height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);   // re-measure: a decoded image with no reserved box can reflow the page
+      frame.style.height = height + 'px';
       const conv = lib.createFigmaConverter();   // default font loader — embeds real fonts so Figma keeps the text
       const result = await conv.convert({ element: doc.body, width, height, name });
       return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0 };
