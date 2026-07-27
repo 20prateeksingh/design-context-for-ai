@@ -150,13 +150,19 @@
   .mapnode { position:absolute; transform:translate(-50%,-50%); border-radius:50%; border:2.5px solid var(--accent);
              background:var(--panel-2) center/cover no-repeat; z-index:3; padding:0; cursor:pointer;
              box-shadow:0 0 0 3px color-mix(in srgb, var(--canvas) 82%, transparent), 0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); }
-  .mapnode:hover { box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); }
+  /* (v2.5.1 F5·2) the rim swaps to accent AND the drop shadow deepens — the disc lifts off the canvas
+     rather than just changing colour. The 1.04 scale that goes with it lives in the motion block. */
+  .mapnode:hover { box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 8px 22px color-mix(in srgb, var(--bg-deep) 80%, transparent); }
   .mapnode.tpl { border-color:var(--tpl); }
   .mapnode.dorm { border-color:var(--dim); }
   .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--canvas); }
+  /* (v2.5.1 F3) node pills are SINGLE-LINE. The `from N` sub-line duplicated the size encoding the legend
+     already states (`size = how linked-to`) as text, ×29 pills — the map's own busiest ingredient restating
+     what the discs were already saying. The exact numbers keep three homes: the hover peek, the rail
+     panel's links section, and the disc's own title. Being single-line, the pill takes the reference's
+     full capsule (v2.5 Deviation 1's own rule: rounded-rect for multi-line, capsule for one line). */
   .mapnlbl { position:absolute; transform:translate(-50%,0); text-align:center; font-size:10px; color:var(--txt); z-index:3; pointer-events:none;
-             border-radius:8px; padding:3px 8px; white-space:nowrap; }
-  .mapnlbl small { color:var(--dim); font-size:9px; }
+             border-radius:999px; padding:3px 9px; white-space:nowrap; }
   .mapghost { position:absolute; transform:translate(-50%,-50%); z-index:5; text-align:center; cursor:pointer; background:none; border:0; padding:0; }
   /* ghosts read against the LOCAL canvas value (they orbit between the play field and the vignette), so
      the dashed stroke is mixed into --canvas rather than faded to transparent — a transparent dash
@@ -168,8 +174,19 @@
                  border-radius:10px; padding:8px 12px; min-width:150px; pointer-events:none; box-shadow:0 6px 20px color-mix(in srgb, var(--bg-deep) 55%, transparent); }
   .mapdistrict h4 { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); margin-bottom:2px; }
   .mapdistrict p { font-size:9.5px; color:var(--dim); }
-  .mapdistrict .bar { height:4px; background:var(--bg); border:1px solid var(--line); border-radius:2px; margin-top:5px; overflow:hidden; }
-  .mapdistrict .bar i { display:block; height:100%; background:var(--dim); }
+  /* (v2.5.1 F4) the bar Prateek saw as "empty" was empty — and not for the reason anyone assumed.
+     ROOT CAUSE: v2.6 introduced a GENERIC `.bar` utility for the Proportions readout (`display:flex;
+     align-items:center; padding:4px 0`, further down this sheet). `.mapdistrict .bar` outranks it only on
+     the properties it actually declares, so `display:flex` and `padding:4px 0` leaked in — and with the
+     global `box-sizing:border-box`, 8px of vertical padding on a 4px-high box leaves a content box of
+     ZERO height. The fill is `height:100%` of that: 0px. Nothing has painted since v2.6, at any share.
+     So the district bar gets a name a utility class cannot reach, and declares its own box outright.
+     On top of that it now renders so 3% can be SEEN: track = --line (Δ≈10 against the card, so the trough
+     itself reads, where --bg read Δ≈5), fill = --accent, and a 2px minimum sliver whenever anything is
+     explored at all. 5px tall, which keeps the weight the old 4px+2×1px-border box had.
+     The card's text line above it remains the exact record; the bar is its shape, not its substitute. */
+  .mapdistrict .dbar { display:block; height:5px; padding:0; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden; }
+  .mapdistrict .dbar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
   /* #mapnote is the one bare line on the canvas (the reference keeps it bare too) — its halo goes with
      the rest of the hack; --dim on --canvas clears 4.5:1 unaided. */
   #mapnote { position:absolute; top:14px; left:16px; font-size:10.5px; color:var(--dim); font-style:italic; z-index:7; max-width:44%; }
@@ -701,7 +718,15 @@
      reference has none at rest — "barely-there" means barely-there).
      The hover wash cannot live inside the group (the group's alpha is uniform by construction), so it
      is one separate shape, #maphot, drawn just above it: a single element, so it cannot stack either. */
-  #mapregions { position:absolute; left:0; top:0; z-index:0; opacity:.035; pointer-events:none; }
+  /* (v2.5.1 F2) THE EDGES SOFTEN AT REST. A rounded bbox with a 1px alpha cliff reads as a shape; a
+     district is not a shape, it is a neighbourhood. `filter` on the GROUP is what makes this free of the
+     stacking hazard: per the compositing model the filter applies to the group's flattened buffer and only
+     THEN is the group alpha applied — the children composite among themselves first, and two fully OPAQUE
+     same-colour shapes flatten to that colour with alpha 1, so blurring the buffer blurs a max-1 alpha
+     field. One composite, one alpha, still geometrically impossible to stack (proof re-run, §gates).
+     Hit-testing uses the UNFILTERED border box, so hover territories and the district card are untouched;
+     #maparea's overflow:hidden is what stops the spread painting outside the pane. */
+  #mapregions { position:absolute; left:0; top:0; z-index:0; opacity:.035; pointer-events:none; filter:blur(14px); }
   .mapregion { position:absolute; border-radius:44% 56% 52% 48% / 50%; background:var(--accent); pointer-events:auto; }
   #maphot { position:absolute; z-index:0; border-radius:44% 56% 52% 48% / 50%; pointer-events:none;
             background:color-mix(in srgb, var(--accent) 7%, transparent); border:1px solid color-mix(in srgb, var(--accent) 26%, transparent); }
@@ -728,6 +753,64 @@
      and the tint now competes with the accent RING that carries the meaning. The ring keeps its encoding
      (accent = explored · --dim = dormant caption · --tpl = template) — only the fill changed. */
   .mapnode.mono-disc { background-color:var(--panel-2); }
+
+  /* ══ (v2.5.1 F5) THE MOTION PASS ════════════════════════════════════════════════════════════════
+     The whole pass in one place, and one rule explains most of it: every keyframe declares only `from`,
+     and every animation uses fill-mode BACKWARDS.
+       · only `from` ⇒ the implicit 100% keyframe IS the element's own static value, taken from the normal
+         cascade (inline styles included). An animation therefore cannot land anywhere except exactly where
+         the static layout already was — "ends in the byte-identical static layout" holds by construction,
+         not by me copying values into a `to` block and keeping them in sync forever.
+       · backwards  ⇒ the from-state is held during the delay (nothing flashes at full opacity first) and
+         the effect is RELEASED the moment it finishes, handing the element back to its static declaration.
+         So `document.getAnimations()` is genuinely EMPTY once the map settles — every measured gate in this
+         build runs against the same render it would have without the pass.
+     Durations 120–450ms, ease-out. NOTHING loops: the capture heartbeat (.ent.live/.livedot) and the
+     capture spinner are the only infinite animations in the file and both exist only while a capture runs.
+     Reduced motion needs no new rules — the :root block kills every animation and transition outright, so
+     no transform motion survives it. */
+  @keyframes mzfade  { from { opacity:0; } }
+  @keyframes mzpop   { from { opacity:0; transform:translate(-50%,-50%) scale(.92); } }
+  @keyframes mzlift  { from { opacity:0; transform:scale(.92); } }
+  @keyframes mzrise  { from { opacity:0; transform:translate(-50%,4px); } }
+  @keyframes mzriseY { from { opacity:0; transform:translateY(4px); } }
+  /* F5·1 — the map materialises ONCE per pane reveal. #maparea.mzin gates every one of these, and it is
+     only ever on for the ~450ms of a reveal: after that the very same elements are rebuilt by pan/zoom/
+     selection with no animation attached, which is exactly why direct manipulation stays immediate. Home
+     and the rings lead (delay 0); discs follow inner-ring→outer via --mzd, written per disc by renderWorld. */
+  #maparea.mzin .mapring { animation:mzfade 200ms ease-out backwards; }
+  #maparea.mzin .mapnode, #maparea.mzin .mapghost { animation:mzpop 200ms ease-out var(--mzd,0ms) backwards; }
+  #maparea.mzin #maplabels .maphomelbl, #maparea.mzin #maplabels .maprlbl { animation:mzlift 200ms ease-out backwards; }
+  #maparea.mzin #maplabels .mapnlbl    { animation:mzfade 170ms ease-out 150ms backwards; }
+  #maparea.mzin #maplabels .maparclbl  { animation:mzfade 170ms ease-out 190ms backwards; }
+  #maparea.mzin #maplabels .mapghostlbl{ animation:mzfade 170ms ease-out 230ms backwards; }
+  /* F5·2 — hover. The disc's transform lives in .mapnode (NOT inline, or :hover could never win) so the
+     scale composes with the centring translate; the drop shadow deepens with it. */
+  .mapnode, .mapghost { transition:transform 140ms ease-out, box-shadow 140ms ease-out; }
+  .mapnode:hover, .mapghost:hover { transform:translate(-50%,-50%) scale(1.04); }
+  #maphot { animation:mzfade 150ms ease-out backwards; }          /* the region wash fades in */
+  .mapdistrict { animation:mzrise 150ms ease-out backwards; }     /* the district card fades + rises 4px */
+  /* F5·3 — selection: the disc's ring pulses exactly once, an accent halo collapsing onto its own rim.
+     Only a `from`, so the last frame IS the disc's resting shadow — no snap at the end. */
+  @keyframes selring { from { box-shadow:0 0 0 12px color-mix(in srgb, var(--accent-strong) 55%, transparent),
+                                        0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); } }
+  .mapnode.selpulse { animation:selring 250ms ease-out backwards; }
+  #maprail-body.xfade, #homerail.xfade { animation:mzfade 160ms ease-out backwards; }
+  /* F5·4 — button zoom eases the world transform; wheel/drag never get the transition (an eased direct
+     manipulation reads as lag). Labels are placed by a screen-space collision pass, so they cannot ride a
+     group transform — they fade for the 220ms and are re-placed at the far end, which is what keeps every
+     pill attached to its disc instead of arriving 60px early. */
+  #mapworld.zt { transition:transform 220ms ease-out; }
+  #maplabels { transition:opacity 110ms ease-out; }
+  #maplabels.zhide { opacity:0; }
+  /* F5·5 — the shell. --pct must be a registered custom property or it cannot interpolate: an unregistered
+     one is a token stream and the conic-gradient would jump. Registered, the ring SWEEPS 0→value once. */
+  @property --pct { syntax:'<number>'; inherits:false; initial-value:0; }
+  @keyframes rsweep { from { --pct:0; } }
+  .rring.sweep { animation:rsweep 600ms ease-out backwards; }
+  .pane.active { animation:mzfade 120ms ease-out backwards; }
+  .ent.newest { animation:mzriseY 200ms ease-out backwards; }
+  #peek.open { animation:mzfade 120ms ease-out backwards; }
 </style>
 </head>
 <body>
@@ -1210,6 +1293,11 @@ function initDashboard(){
   let VW=0, VH=0, minD=0, maxDepth=1, ringR1=0, ringRmax=0, nullR=0, ghostR=0;
   const P = {};                 // id -> {x,y,r,node,ghost}
   let ghostShown=[], deepCount=0, unreachCount=0, regions=[], hotRegion=null;
+  // (v2.5.1 F1) the fog's zone boundaries are MEASURED off the finished layout rather than read off the
+  // ring constants: the frontier band has to begin where the outermost explored disc actually ENDS and run
+  // through where the ghost orbit actually ends, or the band lands on the wrong things — the relaxation
+  // moves discs off their nominal rings, and a sparse product's rings sit nowhere near a dense one's.
+  let exploredR=0, ghostOuterR=0;
   const ringRadius = (d)=> maxDepth<=1 ? ringR1 : ringR1 + (d-1)*(ringRmax-ringR1)/(maxDepth-1);
   const sizeOf = (n)=> Math.round(16 + 46*Math.min(1,(n.inboundCount||0)/maxIn));
 
@@ -1244,6 +1332,13 @@ function initDashboard(){
     deepCount=Math.max(0, lockedTotal - ghostShown.reduce((s,f)=>s+(f.count||1),0));
     unreachCount=capNodes.filter(n=>n.clickDepth==null).length;
     relaxDiscs();
+    // (v2.5.1 F1) zone boundaries, measured AFTER relaxation — the outer edge of the outermost explored
+    // disc and of the outermost ghost. Pure function of the layout, so build-twice identical.
+    exploredR=0; ghostOuterR=0;
+    for(const k in P){ const p=P[k], d=Math.hypot(p.x,p.y)+p.r;
+      if(p.ghost) ghostOuterR=Math.max(ghostOuterR,d); else exploredR=Math.max(exploredR,d); }
+    // a product with no frontier still gets a frontier band — just an empty one, so the fog reads the same
+    if(!ghostOuterR) ghostOuterR = exploredR*1.18;
     computeRegions();
   }
   // deterministic relaxation — seeded from the radial layout, home fixed; guarantees disc gaps
@@ -1253,7 +1348,12 @@ function initDashboard(){
     for(let iter=0; iter<1500; iter++){ let worst=0;
       for(let i=0;i<ids.length;i++){ for(let j=i+1;j<ids.length;j++){
         const a=P[ids[i]], b=P[ids[j]]; let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
-        if(d<0.001){ dx=Math.cos(i*1.7); dy=Math.sin(i*1.7); d=0.001; }   // break exact coincidence deterministically
+        // break exact coincidence deterministically. (v2.5.1) d is set to 1, NOT to 0.001: dx,dy are
+        // already a UNIT vector here, and the push below divides them by d — with d=0.001 that scaled the
+        // separation by 1000×, flinging the pair ±20,000px in a single iteration. Eight of flipkart's
+        // fourteen ghosts were sitting at r≈16,000 world px (invisible, ~20× off-canvas) because of it,
+        // which is also why the frontier read as empty. Deterministic either way; now also correct.
+        if(d<0.001){ dx=Math.cos(i*1.7); dy=Math.sin(i*1.7); d=1; }
         const need=a.r+b.r+GAP; if(d<need){ const push=(need-d)/2, ux=dx/d, uy=dy/d;
           a.x-=ux*push; a.y-=uy*push; b.x+=ux*push; b.y+=uy*push; worst=Math.max(worst,need-d); } } }
       for(const id of ids){ const p=P[id]; const d=Math.hypot(p.x,p.y)||0.001; const need=p.r+hr+10;
@@ -1289,12 +1389,20 @@ function initDashboard(){
     html+='</div><div id="maphot" style="display:none"></div>';
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
     // discs
+    // (v2.5.1 F5·1/F5·2) two changes to the disc's own style attribute:
+    //   · --mzd is its materialize delay, so the reveal staggers inner-ring→outer (home 0 · ring1 90ms ·
+    //     +40ms per ring · unreachable, then ghosts last), capped at 240ms so the whole reveal fits ≤450ms.
+    //   · the centring `transform` is NO LONGER inline. It is identical to the one .mapnode/.mapghost
+    //     already declare, and inline it would outrank every stylesheet rule — which is precisely why a
+    //     :hover scale and the materialize keyframes could not touch it.
     const disc=(id)=>{ const p=P[id]; if(!p) return ''; const n=p.node; const px=Math.round(p.x), py=Math.round(p.y), dia=Math.round(p.r*2);
-      if(p.ghost){ return `<button class="mapghost" data-mapid="${esc(n.id)}" title="${esc(n.pattern||n.label||'')}" style="left:${px}px;top:${py}px;transform:translate(-50%,-50%)"><span class="gc" style="width:${dia}px;height:${dia}px"></span></button>`; }
+      const tier = p.ghost ? maxDepth+2 : (n===root ? 0 : (n.clickDepth==null ? maxDepth+1 : n.clickDepth));
+      const mzd = tier===0 ? 0 : Math.min(90 + 40*(tier-1), 240);
+      if(p.ghost){ return `<button class="mapghost" data-mapid="${esc(n.id)}" title="${esc(n.pattern||n.label||'')}" style="left:${px}px;top:${py}px;--mzd:${mzd}ms"><span class="gc" style="width:${dia}px;height:${dia}px"></span></button>`; }
       const isHome=n===root; const small=dia<30 && !isHome; const hasStates=(n.states||[]).some(s=>s.captured);
       const bg = (!small && n.screenshot) ? `background-image:url('${esc(n.screenshot)}')` : '';
       const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${small?' mono-disc':''}`;
-      return `<button class="${cls}" data-mapid="${esc(n.id)}" title="${esc(dlabel(n))} — from ${n.inboundCount||0}" style="left:${px}px;top:${py}px;transform:translate(-50%,-50%);width:${dia}px;height:${dia}px;${isHome?'border-width:3px;border-color:var(--accent-strong);':''}${bg}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`; };
+      return `<button class="${cls}" data-mapid="${esc(n.id)}" title="${esc(dlabel(n))} — from ${n.inboundCount||0}" style="left:${px}px;top:${py}px;--mzd:${mzd}ms;width:${dia}px;height:${dia}px;${isHome?'border-width:3px;border-color:var(--accent-strong);':''}${bg}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`; };
     html+=disc(root.id);
     capNodes.forEach(n=>html+=disc(n.id));
     ghostShown.forEach(f=>html+=disc(f.id));
@@ -1311,25 +1419,56 @@ function initDashboard(){
     // whole ramp is ONE background on #maparea, i.e. GROUND. Nothing in the world is ever dimmed by it;
     // depth comes from the surface the world sits on. Screen-space, centred on home, radii × zoom so it
     // tracks the orbits exactly as the old fog did.
-    //   · the lamp   — accent mixed into --canvas-lit, brightest at home, the v2.4.1 lit pool folded in
-    //   · the field  — plain --canvas across the play area (every ring ≤0.40 and the arc at 0.45)
-    //   · the rim    — a LONG easing to --bg-deep starting past the ghost orbit (0.56–0.61): atmosphere,
-    //                  not a wall, which is why the ramp runs over ~0.30·minD instead of snapping.
+    // ── (v2.5.1 F1) FOUR zones, not three ───────────────────────────────────────────────────────────
+    // v2.5 shipped lit centre → flat canvas → one compact rim, and the frontier — where the ghosts live —
+    // was indistinguishable from the explored field, so the fog-of-war read was weak at rest. Same
+    // mechanism (one gradient, painted as GROUND on #maparea), new falloff:
+    //   1 · the lamp     — accent mixed into --canvas-lit, brightest at home. Unchanged mechanism, but it
+    //                      now FINISHES inside the explored field: in v2.5 it ran to 0.66·minD, i.e. past
+    //                      the ghost orbit, which is precisely what left no room for a frontier to read.
+    //   2 · the field    — a genuine plain --canvas plateau holding the outermost explored ring.
+    //   3 · the frontier — NEW. From just outside the outermost explored disc, through the ghost orbit, a
+    //                      gradual wash to FRONT. The ghosts now sit visibly IN fog; `NOT LINKED …` sits at
+    //                      this band's inner edge and `DEEP FOG …` at its outer edge.
+    //   4 · the rim      — from past the ghost orbit, a wide ease-in easing (t², seven stops) to OPAQUE
+    //                      --bg-deep by the pane corner. v2.5 stopped the vignette 60% short of --bg-deep
+    //                      and put that 60% mostly outside the pane; the full range is now in-pane.
     const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY, z=mapView.zoom;
-    const LIT='color-mix(in srgb, var(--accent) 11%, var(--canvas-lit))';
-    // the lamp falls off over FIVE stops, not two: a radial-gradient interpolates linearly between
-    // stops, so a 3-stop ramp puts a visible crease in the field exactly where the derivative jumps —
-    // which is what made the lit area read as a hard-edged disc instead of light.
-    const lampR=r=>minD*r*z, L=p=>`color-mix(in srgb, ${LIT} ${p}%, var(--canvas))`;
-    // the rim is world-tied (it belongs past the ghost orbit, §2.1) but FLOORED to the pane: zoomed out,
-    // a purely world-tied vignette collapses onto the shrinking world and the pane goes black — the pane
-    // must always read as a canvas (§2.2), so the vignette can never come closer than its own corners.
     const hd=Math.hypot(VW,VH)/2;
-    const rimIn=Math.max(minD*0.72*z, hd*0.66), deep=Math.max(minD*1.00*z, hd*1.20);
-    areaEl.style.backgroundImage=`radial-gradient(circle at ${cx}px ${cy}px, ${LIT} 0, `
-      + `${L(84)} ${lampR(0.10)}px, ${L(56)} ${lampR(0.22)}px, ${L(30)} ${lampR(0.34)}px, `
-      + `${L(14)} ${lampR(0.45)}px, ${L(5)} ${lampR(0.56)}px, var(--canvas) ${lampR(0.66)}px, `
-      + `var(--canvas) ${rimIn}px, color-mix(in srgb, var(--bg-deep) 60%, var(--canvas)) ${(rimIn+deep)/2}px, var(--bg-deep) ${deep}px)`;
+    // Zone radii are world-tied (they belong to the orbits) but FLOORED to the pane: zoomed out, a purely
+    // world-tied ramp collapses onto the shrinking world and the pane goes black — the pane must always
+    // read as a canvas (v2.5 §2.2), so the fog can never crowd in past these fractions of the pane.
+    const fieldEnd = Math.max(exploredR*z, hd*0.34);
+    const bandEnd  = Math.max(ghostOuterR*z, fieldEnd*1.16);
+    const rimEnd   = hd*0.985;   // …and --bg-deep is fully reached just inside the corner, never beyond it
+    const lampEnd  = fieldEnd*0.85;                 // leaves a real --canvas plateau before the band
+    const LIT='color-mix(in srgb, var(--accent) 11%, var(--canvas-lit))';
+    const FRONT='color-mix(in srgb, var(--bg-deep) 30%, var(--canvas))';   // the frontier's own value
+    const L=p=>`color-mix(in srgb, ${LIT} ${p}%, var(--canvas))`;          // lamp:     LIT   → --canvas
+    const B=p=>`color-mix(in srgb, ${FRONT} ${p}%, var(--canvas))`;        // frontier: canvas → FRONT
+    const R=p=>`color-mix(in srgb, var(--bg-deep) ${p}%, ${FRONT})`;       // rim:      FRONT → --bg-deep
+    const stops=[]; const add=(c,r)=>stops.push(c+' '+(Math.round(r*100)/100)+'px');
+    // the lamp falls off over SEVEN stops, not two: a radial-gradient interpolates linearly between stops,
+    // so a 3-stop ramp puts a visible crease in the field exactly where the derivative jumps — which is
+    // what made the lit area read as a hard-edged disc instead of light.
+    add(LIT,0); [[84,.152],[56,.333],[30,.515],[14,.682],[5,.848]].forEach(([p,t])=>add(L(p), lampEnd*t));
+    add('var(--canvas)', lampEnd);
+    add('var(--canvas)', fieldEnd);                                        // the plateau
+    // the band's onset is quick and its tail is long: by the time the ghost orbit begins the ground is
+    // already most of the way to FRONT, so a ghost sits IN fog rather than at the top of a ramp toward it.
+    // (The onset is still only ~3 levels over 37px — far below a visible edge.)
+    [[35,.25],[62,.5],[82,.75]].forEach(([p,t])=>add(B(p), fieldEnd+(bandEnd-fieldEnd)*t));
+    add(FRONT, bandEnd);
+    // ease-in (t², sampled) is the curve the rim wants: an imperceptible ONSET — no edge where the rim
+    // begins, which is what made v2.5's compact rim read as a band — accelerating into deep. Six stops
+    // past the band's end, so no two adjacent stops are far enough apart to band.
+    [[.17,3],[.33,11],[.50,25],[.67,45],[.83,69]].forEach(([t,p])=>add(R(p), bandEnd+(rimEnd-bandEnd)*t));
+    add('var(--bg-deep)', rimEnd);
+    // zoomed in past the fog the radii invert; a monotonic sweep keeps the stop list ordered so the ramp
+    // degrades into "all field" instead of relying on the UA's out-of-order clamping.
+    let prev=-1; const ordered=stops.map(s=>{ const i=s.lastIndexOf(' '), r=parseFloat(s.slice(i+1));
+      const rr=Math.max(prev, r); prev=rr; return s.slice(0,i)+' '+rr+'px'; });
+    areaEl.style.backgroundImage=`radial-gradient(circle at ${cx}px ${cy}px, ${ordered.join(', ')})`;
     const zl=document.getElementById('zlbl'); if(zl) zl.textContent=Math.round(mapView.zoom*100)+'%';
     placeLabels();
     if(hoverId) drawLinks(hoverId);
@@ -1351,7 +1490,12 @@ function initDashboard(){
       if(!el || !el.offsetWidth) return; const r=el.getBoundingClientRect();
       committed.push({left:r.left-paneRect.left-4, top:r.top-paneRect.top-4, right:r.right-paneRect.left+4, bottom:r.bottom-paneRect.top+4}); });
     const specs=[];
-    { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(dlabel(root))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
+    // (v2.5.1 F3) the home pill is the ONE label that never truncated, and on a product whose home page
+    // carries a marketing <title> that is fatal: flipkart's is 108 characters, which at white-space:nowrap
+    // is a 649px pill — wider than half the pane, so every candidate collided and the collision pass DROPPED
+    // the map's most important label entirely (silently, since v2.5). It now gets a budget like everything
+    // else — longer than a node pill's 18, because it is the sun. Its stats line stays, per the F3 ruling.
+    { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(short(dlabel(root),28))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d)*z; const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY;
       specs.push({pri:1, ring:true, cx, cy, rr, cls:'maprlbl', html:`${d} click${d===1?'':'s'}`}); }
     if(unreachCount>0){ const [ax,ay]=toScreen({x:Math.cos(2.0)*nullR, y:Math.sin(2.0)*nullR}); specs.push({pri:1, ax, ay, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} pages`}); }
@@ -1367,7 +1511,8 @@ function initDashboard(){
       .sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0) || String(a.id).localeCompare(String(b.id)))
       .slice(0, FAR_ANCHORS);
     set.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
-    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}<br><small>from ${n.inboundCount||0}</small>`}); });
+    // (v2.5.1 F3) one line, the label alone — the `from N` sub-line is gone from node pills (design ruling)
+    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}`}); });
     if(level==='near') ghostShown.forEach(f=>{ const [sx,sy]=toScreen(P[f.id]); specs.push({pri:3, ax:sx, ay:sy, dr:P[f.id].r*z, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}); });
     specs.sort((a,b)=>a.pri-b.pri);
     const els=specs.map(s=>{ const e=document.createElement('div'); e.className=s.cls; e.style.visibility='hidden'; e.innerHTML=s.html; labelsEl.appendChild(e); return e; });
@@ -1418,8 +1563,11 @@ function initDashboard(){
   function showRegion(rg, el){ hotRegion={rg,el};
     const hot=world.querySelector('#maphot');
     if(hot){ hot.style.left=rg.x+'px'; hot.style.top=rg.y+'px'; hot.style.width=rg.w+'px'; hot.style.height=rg.h+'px'; hot.style.display='block'; }
+    // (v2.5.1 F4) the fill is the explored share, floored to a 2px sliver whenever explored ≥ 1 — a 3%
+    // share is the truth and a 0px bar is not a way of telling it. Nothing explored ⇒ genuinely no fill.
+    const share = rg.explored+rg.fog ? Math.round(100*rg.explored/(rg.explored+rg.fog)) : 100;
     dcardEl.innerHTML=`<h4>${esc(rg.name)}</h4><p>${rg.explored} explored${rg.fog?` · ${rg.fog} in the fog`:''}${rg.states?` · ${rg.states} ${rg.states===1?'page has':'pages have'} states`:''}</p>
-      <div class="bar"><i style="width:${rg.explored+rg.fog?Math.round(100*rg.explored/(rg.explored+rg.fog)):100}%"></i></div>`;
+      <div class="dbar" title="explored share of this district"><i style="width:${rg.explored?`max(2px, ${share}%)`:'0'}"></i></div>`;
     dcardEl.style.display='block'; positionCard(rg, el); }
   function hideRegion(){ const hot=world.querySelector('#maphot'); if(hot) hot.style.display='none';
     hotRegion=null; dcardEl.style.display='none'; }
@@ -1435,6 +1583,47 @@ function initDashboard(){
   world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ hoverId=null; linesEl.innerHTML=''; hidePeek(); } });
   world.addEventListener('click', e=>{ if(mapDragged) return; const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) selectPage(n); } });
 
+  // ═════════ (v2.5.1 F5) THE MOTION CONTROLLER ═════════
+  // Three one-shot effects the CSS cannot start on its own, and one suspend switch. No JS ever writes a
+  // layout value on a timer — the only thing these do is add or drop a class, so the settled render (and
+  // therefore every measured gate, and the shot tooling) is identical to a build with no motion at all.
+  let mzT=null;
+  // Ending the reveal RE-PLACES the labels, and that is not a nicety — it is what keeps the reveal from
+  // changing the settled layout. placeLabels() is a screen-space collision pass that measures real disc
+  // rects; during the reveal those rects are mid-`mzpop`, i.e. scale(.92), so the pass sees discs ~8%
+  // smaller than they end up and commits pill positions computed against geometry that no longer exists a
+  // moment later. (Caught by the F5 gate: a home→map switch left five pills in different slots than the
+  // same map at rest, and the difference vanished under prefers-reduced-motion — which is what named the
+  // animation as the cause.) One re-place on settle, so the collision pass always has final geometry.
+  function endMaterialize(){ clearTimeout(mzT);
+    if(!areaEl.classList.contains('mzin')) return;
+    areaEl.classList.remove('mzin'); placeLabels(); }
+  function startMaterialize(){ clearTimeout(mzT); areaEl.classList.add('mzin');
+    // 520ms = the longest chain (ghost labels: 230ms delay + 170ms) plus a frame's slack
+    mzT=setTimeout(endMaterialize, 520); }
+  // any direct manipulation ends the reveal immediately and takes the zoom easing off the world: a gesture
+  // must be same-frame, and a pill must never animate while the user is dragging the world under it.
+  function suspendMapMotion(){ endMaterialize();
+    world.classList.remove('zt'); labelsEl.classList.remove('zhide'); }
+  function replay(el, cls){ if(!el) return; el.classList.remove(cls); void el.offsetWidth;   // read, not a write
+    el.classList.add(cls); el.addEventListener('animationend', ()=>el.classList.remove(cls), {once:true}); }
+  function pulseDisc(id){ replay([...world.querySelectorAll('.mapnode')].find(e=>e.dataset.mapid===id), 'selpulse'); }
+  function railFade(){ replay(railTarget(), 'xfade'); }
+  // F5·4 — the eased button zoom. Labels are hidden for the ride and re-placed once the transform lands, so
+  // a pill can never sit 60px away from its disc mid-ease. A zoom clamped at its limit doesn't move, so it
+  // would never fire transitionend — hence the explicit no-op path.
+  function easedZoom(apply){
+    const t0=world.style.transform;
+    world.classList.add('zt'); labelsEl.classList.add('zhide');
+    let settled=false;
+    const done=()=>{ if(settled) return; settled=true;
+      world.classList.remove('zt'); labelsEl.classList.remove('zhide'); placeLabels(); };
+    apply();
+    if(world.style.transform===t0) return done();
+    world.addEventListener('transitionend', done, {once:true});
+    world.addEventListener('transitioncancel', done, {once:true});
+  }
+
   // ---- zoom + pan (listeners live on #maparea so the rail scrolls/clicks like a normal column, F4) ----
   const clampZoom=z=>Math.max(0.45, Math.min(3, z));
   function zoomAt(cx, cy, factor){ const z0=mapView.zoom, z1=clampZoom(z0*factor);
@@ -1444,9 +1633,11 @@ function initDashboard(){
   const mapPane=document.getElementById('pane-map');
   const mapArea=document.getElementById('maparea');
   mapArea.addEventListener('wheel', e=>{ if(!mapPane.classList.contains('active')) return; e.preventDefault();
+    suspendMapMotion();   // (F5·4) wheel is direct manipulation: same-frame, never eased
     const r=mapArea.getBoundingClientRect(); zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:0.893); }, {passive:false});
   let panning=false, sx0=0, sy0=0, mapDragged=false;
-  mapArea.addEventListener('mousedown', e=>{ if(e.target.closest('#mapzoom')) return; panning=true; mapDragged=false; sx0=e.clientX; sy0=e.clientY; world.style.cursor='grabbing'; });
+  mapArea.addEventListener('mousedown', e=>{ if(e.target.closest('#mapzoom')) return; suspendMapMotion();
+    panning=true; mapDragged=false; sx0=e.clientX; sy0=e.clientY; world.style.cursor='grabbing'; });
   addEventListener('mousemove', e=>{ if(!panning) return; const dx=e.clientX-sx0, dy=e.clientY-sy0; if(Math.abs(dx)+Math.abs(dy)>3) mapDragged=true;
     mapView.panX+=dx; mapView.panY+=dy; sx0=e.clientX; sy0=e.clientY; applyMapView(); });
   addEventListener('mouseup', ()=>{ if(panning){ panning=false; world.style.cursor=''; setTimeout(()=>mapDragged=false, 0); } });
@@ -1456,9 +1647,10 @@ function initDashboard(){
   mapArea.addEventListener('click', e=>{ if(mapDragged) return;
     if(e.target.closest('[data-mapid]')||e.target.closest('#mapzoom')||e.target.closest('#mapstats')||e.target.closest('#maplegend')||e.target.closest('#mapnote')||e.target.closest('#mapdcard')) return;
     window.closePanel(); });
-  document.getElementById('zinbtn').onclick=()=>zoomAt(VW/2, VH/2, 1.2);
-  document.getElementById('zoutbtn').onclick=()=>zoomAt(VW/2, VH/2, 0.83);
-  document.getElementById('zfitbtn').onclick=resetView;
+  // (F5·4) the three BUTTONS ease — a deliberate step deserves a transition; the gestures above do not
+  document.getElementById('zinbtn').onclick=()=>easedZoom(()=>zoomAt(VW/2, VH/2, 1.2));
+  document.getElementById('zoutbtn').onclick=()=>easedZoom(()=>zoomAt(VW/2, VH/2, 0.83));
+  document.getElementById('zfitbtn').onclick=()=>easedZoom(resetView);
   function resetView(){ mapView.zoom=1; mapView.panX=0; mapView.panY=0; applyMapView(); }
 
   function resize(){ computeLayout(); renderWorld(); applyMapView(); }
@@ -1507,6 +1699,7 @@ function initDashboard(){
     if (n) renderDetail(el, n); else el.innerHTML = ledgerBody();
   }
   function openPanel(n){ activeNode=n; railSel=n.id; renderRail();
+    railFade(); pulseDisc(n.id);   // (v2.5.1 F5·3) ledger→detail dissolves; the chosen disc pulses once
     const mr=document.getElementById('maprail');
     if(mr && document.getElementById('pane-map').classList.contains('active')) mr.scrollTop=0; }
   function renderDetail(el, n){
@@ -1573,7 +1766,8 @@ function initDashboard(){
         else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
     }
   }
-  window.closePanel = function(){ railSel=null; activeNode=null; renderRail(); };
+  window.closePanel = function(){ const had=railSel!=null; railSel=null; activeNode=null; renderRail();
+    if(had) railFade(); };   // (v2.5.1 F5·3) detail→ledger dissolves too; a no-op close stays still
   // × on the rail panel + ESC both return the rail to the ledger (F4·3)
   document.addEventListener('click', e=>{ if(e.target.closest && e.target.closest('[data-rail-close]')) window.closePanel(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && railSel) window.closePanel(); });
@@ -1822,6 +2016,10 @@ function initDashboard(){
     const ring=document.getElementById('ready-ring'), lab=document.getElementById('ready-label'), pop=document.getElementById('readypop');
     const full = R.score>=100;
     if(ring) ring.style.setProperty('--pct', R.score);
+    // (v2.5.1 F5·5) the ring sweeps 0→value ONCE per load — a readiness score is a thing that was earned,
+    // and the sweep says so. Guarded on a window flag, so a later re-render just sets the value.
+    if(ring && !window.__rswept){ window.__rswept=true; ring.classList.add('sweep');
+      ring.addEventListener('animationend', ()=>ring.classList.remove('sweep'), {once:true}); }
     chip.classList.toggle('quiet', full);
     // OPEN WORDING (flagged): ship "100% context ready" — the "context complete" alternative is a P3 call (PRD §2, ux-copy open q)
     lab.textContent = R.score + '% context ready';
@@ -1850,7 +2048,7 @@ function initDashboard(){
   function fmtTime(iso){ try{ return new Date(iso).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }catch{ return ''; } }
   function firstSlug(){ return (DATA.nodes.find(n=>n.kind!=='template')||DATA.nodes[0]||{}).id||'<slug>'; }
 
-  function ledgerEntry(ev, compact){
+  function ledgerEntry(ev, compact, newest){
     const when = ev.dateOnly ? fmtDate(ev.at) : [fmtDate(ev.at), fmtTime(ev.at)].filter(Boolean).join(' · ');
     let link='';
     if(ev.link){ if(ev.link.page) link=`<button class="elink" data-goto="page/${esc(ev.link.page)}">open the page</button>`;
@@ -1868,7 +2066,7 @@ function initDashboard(){
     let chip='';
     if(ev.kind==='describe'){ const pend=DASH.pendingDescriptions||0;
       if(pend>0) chip=`<div class="chiprow" style="margin-top:8px">${pchip(`Describe the ${pend} new page${pend===1?'':'s'}`, PROMPTS.describeLibrary())}</div>`; }
-    return `<div class="ent" data-actor="${esc(ev.actor)}"><div class="emeta">${esc(when)} · ${esc(ev.actor)}</div>
+    return `<div class="ent${newest?' newest':''}" data-actor="${esc(ev.actor)}"><div class="emeta">${esc(when)} · ${esc(ev.actor)}</div>
       <span class="etitle">${esc(ev.title)}</span>${ev.detail?`<div class="edetail">${esc(ev.detail)}</div>`:''}${dlines}${thumbs}${chip}${link}</div>`;
   }
 
@@ -1916,7 +2114,7 @@ function initDashboard(){
     return `<div class="railh">Working ledger</div>
       <div class="led">
         ${nextSlot()}
-        ${evs.map(e=>ledgerEntry(e,true)).join('')}
+        ${evs.map((e,i)=>ledgerEntry(e,true,i===0)).join('')}${''/* (F5·5) i===0 is the newest — it eases in */}
         <div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Drift checks land here</span><div class="edetail">"3 pages changed — review side by side"</div></div>
       </div>
       <div class="railfoot">every capture, read, and design run is appended · <button class="elink" data-goto="journal">full journal</button></div>`;
@@ -2090,7 +2288,9 @@ function initDashboard(){
     const activeTab = name==='page' ? (pageOrigin==='map'?'map':'home') : name;
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.tab===activeTab));
     const jp=document.getElementById('journalpill'); if(jp) jp.classList.toggle('on', name==='journal');
-    if(name==='map'){ resize(); if(!window.__fitted){ fit(); window.__fitted=true; }
+    // (v2.5.1 F5·1) the reveal replays on every entry to the map — including a tab switch back — and the
+    // class goes on BEFORE resize() so the discs it rebuilds are born with their stagger already attached.
+    if(name==='map'){ startMaterialize(); resize(); if(!window.__fitted){ fit(); window.__fitted=true; }
       renderRail(); // F4·1: the map rail defaults to the ledger on every entry
       // F1 restore: reopen the rail panel we expanded from + reapply camera on return (F4·5). v2.4.2 F4:
       // stacked, the camera still restores but the rail must NOT swap — there is no rail-swap below the
