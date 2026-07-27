@@ -15,6 +15,8 @@ Read `design-context/ia/sitemap.json` and offer the pages by their nav labels. I
 
 "What do you want to explore on this page?" Get the intent in a sentence or two. Don't interrogate; you can propose the framing back ("so: make the filters findable without opening the drawer — right?").
 
+**Fidelity is inferred, asked only on ambiguity.** Fidelity follows the designer's own word: wireframe / redesign / explore / sketch → lofi (the default); mock / prototype / hi-fi → the hi-fi path (§4's note). Only if the wording is genuinely ambiguous, fold one clause into the same question — never a second question.
+
 ## 3. Work on a copy — never in the library
 
 ```
@@ -77,7 +79,7 @@ Inject this once into every copy, just before `</body>` (verbatim — both block
 - The kit primitives are the **only** visual language for invented parts: hatched `.lofi-box` for regions you're blocking out, `.lofi-img` for image placeholders, `.lofi-line`(+`.short`) stacks for placeholder text, `.lofi-steps` for any stepper/timeline/progress element. Same vocabulary every approach, every round — consistency is most of what makes a lo-fi read as deliberate.
 - **Never redraw the shell, never drop it, never leave it in brand color.** Nav, header, footer stay as captured (now lo-fi). If the change itself is about the shell, still inject lofi-mode — then edit the shell region like any other target area.
 - Gotcha: `filter` on `html` re-anchors `position:fixed` elements to the page instead of the viewport — harmless (usually better) in full-page screenshots; if a page's chrome lands oddly in the render, screenshot at viewport height instead of `--full`.
-- **Hi-fi is a different request.** If the designer explicitly asks for a shipped-look mock, skip lofi-mode — but name it a prototype, not a wireframe, and confirm that's what they want.
+- **Hi-fi is a different request** and is NOT yet supported end-to-end: today you'd get the captured parts in brand color and every invented part still in gray lofi primitives — exactly the half-real hybrid this section warns against — and the `NEW:`/`ASSUMED:` vocabulary has no color equivalent yet. Name it, park it, and tell the designer the generated-designs round will carry it.
 - **Status that survives grayscale.** When the captured page distinguishes states by hue alone (e.g. a green "delivered" vs an amber "returned" with no other visual difference), `grayscale(1)` flattens that to one gray and the page loses its only status signal. Keep the real hex **and** add a shape difference (filled dot / ring / double ring) so the states stay distinguishable lo-fi — and note the substitution in `notes.md`.
 
 ## 5. Produce 2–3 genuinely different approaches
@@ -109,6 +111,8 @@ Open each screenshot and actually look at it: wrapped or colliding labels, clipp
 ## 6. Show, then iterate
 
 Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
+
+A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance.
 
 ## 7. Designing a page the product doesn't have yet
 
@@ -151,6 +155,10 @@ between a screen and a page.
 **7.4 Set the `<title>`.** The Figma converter names the pasted frame from `document.title`. Leave it
 alone and every wireframe lands in Figma with the donor page's title, indistinguishable from the
 captured original. Set it to something a designer can find: `Track order · <product>`.
+
+Before converting: run `tools/lofi-bake.js` on a lofi wireframe (the CSS filter is paint-time;
+converters read computed styles and export full color otherwise) · pin the conversion width to the
+capture viewport (1440), never the operator's window.
 
 **7.5 Assemble the vocabulary before you draw, and write down where each piece came from.** There is
 no single source page, so name the source of each pattern you reuse — in `notes.md`, as a table:
