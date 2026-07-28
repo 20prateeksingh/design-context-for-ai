@@ -129,6 +129,12 @@ function startCapture(mode, res) {
 // ── Guided capture (F5) — headed, human-driven; spawned detached, streamed like a capture ─────────
 // Symmetric with startCapture: holds the same `busy` lock (guided uses the persistent profile, so it
 // conflicts with capture AND login — the shared lock is what makes all three mutually exclusive).
+// (ux-busy-states F1) the guided end sequence — SIGTERM through the post-session hygiene check — reports
+// itself as a run of these phases, oldest-named-thing-first. Kept here (not just in the dashboard) so the
+// mid-end-kill error message below can name the stage a killed child was actually in.
+const END_PHASES = ['ending', 'browser-closed', 'session-saved', 'indexing', 'hygiene', 'ended'];
+const END_STAGE_LABEL = { ending: 'closing the browser', 'browser-closed': 'closing the browser',
+  'session-saved': 'saving the session', indexing: 'rebuilding the index', hygiene: 'running the library check' };
 function guidedStatePayload() {
   return {
     running: !!(guidedJob && guidedJob.running),
@@ -138,10 +144,15 @@ function guidedStatePayload() {
     lastCapture: guidedJob ? guidedJob.lastCapture : null,
     capturing: !!(guidedJob && guidedJob.capturing),   // a page snapshot is in flight right now
     code: guidedJob ? guidedJob.code : null,
+    // (F1) the end sequence's own live stage — null until SIGTERM/window-close starts it.
+    endPhase: guidedJob ? (guidedJob.endPhase || null) : null,
+    endCaptures: guidedJob ? (guidedJob.endCaptures == null ? null : guidedJob.endCaptures) : null,
+    endMs: guidedJob ? (guidedJob.endMs || null) : null,
   };
 }
-// Parse capture.js's stdout for the stable `GUIDED_JSON:` line → live status + SSE. Two shapes:
-// {phase:'capturing',url} (a snapshot started) and {slug,state,url,at,...} (one finished).
+// Parse capture.js's stdout for the stable `GUIDED_JSON:` line → live status + SSE. Three shapes:
+// {phase:'capturing',url} (a snapshot started), {slug,state,url,at,...} (one finished), and the F1 end
+// sequence ({phase:'ending'|'browser-closed'|'session-saved'|'indexing'|'hygiene'|'ended', ...}).
 function pushGuidedOutput(text) {
   if (!guidedJob) return;
   guidedJob._partial += String(text).replace(/\r/g, '');
@@ -151,6 +162,11 @@ function pushGuidedOutput(text) {
     if (ln.indexOf('GUIDED_JSON:') === 0) {
       try { const c = JSON.parse(ln.slice('GUIDED_JSON:'.length));
         if (c.phase === 'capturing') { guidedJob.capturing = true; }
+        else if (c.phase && END_PHASES.includes(c.phase)) {
+          guidedJob.endPhase = c.phase;
+          if (c.phase === 'session-saved') guidedJob.endCaptures = c.captures;
+          if (c.phase === 'ended') guidedJob.endMs = c.ms;
+        }
         else { guidedJob.captures.push(c); guidedJob.lastCapture = c; guidedJob.capturing = false; }
         broadcast('guided', JSON.stringify(guidedStatePayload()));
       } catch (_) {}
@@ -171,7 +187,7 @@ function startGuided(startUrl, res) {
   if (!url) return json(res, 400, { ok: false, error: 'no start URL and no product.json — answer onboarding first' });
   busy = true;
   const startedAt = new Date().toISOString();
-  guidedJob = { running: true, code: null, startedAt, startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, errTail: [], _partial: '' };
+  guidedJob = { running: true, code: null, error: null, startedAt, startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, errTail: [], _partial: '', endPhase: null, endCaptures: null, endMs: null };
   // F3: pass the product's logged-in signal through via --config — the same product.json path
   // startCapture already reads. Without it, the guided child's CFG.loggedIn is always unset, so it can
   // neither take the ephemeral public-fallback path (F3, capture.js) nor correctly surface "this product
@@ -185,7 +201,7 @@ function startGuided(startUrl, res) {
   child.stdout.on('data', pushGuidedOutput);
   child.stderr.on('data', pushGuidedOutput);
   child.on('error', (e) => { console.log(`✗ guided ${e.message}`); if (guidedJob) guidedJob.errTail.push(e.message); });
-  child.on('exit', (code) => {
+  child.on('exit', (code, signal) => {
     const captured = guidedJob ? guidedJob.captures.length : 0;
     const fast = (Date.now() - Date.parse(startedAt)) < 8000;   // errored almost immediately
     // Fast, non-zero exit with nothing captured = launch never really started — almost always the
@@ -201,9 +217,20 @@ function startGuided(startUrl, res) {
       const lockedLine = tail.find(l => /another window|locked|in use/i.test(l));
       const line = absentLine || lockedLine || tail[tail.length - 1];
       error = (line || 'Guided capture couldn’t start — the browser profile may be open in another window. Close any capture/login window and try again.').replace(/^❌\s*/, '');
+    } else if (guidedJob && guidedJob.endPhase && guidedJob.endPhase !== 'ended' && (code || signal)) {
+      // (ux-busy-states F1, design contract #3) the end sequence started (SIGTERM sent, or the window was
+      // closed by hand) but the child died before reaching 'ended' — a genuinely abnormal exit, not the
+      // clean shutdown the SIGTERM path always produces on success. Name the stage it died in; captures
+      // already on disk are unaffected (writeSnapshot commits per-page, not at session end).
+      const stage = END_STAGE_LABEL[guidedJob.endPhase] || guidedJob.endPhase;
+      error = `The session ended abnormally while ${stage} (${signal || `exit ${code}`}). Pages already captured are safely on disk — check the terminal for details.`;
     }
     busy = false;
-    if (guidedJob) { guidedJob.running = false; guidedJob.code = code; }
+    // (design contract #3) persisted onto the job, not just this closure's broadcast — a client that
+    // reconnects after the live 'guided-done' already went out (dropped SSE, or the dashboard opened
+    // fresh right after the crash) still gets the real error from the /api/capture/events replay below,
+    // instead of silently falling into the success/reload path.
+    if (guidedJob) { guidedJob.running = false; guidedJob.code = code; guidedJob.error = error; }
     // capture.js --guided already rebuilds at its own exit; rebuild here too so the dashboard's reload
     // sees the fresh registry/dashboard.html even if the child's own build-index was interrupted.
     try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ guided post-build: ${e.message.split('\n')[0]}`); }
@@ -262,7 +289,7 @@ const server = http.createServer((req, res) => {
       // never receives them. Replay current guided state so a reconnecting dashboard catches up.
       if (guidedJob) {
         res.write(`event: guided\ndata: ${JSON.stringify(guidedStatePayload())}\n\n`);
-        if (!guidedJob.running) res.write(`event: guided-done\ndata: ${JSON.stringify({ code: guidedJob.code, captures: guidedJob.captures.length })}\n\n`);
+        if (!guidedJob.running) res.write(`event: guided-done\ndata: ${JSON.stringify({ code: guidedJob.code, captures: guidedJob.captures.length, error: guidedJob.error || null })}\n\n`);
       }
       sseClients.add(res);
       const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch (_) {} }, 15000);

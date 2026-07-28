@@ -834,11 +834,20 @@ if (require.main === module) (async () => {
     // End the session gracefully on a signal (the dashboard's "End session" sends SIGTERM; Ctrl+C sends
     // SIGINT) — closing the context fires the 'close' below, so persistence + build-index still run. This
     // is what lets the session be ended from the dashboard, not only by quitting the browser window.
+    // (ux-busy-states F1) each real checkpoint from here emits a GUIDED_JSON {phase} line — map.js relays
+    // it over SSE so the dashboard can show honest stages instead of one frozen "Ending…" message.
     let ending = false;
-    const endSession = () => { if (ending) return; ending = true; gctx.close().catch(() => {}); };
+    let tEnding = null;
+    const emitPhase = (phase, extra) => console.log('GUIDED_JSON:' + JSON.stringify({ phase, ...extra }));
+    const endSession = () => { if (ending) return; ending = true; tEnding = Date.now(); emitPhase('ending'); gctx.close().catch(() => {}); };
     process.on('SIGTERM', endSession); process.on('SIGINT', endSession);
     await new Promise((resolve) => gctx.on('close', resolve));
+    // The window can also be closed by hand, bypassing endSession — tEnding still needs a value so the
+    // timing math below can't see a negative/NaN duration.
+    if (tEnding === null) { tEnding = Date.now(); emitPhase('ending'); }
     if (gbrowser) await gbrowser.close().catch(() => {});   // F3: the ephemeral (logged-out) path owns a browser process the persistent-context path never has
+    const tBrowserClosed = Date.now();
+    emitPhase('browser-closed');
     const endedAt = new Date().toISOString();
     console.log(`\n✅  Guided session ended — ${captures.length} state(s) captured.`);
     // ── Session persistence (F4·1, additive + absent-safe) — append this session to guided-sessions.json.
@@ -853,11 +862,16 @@ if (require.main === module) (async () => {
         console.log(`🗒  guided-sessions.json updated (${store.sessions.length} session${store.sessions.length === 1 ? '' : 's'})`);
       } catch (e) { console.log(`⚠  could not write guided-sessions.json: ${e.message.split('\n')[0]}`); }
     }
+    const tSessionSaved = Date.now();
+    emitPhase('session-saved', { captures: captures.length });
+    emitPhase('indexing');
     try {
       const { buildIndex } = require('./build-index.js');
       const r = buildIndex(OUT_DIR);
       console.log(`📇  Index + map rebuilt (${r.pages} pages)`);
     } catch (e) { console.log(`⚠  build-index failed: ${e.message.split('\n')[0]}`); }
+    const tIndexed = Date.now();
+    emitPhase('hygiene');
     try {
       const { runHygiene, formatHygiene } = require('./hygiene.js');
       const findings = runHygiene(OUT_DIR);
@@ -867,6 +881,10 @@ if (require.main === module) (async () => {
       try { fs.writeFileSync(path.join(OUT_DIR, 'hygiene.json'), JSON.stringify({ generatedAt: endedAt, findings: flattenHygiene(findings) }, null, 2), 'utf8'); }
       catch (e) { console.log(`⚠  could not write hygiene.json: ${e.message.split('\n')[0]}`); }
     } catch (e) { console.log(`⚠  hygiene skipped: ${e.message.split('\n')[0]}`); }
+    const tHygiened = Date.now();
+    const ms = { browser: tBrowserClosed - tEnding, save: tSessionSaved - tBrowserClosed, index: tIndexed - tSessionSaved, hygiene: tHygiened - tIndexed, total: tHygiened - tEnding };
+    console.log(`⏱  guided end — browser ${ms.browser}ms · save ${ms.save}ms · index ${ms.index}ms · hygiene ${ms.hygiene}ms · total ${ms.total}ms`);
+    emitPhase('ended', { ms });
     return;
   }
 
