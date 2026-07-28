@@ -13,6 +13,8 @@ The best first-run path is **not** this conversation: tell the designer to run *
 
 **If `design-context/product.json` exists, the questions in §1 are already answered** — read it (`url`, `loggedIn`, `productType`, `presets`) and do **not** re-ask. Pass it straight through: `node tools/capture.js --config design-context/product.json`. Only ask what's missing.
 
+**If it doesn't exist and a re-capture is wanted** (e.g. the library was captured with `--url` directly, not through the wizard), there's nothing to pass `--config`. Read `design-context/manifest.json` instead — it records the `startUrl`, `depth`, and `cap` the last capture used — and rebuild the command from those: `node tools/capture.js --url <startUrl> --depth <depth> --cap <cap>`.
+
 ## 1. Kickoff — two questions, one at a time (skip any already in product.json)
 
 Ask **sign-in first** — it decides how you ask for the URL.
@@ -47,7 +49,7 @@ Runs with a visible browser so the designer can watch. While it runs, you may na
 
 ## 5. Describe the library — write the screen docs
 
-Capture auto-generates the consumption layer: `INDEX.md` (human front door), `registry.json` (machine front door for AI agents), and a `page.md` digest per page. The part only you can fill: **each page.md has a section between `ai:begin`/`ai:end` markers** — write a **screen document** there, grounded strictly in that page's captured artifacts (`content.md`, `screenshot.png` — look at it, `meta.json` link graph). Never invent. Announce the step ("writing a guide to each page"); fan out subagents for big libraries (7–8 pages each). Then re-run `node tools/build-index.js` — the first paragraph becomes the page's one-liner in INDEX.md and registry.json; the full doc stays in page.md.
+Capture auto-generates the consumption layer: `INDEX.md` (human front door), `registry.json` (machine front door for AI agents), and a `page.md` digest per page. The part only you can fill: **each page.md has a section between `ai:begin`/`ai:end` markers** — write a **screen document** there, grounded strictly in that page's captured artifacts (`content.md`, `screenshot.png` — look at it, `meta.json` link graph). Never invent. `content.md` is a linear dump of the page's text — adjacency in it is not always structure. Where a count, badge or label could attach to either the block above or below it, check `screenshot.png` before you state which. Announce the step ("writing a guide to each page"); fan out subagents for big libraries (7–8 pages each). Then re-run `node tools/build-index.js` — the first paragraph becomes the page's one-liner in INDEX.md and registry.json; the full doc stays in page.md.
 
 The screen-doc shape (mirrors a mature product-context format):
 

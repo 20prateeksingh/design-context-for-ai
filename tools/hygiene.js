@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { extractPathRefs } = require('./path-refs.js');
 
 const NEAR_EMPTY_CHARS = 200;   // content.md shorter than this = suspiciously thin
 const MIDLOAD_CHARS = 500;      // + loading markers below this = probably captured mid-render
@@ -232,6 +233,26 @@ function runHygiene(outDir) {
   for (const s of slugs) {
     findings.quality.push(...qualityChecks(path.join(pagesDir, s), s));
     for (const st of collectStates(pagesDir, s)) findings.quality.push(...qualityChecks(st.dir, `${s} › ${st.name}`));
+  }
+
+  // 5. E14: path-resolution check — the same backtick-path resolver E13's test-prompts.js uses, run
+  // here over the WORKSPACE's own CLAUDE.md/AGENTS.md (not the package template). Unlike test-prompts.js's
+  // canonical-shape check (run before any real capture exists), this runs post-capture, so
+  // design-context/... paths already exist for real — a plain existence check is enough. Info-level:
+  // a stale doc shouldn't block a build (this is exactly F1's bug class, caught here if it recurs).
+  const workspaceRoot = path.join(outDir, '..');
+  for (const file of ['CLAUDE.md', 'AGENTS.md']) {
+    const text = fileText(path.join(workspaceRoot, file));
+    if (!text) continue;
+    for (const ref of extractPathRefs(text)) {
+      if (fs.existsSync(path.join(workspaceRoot, ref))) continue;
+      findings.quality.push({
+        kind: 'quality', subKind: 'broken-path-ref', severity: 'info', target: file,
+        issue: `${file} references \`${ref}\`, which doesn't exist in this workspace`,
+        action: 'fix or remove the reference, or re-copy from the template',
+        key: makeKey('broken-path-ref', file, ref),
+      });
+    }
   }
 
   // F1: acknowledgments — designer-owned, live in annotations.json (`hygiene.acks`), survive every

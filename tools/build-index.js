@@ -26,6 +26,12 @@ const AI_BEGIN = '<!-- ai:begin method=ai — written by the describe step, NOT 
 const AI_END = '<!-- ai:end -->';
 const PENDING = '_(not yet described — run the describe step)_';
 
+// F6/E6: bump whenever CLAUDE.md/AGENTS.md's INSTRUCTIONAL content changes (not every kit release —
+// only when a workspace running an older copy would actually miss something). Stamped as the last line
+// of each file; a workspace copy running behind this gets a one-line, info-level hygiene warning rather
+// than drifting silently (F6: a 7-day-old workspace had no design-new instruction at all, undetected).
+const KIT_SURFACES_VERSION = 1;
+
 // journal actor canon — CLOSED set. The dashboard's journal filter chips (All/You/The kit/Your AI)
 // assume every event's actor is exactly one of these three, so each entry matches exactly one filter.
 // Any unrecognized actor string (future event kind, typo) coerces to the nearest canonical one instead
@@ -71,7 +77,11 @@ function templateLabel(m) {
   if (!words.length) return null;
   words[words.length - 1] = words[words.length - 1].replace(/s$/, ''); // singularize the final word only
   const titled = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  return titled ? `${titled} Details` : null;
+  if (!titled) return null;
+  // E15: a pattern whose last segment IS already "order-details" singularizes to "Order Detail" above,
+  // and unconditionally appending " Details" produced "Order Detail Details". Pluralize the existing
+  // word back instead of stacking a second one.
+  return /\bDetail$/i.test(titled) ? titled.replace(/Detail$/i, 'Details') : `${titled} Details`;
 }
 
 function headingsFrom(contentMd, max = 8) {
@@ -418,6 +428,19 @@ function buildIndex(libDir) {
   if (leftover.length > MAX_SINGLES) pushGroup('(assorted one-off pages)', leftover.slice(MAX_SINGLES));
   const frontierTotal = [...fro.values()].length;
 
+  // 2e. offOrigin (F11): hosts linked from captured pages that the same-origin-only crawl never follows.
+  // inbound = number of distinct captured pages referencing that host (mirrors inboundCount's semantics).
+  const offOriginTally = new Map(); // host -> Set(slug)
+  for (const [slug, p] of Object.entries(pages)) {
+    for (const host of p.meta.offOriginHosts || []) {
+      if (!offOriginTally.has(host)) offOriginTally.set(host, new Set());
+      offOriginTally.get(host).add(slug);
+    }
+  }
+  const offOrigin = [...offOriginTally.entries()]
+    .map(([host, slugs]) => ({ host, inbound: slugs.size }))
+    .sort((a, b) => b.inbound - a.inbound || (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
+
   // 3. per-page page.md (regenerated; AI section preserved)
   const navOrder = sitemap.pages.map(x => x.slug);
   const ordered = [...navOrder.filter(s => pages[s]), ...Object.keys(pages).filter(s => !navOrder.includes(s))];
@@ -684,6 +707,9 @@ function buildIndex(libDir) {
       description: p.description ? { text: p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim(), method: 'ai', fullDoc: `pages/${slug}/page.md` } : null,
     }]; })),
     frontier: { total: frontierTotal, note: 'discovered during capture, not downloaded; select on map.html or pass to capture.js --urls', nodes: frontier },
+    // F11: hosts linked from captured pages that same-origin capture never follows (e.g. a marketing
+    // site's "Sign in" pointing at a separate app subdomain) — not in frontier, not in readiness.
+    offOrigin,
     // additive dashboard-v2 top-level fields
     identity, readiness, events,
   };
@@ -696,6 +722,28 @@ function buildIndex(libDir) {
   // Especially catches what guided (human-driven) capture can introduce: dupes, orphans, dead states.
   let hygiene = null;
   try { hygiene = require('./hygiene.js').runHygiene(libDir); } catch (_) {}
+
+  // E6: surfaces-version staleness — CLAUDE.md/AGENTS.md carry a version stamp as their last line
+  // (HTML comment). A workspace copy behind tools/'s own KIT_SURFACES_VERSION gets one info-level
+  // hygiene line, never a build failure. No stamp at all (pre-E6 workspace) counts as stale.
+  if (hygiene && !hygiene.error) {
+    const workspaceRoot = path.join(libDir, '..');
+    const stampVersion = (file) => {
+      try {
+        const m = fs.readFileSync(path.join(workspaceRoot, file), 'utf8').match(/design-context-kit surfaces v(\d+)/);
+        return m ? parseInt(m[1], 10) : null;
+      } catch { return null; }
+    };
+    if (stampVersion('CLAUDE.md') !== KIT_SURFACES_VERSION || stampVersion('AGENTS.md') !== KIT_SURFACES_VERSION) {
+      hygiene.quality = hygiene.quality || [];
+      hygiene.quality.push({
+        kind: 'quality', subKind: 'stale-surfaces', severity: 'info', target: 'CLAUDE.md/AGENTS.md',
+        issue: 'CLAUDE.md/AGENTS.md are older than tools/ — re-copy them from the template.',
+        action: 're-copy CLAUDE.md, AGENTS.md and skills/ from the template',
+        key: 'quality::stale-surfaces',
+      });
+    }
+  }
 
   // 4b. tokens.json + dashboard.html — Map · Home · Design language (self-contained; live via tools/map.js)
   // F2: `brand` is strictly additive (appended after every existing field) and only present when derived.
@@ -764,9 +812,19 @@ function buildIndex(libDir) {
     return `| **${m.navLabel || templateLabel(m) || m.title || slug}**${tpl} | \`${m.route}\` | ${desc} | [📸](pages/${slug}/screenshot.png) [HTML](pages/${slug}/page.html) [MD](pages/${slug}/page.md) |`; };
   const navSlugs = ordered.filter(s => !pages[s].meta.template);
   const tplSlugs = ordered.filter(s => pages[s].meta.template);
+  // F4: machine-readable front-matter — every auto-load subject opened INDEX.md first regardless of
+  // where the prose pointed (F4's evidence); this puts the counts they went hunting for on the first
+  // lines instead. Exact keys, deterministic (same inputs registry.json already computes).
+  const frontMatter = [
+    '```',
+    `described: ${describedCount}/${capturedCount} · states: ${statesTotalD} · frontier: ${frontierTotal} · offOrigin: ${offOrigin.length} hosts · labels: scraped`,
+    '```',
+    '',
+  ];
   const index = [
     `# ${sitemap.product} — design context library`,
     '',
+    ...frontMatter,
     `Captured ${manifest.capturedAt.slice(0, 10)} from ${sitemap.origin} · ${ordered.length} pages · read-only scrape, provenance-stamped.`,
     '',
     `**[Open the dashboard](dashboard.html)** — coverage map (**${frontierTotal}** discovered-but-not-downloaded pages on the frontier), capture overview, and the product's observed design tokens ([tokens.json](tokens.json), method: heuristic). Run \`node tools/map.js\` to make it live (unlock frontier pages, add state URLs).`,

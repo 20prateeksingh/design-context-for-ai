@@ -905,17 +905,26 @@ function toast(msg, sticky){ const t=document.getElementById('toast'); t.textCon
 // Canonical wordings — the single source of truth is prds/use-it-layer.md Appendix A.
 // Change one, review both. Copied text is PLAIN markdown; real workspace paths baked in.
 const PROMPTS = {
+  // A.1 (ux-copy.md — verbatim)
   describeLibrary: () => "Open this folder's design context. Read `design-context/registry.json`, then for every page whose `page.md` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per `skills/capture-product/SKILL.md` §5 — grounded only in that page's `content.md`, `screenshot.png`, and `meta.json`. Never invent features; never edit anything outside the markers. Then run `node tools/build-index.js`.",
-  wireframe: (slug) => "Read `design-context/pages/" + slug + "/page.md` and look at its `screenshot.png`. I want to explore: ‹describe your change›. Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` (never edit `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with `node tools/shot.js`.",
+  // A.2 (ux-copy.md — revised 2026-07-28 E7: registry-first clause prepended)
+  wireframe: (slug) => "Read `design-context/registry.json` for the shape of this product, then `design-context/pages/" + slug + "/page.md` and its `screenshot.png` for the page itself. I want to explore: ‹describe your change›. Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` (never edit `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with `node tools/shot.js`.",
+  // A.3 (ux-copy.md — verbatim)
   whatsMissing: () => "Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`. Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why. Don't capture anything yet — recommend.",
+  // A.4 (ux-copy.md — verbatim)
   addState: () => "I can reach a page state via URL. Run `node tools/capture.js --state <slug>:<state-name> --url \"<the url>\"` and confirm it landed under `design-context/pages/<slug>/states/`.",
   // A.9 (ux-copy.md — verbatim) — guided capture: human-driven, button-only states/modals
   guided: () => "Run `node tools/capture.js --guided --url ‹where to start›`. A browser window opens on my logged-in profile — I'll drive. Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`. When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found.",
+  // A.5 (ux-copy.md — verbatim)
   auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
-  recaptureCheck: () => "The product may have changed. Re-run `node tools/capture.js --config design-context/product.json`, then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
-  bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/INDEX.md` to learn this product, and ask me what I want to work on.",
-  // A.8 (ux-copy.md — revised 2026-07-27: skill pointer + shell instruction, evidence: create-chain run)
-  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. **Per `skills/wireframe-on-snapshot/SKILL.md` §7:** start from the captured page whose shell this new page would share, work on a COPY in `wireframes/new/‹concept›/round-1/` (never in `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi. If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style. Render previews with `node tools/shot.js`.",
+  // A.6 (ux-copy.md — revised 2026-07-28 E1: product.json-if-it-exists, else rebuild from manifest.json)
+  recaptureCheck: () => "The product may have changed. Re-run the capture with the same settings as last time — use `design-context/product.json` if it exists, otherwise read the parameters recorded in `design-context/manifest.json` and rebuild the command from those. Then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
+  // A.7 (ux-copy.md — revised 2026-07-28 E4: registry.json replaces INDEX.md as the entry file)
+  bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/registry.json` to learn this product, and ask me what I want to work on.",
+  // A.8 (ux-copy.md — revised 2026-07-27: skill pointer + shell instruction, evidence: create-chain run;
+  // 2026-07-28 E10: ‹concept› placeholder made self-evidently the designer's to fill)
+  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. **Per `skills/wireframe-on-snapshot/SKILL.md` §7:** start from the captured page whose shell this new page would share, work on a COPY in `wireframes/new/<kebab-case name for this concept, your choice>/round-1/` (never in `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi. If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style. Render previews with `node tools/shot.js`.",
+  // A.11 (ux-copy.md — verbatim; added after the original use-it-layer.md Appendix A canon, first numbered 2026-07-28)
   askQuestion: () => "Read `design-context/registry.json` and `INDEX.md` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.",
   // A.10 (ux-copy.md — verbatim) — the Figma exit: convert a captured page/state to editable Figma layers
   figma: () => "Open the dashboard, go to the page you want, click ⧉ Copy for Figma, and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
@@ -2167,8 +2176,42 @@ function initDashboard(){
   // Source of truth: DASH.overview.hygiene — the SAME live runHygiene() findings (with F1's stable keys
   // + acknowledged flags) build-index.js computes every rebuild, never the historical hygiene.json snapshot.
   function pageLabelOf(slug){ const n = byId[slug]; return n ? dlabel(n) : slug; }
+  // E15: cap a hygiene-card label at ~48 chars on a word boundary — two full site-generic <title>s (e.g.
+  // matching Flipkart product pages) read as unreadable noise in a one-line finding otherwise.
+  function shortLabel(s, n=48){ s = s||''; if (s.length<=n) return s;
+    const cut = s.slice(0, n-1), wb = cut.replace(/\s+\S*$/, ''); return (wb||cut)+'…'; }
+  // When capping collapses two DIFFERENT pages to the same visible text, tell them apart: each page's
+  // own route's last segment; if that still collides, the full route; if there's no route at all, the slug.
+  function distinguishBits(slugs){
+    const routeOf = (s) => (byId[s] && byId[s].route) || '';
+    const lastSeg = (r) => (r.split('?')[0].split('/').filter(Boolean).pop()) || '';
+    let cands = slugs.map(s => lastSeg(routeOf(s)) || routeOf(s) || s);
+    if (new Set(cands).size < slugs.length) cands = slugs.map(s => routeOf(s) || s);
+    // routes collided too (templated variants sharing one literal route) — the slug is the last resort,
+    // but two long template slugs usually share a long prefix and differ only in their trailing hash;
+    // show just the differing tail so the parenthetical stays short instead of repeating the whole slug.
+    if (new Set(cands).size < slugs.length) {
+      const lcp = (a, b) => { let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; return i; };
+      const prefixLen = slugs.reduce((min, s) => Math.min(min, lcp(slugs[0], s)), slugs[0].length);
+      cands = slugs.map(s => s.slice(prefixLen) || s);
+    }
+    const out = {}; slugs.forEach((s,i)=>out[s]=cands[i]); return out;
+  }
   // ‹A›/‹B› are page display labels, never slugs — the slug rides on the title attr for anyone who needs it.
-  function pgspan(slug){ return `<span title="${esc(slug)}">${esc(pageLabelOf(slug))}</span>`; }
+  // Batch form: collision detection (and the disambiguating parenthetical) only makes sense across the
+  // set of labels sharing ONE hygiene line, so every multi-page call site passes its slugs together.
+  function pgspans(slugs){
+    const capped = slugs.map(s => shortLabel(pageLabelOf(s)));
+    const counts = {}; capped.forEach(c => counts[c]=(counts[c]||0)+1);
+    const colliding = slugs.filter((s,i)=>counts[capped[i]]>1);
+    const bits = colliding.length ? distinguishBits(colliding) : {};
+    return slugs.map((s,i)=>{
+      let label = capped[i];
+      if (counts[label] > 1) label = `${label} (${bits[s]})`;
+      return `<span title="${esc(s)}">${esc(label)}</span>`;
+    });
+  }
+  function pgspan(slug){ return pgspans([slug])[0]; }
   function targetSpan(target){ const t = String(target||''); const i = t.indexOf(' › ');
     return i<0 ? pgspan(t) : `${pgspan(t.slice(0,i))} › ${esc(t.slice(i+3))}`; }
   function targetPlain(target){ const t = String(target||''); const i = t.indexOf(' › ');
@@ -2187,17 +2230,19 @@ function initDashboard(){
   function hygRow(it){
     const A = pgspan;
     if (it.kind==='duplicate-content'){
-      const names = it.pages.map(A);
+      const names = pgspans(it.pages);
       const line = names.length===2 ? `${names[0]} and ${names[1]} are the same capture twice.` : `${andListHtml(names)} are the same capture, more than once.`;
       return { line, primary:{ label:'Fold into one', act:'fold', key:it.key, rep:it.repSlug, members:it.members },
         secondary:{ label:'Keep both', act:'ack', key:it.key } };
     }
     if (it.kind==='same-template'){
-      if (it.matchesRep && it.pages.length===1)
-        return { line: `${A(it.pages[0])} uses the same layout as ${A(it.repSlug)} — one example can stand for both.`,
+      if (it.matchesRep && it.pages.length===1){
+        const [aSpan, repSpan] = pgspans([it.pages[0], it.repSlug]);
+        return { line: `${aSpan} uses the same layout as ${repSpan} — one example can stand for both.`,
           primary:{ label:'Fold into one example', act:'fold', key:it.key, rep:it.repSlug, members:it.members, pattern:it.pattern },
           secondary:{ label:'Keep both', act:'ack', key:it.key } };
-      const names = (it.matchesRep ? [...it.pages, it.repSlug] : it.pages).map(A);
+      }
+      const names = pgspans(it.matchesRep ? [...it.pages, it.repSlug] : it.pages);
       return { line: `${andListHtml(names)} share one layout — one example can stand for all of them.`,
         primary:{ label:'Fold into one example', act:'fold', key:it.key, rep:it.repSlug, members:it.members, pattern:it.pattern },
         secondary:{ label:'Keep them all', act:'ack', key:it.key } };
@@ -2802,7 +2847,7 @@ function initDashboard(){
         else omittedDoc=true;
       }
       L.push('', '---',
-        'You are helping a designer. The above is a captured snapshot of a real product: everything was extracted from the live site, except page descriptions (labeled method: ai — model-written orientation). Do not invent pages, routes, or features not listed here; build on what exists. Ask the designer which page to work on.');
+        `You are helping a designer. The above is a captured snapshot of a real product: everything here was extracted from the live site.${DASH.identity.described > 0 ? ' The one exception is the page descriptions, labeled method: ai — model-written orientation.' : ' No page has been described yet, so every line above is raw scraped text — including the page names, which are nav strings and may be truncated or run two phrases together.'} Do not invent pages, routes, or features not listed here; build on what exists. You have only this summary — no page HTML, no screenshots, no page copy — so you can answer questions and sketch structure in text, but you cannot produce a real wireframe on the product's own markup. If the designer asks for one, say so and point them at the workspace folder, where an AI with file access builds it on the captured page. Ask the designer which page to work on.`);
       let text=L.join('\n'), capped=false; const CAP=15000;
       if (text.length>CAP){ text=text.slice(0,CAP)+'\n\n[bundle truncated at 15k chars]'; capped=true; }
       let note = 'Bundle copied — product, pages, templates, and tokens included.';
@@ -2814,7 +2859,7 @@ function initDashboard(){
 
     el.innerHTML = `<div class="useit">
       <h2>Use it — what to do with your design context</h2>
-      <p class="lead">your AI has read this library · answers and designs will be grounded in it, not generic</p>
+      <p class="lead">${DASH.identity.described>0 ? 'your AI has read this library · answers and designs will be grounded in it, not generic' : 'nothing has read this library yet · start with <b>Describe the pages</b> below, then answers and designs will be grounded in it, not generic'}</p>
       <div class="create">
         <div class="t"><span class="kick">The reason this library exists</span>
           <h3>Design something new — in ${esc(DASH.identity.name)}'s own language</h3>
