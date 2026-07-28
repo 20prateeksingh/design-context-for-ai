@@ -1,5 +1,37 @@
 # UX copy canon
 
+## 2026-07-28 — diversity-sweep fix train (D1–D8)
+
+`prds/v1-fix-diversity.md`, off `prds/v1-diversity-uat-REPORT.md`. New/changed designer-facing strings only — D5 (heading extraction) and D8 (directed gate) introduced no copy.
+
+**D1 — hygiene mid-render finding** (`tools/hygiene.js` — content length no longer consulted; `N` = measured visible loading indicators):
+- Measured (post-fix captures): `N loading indicator(s) still visible in the captured DOM — possibly captured mid-render`
+- Fallback (pre-fix captures, no `meta.json.visibleLoadingMarkers` yet, demoted to info): `loading markers + thin content — possibly captured mid-render (re-capture to measure)`
+
+**D2 — blocked headless capture** (terminal, printed once at the end of a crawl when `--headless` and the run got 0 pages or a majority `blocked`):
+`⚠  Blocked pages + --headless often means the site rejects headless browsers — retry without --headless (a browser window will open).`
+
+**D3 — zero-page capture, INDEX.md** (`build-index.js`'s new empty-registry branch; `‹why›` is `every attempted page was skipped (‹reasons›)`, `every attempted page failed to capture`, or `no capture has run yet, or it found nothing to capture`):
+`**No pages are captured yet** — ‹why›. See [manifest.json](manifest.json) for the full detail.`
+
+**D4 — dashboard attempt banner** (rides F7's file:// banner mechanism — `.filebanner`/`--fb-h`, dismissible, zero layout cost when absent; `N` = blocked count):
+`Your last capture couldn't download anything — N page${N===1?' was':'s were'} blocked by the site. The wizard below re-runs it; if this keeps happening, the site may not allow automated capture.`
+Appended when the last attempt used `--headless` (D2's own string, verbatim, one space before it): ` Blocked pages + --headless often means the site rejects headless browsers — retry without --headless (a browser window will open).`
+
+**D6 — truncated screenshot** (a page taller than `SAFE_SCREENSHOT_HEIGHT` — capped at the viewport resize, never Chromium's scroll-and-stitch, so there's no seam to avoid in the first place; `shownPx`/`fullPx` from `meta.json.screenshotTruncated`):
+- Hygiene, info-level: `screenshot shows the first ‹shownPx›px of a ‹fullPx›px page`
+- `page.md`'s Files section: `_Screenshot shows the first ‹shownPx›px of a ‹fullPx›px page — the full page is still captured in [content.md](content.md)._`
+
+**D7 — off-origin hosts, INDEX.md** (new section, only when `offOrigin.length > 0`; hostnames are always the decoded `hostDisplay` form — `registry.json` keeps the raw punycode as ground truth):
+```
+## Off-origin (linked but not captured — a different host)
+
+N hosts linked from captured pages, on a different host the same-origin crawl never follows:
+
+- ‹hostDisplay› (‹inbound› pages link here)
+- …and ‹N-10› more — see registry.json's `offOrigin` array
+```
+
 ## 2026-07-28 — busy states: honest stages, one ring (F1–F2)
 
 `prds/ux-busy-states.md`. F1 replaces the guided-end path's one frozen message with real checkpoints;

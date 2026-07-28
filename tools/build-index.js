@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { domainToUnicode } = require('url');
 
 const AI_BEGIN = '<!-- ai:begin method=ai — written by the describe step, NOT ground truth -->';
 const AI_END = '<!-- ai:end -->';
@@ -84,8 +85,18 @@ function templateLabel(m) {
   return /\bDetail$/i.test(titled) ? titled.replace(/Detail$/i, 'Details') : `${titled} Details`;
 }
 
-function headingsFrom(contentMd, max = 8) {
-  return contentMd.split('\n').filter(l => /^#{1,6} /.test(l)).slice(1, 1 + max) // skip the title line
+// D5: root-caused the "On this page" truncation — content.md always begins with ITS OWN generated
+// "# {title}" line (capture.js writes it as line 1, before the real DOM extraction starts), which is
+// itself a `#`-heading match. The old code matched every `#`-line first, THEN sliced off exactly one
+// entry (`.slice(1, 1 + 8)`) to account for that — but content.md's real DOM extraction usually starts
+// with the page's OWN <h1>, a second title-like match, so the slice's implicit "skip 1" assumption was
+// already wrong by one, AND the hardcoded max=8 silently dropped anything past the 8th real heading —
+// confirmed truncating 3 separate MDN pages at exactly that count. Fix: drop content.md's generated
+// title by POSITION (it is always line 1, deterministic by construction) rather than by counting
+// matches, and keep every real heading after it — max is a generous sanity ceiling, not a design limit.
+function headingsFrom(contentMd, max = 300) {
+  const body = contentMd.split('\n').slice(1).join('\n'); // drop content.md's own generated title line only
+  return body.split('\n').filter(l => /^#{1,6} /.test(l)).slice(0, max)
     .map(l => l.replace(/^#+ /, '').trim()).filter(Boolean);
 }
 
@@ -262,10 +273,60 @@ function deriveBrand(tokens) {
   return { seed: seed.value.toUpperCase(), applied: { accent, accentStrong, buttonText }, source: 'observed', basis: { count: seed.count, pages: seed.pages } };
 }
 
+// D3: the zero-page branch — same public shape (registry.json + INDEX.md), honest content. Never
+// throws even if manifest fields are missing/unexpected (a hand-built or edge-case manifest.json).
+function buildEmptyIndex(libDir, manifest) {
+  const product = (manifest && manifest.product) || path.basename(path.dirname(libDir));
+  const origin = (manifest && (manifest.resolvedOrigin || manifest.startUrl)) || null;
+  const skipped = (manifest && manifest.skipped) || [];
+  const failed = (manifest && manifest.failed) || [];
+  const reasons = [...new Set(skipped.map(s => s && s.reason).filter(Boolean))];
+
+  const registry = {
+    product, origin, capturedAt: (manifest && manifest.capturedAt) || null,
+    generated: 'build-index.js — derived view; ground truth lives in pages/*/meta.json',
+    howToConsume: 'This capture landed 0 pages — see manifest.json for the per-page skipped/failed reasons. Re-run capture once the underlying issue is addressed.',
+    pages: {},
+    frontier: { total: 0, note: 'discovered during capture, not downloaded; select on map.html or pass to capture.js --urls', nodes: [] },
+    offOrigin: [],
+    identity: null, readiness: null, events: [],
+  };
+  fs.writeFileSync(path.join(libDir, 'registry.json'), JSON.stringify(registry, null, 2), 'utf8');
+
+  const why = reasons.length ? `every attempted page was skipped (${reasons.join(', ')})`
+    : (failed.length ? 'every attempted page failed to capture' : 'no capture has run yet, or it found nothing to capture');
+  const index = [
+    `# ${product} — design context library`,
+    '',
+    '```',
+    'described: 0/0 · states: 0 · frontier: 0 · offOrigin: 0 hosts · labels: scraped',
+    '```',
+    '',
+    `**No pages are captured yet** — ${why}. See [manifest.json](manifest.json) for the full detail.`,
+    '',
+    origin ? `Last attempt was against: ${origin}` : null,
+    '',
+    'Re-run capture once the underlying issue is addressed — see the workspace CLAUDE.md for the command.',
+  ].filter(x => x !== null).join('\n');
+  fs.writeFileSync(path.join(libDir, 'INDEX.md'), index, 'utf8');
+
+  return { pages: 0, described: 0, frontier: 0, hygiene: null };
+}
+
 function buildIndex(libDir) {
   const pagesDir = path.join(libDir, 'pages');
-  const sitemap = JSON.parse(fs.readFileSync(path.join(libDir, 'ia', 'sitemap.json'), 'utf8'));
   const manifest = JSON.parse(fs.readFileSync(path.join(libDir, 'manifest.json'), 'utf8'));
+
+  // D3: a capture that landed 0 pages (fully blocked, cap hit at zero, etc.) never gets a pages/
+  // directory at all — writeSnapshot only mkdir's it on an actual write, which happens AFTER the
+  // bad-page check, so a 100%-blocked run leaves neither pages/ nor ia/sitemap.json behind. That's a
+  // real STATE to report honestly (see manifest.json's own skipped/failed reasons), not a crash —
+  // build-index used to abort here with an unhandled ENOENT scanning a directory that was never
+  // created. Any workspace with at least one real captured page is untouched by this guard.
+  const hasPages = fs.existsSync(pagesDir) && fs.readdirSync(pagesDir).some(slug => fs.existsSync(path.join(pagesDir, slug, 'meta.json')));
+  if (!hasPages) return buildEmptyIndex(libDir, manifest);
+
+  const sitemap = JSON.parse(fs.readFileSync(path.join(libDir, 'ia', 'sitemap.json'), 'utf8'));
 
   // 1. load every page's meta + existing AI description
   const pages = {};
@@ -437,8 +498,12 @@ function buildIndex(libDir) {
       offOriginTally.get(host).add(slug);
     }
   }
+  // D7: `host` stays the raw punycode form (ground truth, unchanged) — `hostDisplay` is additive, for
+  // anywhere this reaches a designer (an AI agent quoting it in chat, INDEX.md, the dashboard). Node's
+  // domainToUnicode is a no-op on an already-ASCII host, so this is safe for every product, not just an
+  // IDN one.
   const offOrigin = [...offOriginTally.entries()]
-    .map(([host, slugs]) => ({ host, inbound: slugs.size }))
+    .map(([host, slugs]) => ({ host, hostDisplay: domainToUnicode(host), inbound: slugs.size }))
     .sort((a, b) => b.inbound - a.inbound || (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
 
   // 3. per-page page.md (regenerated; AI section preserved)
@@ -680,6 +745,9 @@ function buildIndex(libDir) {
         : `- **${s.name}** — pending (${s.url})`), ''] : []),
       '## Files',
       `[screenshot](screenshot.png) · [editable HTML](page.html) · [verbatim copy](content.md) · [style tally](computed-tokens.json) · [meta](meta.json)`,
+      // D6: an honest partial beats a corrupted whole — the screenshot only shows the top slice on a
+      // page tall enough that a full capture would mis-render (see meta.json.screenshotTruncated).
+      ...(m.screenshotTruncated ? [`_Screenshot shows the first ${m.screenshotTruncated.shownPx}px of a ${m.screenshotTruncated.fullPx}px page — the full page is still captured in [content.md](content.md)._`] : []),
       '',
       ...(p.headings.length ? ['## On this page (headings, verbatim)', ...p.headings.map(h => `- ${h}`), ''] : []),
       ...(p.linksTo.length ? ['## Links to (captured pages)', ...p.linksTo.map(t => `- [${t.replace(' (template)', '')}](../${t.replace(' (template)', '')}/page.md)${t.endsWith('(template)') ? ' _(via template)_' : ''}`), ''] : []),
@@ -839,6 +907,14 @@ function buildIndex(libDir) {
     '## How pages connect',
     '', ...ordered.filter(s => pages[s].linksTo.length).map(s => `- **${pages[s].meta.navLabel || s}** → ${pages[s].linksTo.map(t => t.replace(' (template)', '⧉')).join(', ')}`),
     '',
+    // D7: the human front door showing readable hostnames — decoded (hostDisplay), never the raw
+    // punycode form registry.json keeps as ground truth. Top 10 by inbound count; the rest are in
+    // registry.json's own offOrigin array for anything that needs the full list.
+    ...(offOrigin.length ? ['## Off-origin (linked but not captured — a different host)', '',
+      `${offOrigin.length} host${offOrigin.length === 1 ? '' : 's'} linked from captured pages, on a different host the same-origin crawl never follows:`, '',
+      ...offOrigin.slice(0, 10).map(o => `- ${o.hostDisplay} (${o.inbound} page${o.inbound === 1 ? '' : 's'} link here)`),
+      ...(offOrigin.length > 10 ? [`- …and ${offOrigin.length - 10} more — see registry.json's \`offOrigin\` array`] : []),
+      ''] : []),
     `Skipped/failed during capture: see [manifest.json](manifest.json). Wireframes built on these pages live in \`../wireframes/\` — never inside this library.`,
   ].join('\n');
   fs.writeFileSync(path.join(libDir, 'INDEX.md'), index, 'utf8');

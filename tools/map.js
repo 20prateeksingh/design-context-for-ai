@@ -89,6 +89,22 @@ function readProduct() {
   try { return JSON.parse(fs.readFileSync(path.join(LIB, 'product.json'), 'utf8')); } catch { return null; }
 }
 
+// D4: the dashboard's own hard rule ("never present a partial capture as complete") extends to a FULLY
+// blocked one. isFirstRun() (no captured pages) can't by itself tell "never even tried" from "tried and
+// was blocked" — manifest.json (capture.js's own attempt record) can. Read it ONLY when there are no
+// real pages, so a workspace that already has a library never shows a stale attempt banner.
+function readLastAttempt() {
+  if (!isFirstRun()) return null;
+  let m;
+  try { m = JSON.parse(fs.readFileSync(path.join(LIB, 'manifest.json'), 'utf8')); } catch { return null; }
+  if (!m || typeof m !== 'object') return null;
+  const captured = (m.counts && m.counts.captured) || 0;
+  if (captured > 0) return null; // shouldn't happen alongside isFirstRun()===true, but don't second-guess a real capture
+  const skippedList = Array.isArray(m.skipped) ? m.skipped : [];
+  const blockedCount = skippedList.filter(s => s && s.reason === 'blocked').length;
+  return { at: m.capturedAt || null, captured, skipped: skippedList.length, blockedCount, blockedReason: blockedCount > 0 ? 'blocked' : null, headless: !!m.headless };
+}
+
 // ── SSE fan-out ────────────────────────────────────────────────────────────────
 function broadcast(event, data) {
   const frame = `event: ${event}\ndata: ${data}\n\n`;
@@ -263,7 +279,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET') {
     if (url === '/api/ping') return json(res, 200, { ok: true });
     if (url === '/api/status') return json(res, 200, {
-      ok: true, firstRun: isFirstRun(), product: readProduct(),
+      ok: true, firstRun: isFirstRun(), product: readProduct(), lastAttempt: readLastAttempt(),
       workspacePath: KIT,  // absolute path of THIS workspace root — served live only, never baked into dashboard.html
       capture: { running: !!(capJob && capJob.running), mode: capJob ? capJob.mode : null, done: !!(capJob && !capJob.running) },
       login: { running: !!(loginJob && loginJob.running), done: !!(loginJob && !loginJob.running), started: !!loginJob },
