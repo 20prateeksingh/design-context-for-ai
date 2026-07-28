@@ -346,6 +346,73 @@ const server = http.createServer((req, res) => {
         return runCapture(['--state', `${slug}:${name}`, '--url', stateUrl], res);
       }
 
+      // F1 (hygiene-speaks-designer brief): acknowledge a hygiene finding — "kept on purpose". Additive
+      // to annotations.json under hygiene.acks, keyed by the finding's stable key (F1). Never deletes a
+      // finding; hygiene still finds it next run, just marked acknowledged. No un-ack endpoint — that's
+      // an edit to annotations.json, a designer/AI act. Pattern: the existing /api/state handler above.
+      if (url === '/api/hygiene/ack') {
+        const key = String(data.key || '').trim();
+        if (!key) return json(res, 400, { ok: false, error: 'need a finding key' });
+        const note = (data.note == null || String(data.note).trim() === '') ? null : String(data.note).trim().slice(0, 500);
+        const annPath = path.join(LIB, 'annotations.json');
+        const ann = fs.existsSync(annPath) ? JSON.parse(fs.readFileSync(annPath, 'utf8')) : { pages: {} };
+        ann.hygiene = ann.hygiene || {};
+        ann.hygiene.acks = ann.hygiene.acks || {};
+        ann.hygiene.acks[key] = { note, at: new Date().toISOString() };
+        try { fs.writeFileSync(annPath, JSON.stringify(ann, null, 2), 'utf8'); }
+        catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+        if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ hygiene-ack post-build: ${e.message.split('\n')[0]}`); } }
+        console.log(`✓ hygiene ack ${key}${note ? ' — ' + note : ''}`);
+        return json(res, 200, { ok: true });
+      }
+
+      // F3: fold — a derived-view decision recorded in annotations.json (hygiene.folds), never touching
+      // pages/ on disk. Validates both slugs exist, records the fold, acks the originating finding key
+      // (if given) so the ledger card excludes it going forward, and rebuilds so build-index.js's fold
+      // derivation (member → foldedInto, rep's template/standsFor extended) takes effect immediately.
+      if (url === '/api/hygiene/fold') {
+        const rep = String(data.rep || '').trim();
+        const members = Array.isArray(data.members) ? [...new Set(data.members.map(m => String(m || '').trim()).filter(Boolean))] : [];
+        if (!rep || !members.length) return json(res, 400, { ok: false, error: 'need rep and members' });
+        if (!fs.existsSync(path.join(LIB, 'pages', rep))) return json(res, 404, { ok: false, error: 'unknown rep slug' });
+        for (const m of members) {
+          if (m === rep) return json(res, 400, { ok: false, error: 'a page cannot fold into itself' });
+          if (!fs.existsSync(path.join(LIB, 'pages', m))) return json(res, 404, { ok: false, error: `unknown member slug: ${m}` });
+        }
+        const pattern = data.pattern == null ? null : String(data.pattern).trim().slice(0, 300) || null;
+        const key = data.key == null ? null : String(data.key).trim() || null;
+        const annPath = path.join(LIB, 'annotations.json');
+        const ann = fs.existsSync(annPath) ? JSON.parse(fs.readFileSync(annPath, 'utf8')) : { pages: {} };
+        ann.hygiene = ann.hygiene || {};
+        ann.hygiene.folds = ann.hygiene.folds || [];
+        ann.hygiene.folds.push({ rep, members, pattern, at: new Date().toISOString() });
+        if (key) { ann.hygiene.acks = ann.hygiene.acks || {}; ann.hygiene.acks[key] = { note: null, at: new Date().toISOString() }; }
+        try { fs.writeFileSync(annPath, JSON.stringify(ann, null, 2), 'utf8'); }
+        catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+        if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ hygiene-fold post-build: ${e.message.split('\n')[0]}`); } }
+        console.log(`⧉ fold ${members.join(', ')} → ${rep}`);
+        return json(res, 200, { ok: true });
+      }
+
+      // F4 wiring: "Say how you got there" on an orphan finding — records the designer's own account of
+      // how the page is reached. Additive to annotations.json (ann.pages[slug].reachedBy); build-index.js
+      // and hygiene.js already treat this exactly like a meta.json reachedBy — the orphan reads explained.
+      if (url === '/api/reached-by') {
+        const slug = String(data.slug || '').trim();
+        const note = String(data.note || '').trim().slice(0, 300);
+        if (!slug || !note) return json(res, 400, { ok: false, error: 'need slug and a note' });
+        if (!fs.existsSync(path.join(LIB, 'pages', slug))) return json(res, 404, { ok: false, error: 'unknown page slug' });
+        const annPath = path.join(LIB, 'annotations.json');
+        const ann = fs.existsSync(annPath) ? JSON.parse(fs.readFileSync(annPath, 'utf8')) : { pages: {} };
+        ann.pages = ann.pages || {}; ann.pages[slug] = ann.pages[slug] || {};
+        ann.pages[slug].reachedBy = note;
+        try { fs.writeFileSync(annPath, JSON.stringify(ann, null, 2), 'utf8'); }
+        catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+        if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ reached-by post-build: ${e.message.split('\n')[0]}`); } }
+        console.log(`↳ reached-by ${slug}: ${note}`);
+        return json(res, 200, { ok: true });
+      }
+
       return json(res, 404, { ok: false, error: 'unknown endpoint' });
     });
   }

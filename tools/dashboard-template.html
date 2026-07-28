@@ -600,6 +600,29 @@
   .ent .thumbs img, .ent .thumbs i { width:64px; height:40px; border:1px solid var(--line); border-radius:4px; object-fit:cover; object-position:top; display:block; }
   .railfoot { font-size:10.5px; color:var(--dim); padding:8px 0 0 0; }
 
+  /* ── hygiene ledger card (hygiene-speaks-designer brief, F4) ── */
+  .lnk { background:none; border:0; padding:0; color:var(--link); cursor:pointer; text-decoration:underline; font:inherit; }
+  .hygfinding { border-top:1px solid var(--line); padding-top:10px; margin-top:10px; }
+  .hygfinding:first-of-type { border-top:0; padding-top:0; margin-top:0; }
+  .hygline { font-size:12px; color:var(--txt); line-height:1.45; }
+  .hygbtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center; }
+  .hygbtns .btn { font-size:11.5px; padding:5px 10px; }
+  .hygbtns .lnk { font-size:11px; background:none; border:0; padding:0; color:var(--link); cursor:pointer; text-decoration:underline; }
+  .hygnoterow { display:none; gap:6px; margin-top:8px; }
+  .hygnoterow.open { display:flex; }
+  .hygnoterow input { flex:1; font-size:11.5px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 8px; color:var(--txt); }
+  .hygfoot { margin-top:6px; }
+  .hygfoot > summary { cursor:pointer; font-size:11.5px; color:var(--dim); list-style:none; }
+  .hygfoot > summary::-webkit-details-marker { display:none; }
+  .hygfoot[open] > summary { margin-bottom:6px; }
+  .hygfoot ul { margin:0; padding:0; list-style:none; }
+  .hygfoot li { font-size:11px; color:var(--dim); padding:4px 0; border-top:1px solid var(--line); }
+  .hygfoot li:first-child { border-top:0; }
+  .hygfilehint { font-size:11px; color:var(--dim); margin-top:8px; }
+  /* the journal pill's unacked-warnings count chip (clears once fixed/acked — never on view alone) */
+  .jpill .jcount { display:inline-flex; align-items:center; justify-content:center; min-width:15px; height:15px; padding:0 4px;
+    border-radius:8px; background:var(--warn); color:var(--bg); font-size:9.5px; font-weight:700; margin-left:1px; }
+
   /* journal (full page) */
   .jwrap { max-width:940px; margin:0 auto; }
   .jhead { display:flex; align-items:flex-start; gap:14px; margin-bottom:20px; }
@@ -1199,7 +1222,10 @@ function mountFileBanner(){
 function initDashboard(){
   // ── tabs + journal pill → hash-based routing (route()/showPane() are hoisted, defined below) ──
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ location.hash = t.dataset.tab; });
-  { const jp=document.getElementById('journalpill'); if(jp) jp.onclick=()=>{ location.hash='journal'; }; }
+  { const jp=document.getElementById('journalpill'); if(jp){ jp.onclick=()=>{ location.hash='journal'; };
+    // F4 salience: a small count chip while unacked hygiene WARNINGS exist — clears once fixed or acked,
+    // never just from viewing (this is computed once at load; every hygiene action reloads the page).
+    const wc = hygieneUnackedWarnCount(); if (wc>0) jp.insertAdjacentHTML('beforeend', `<span class="jcount">${wc}</span>`); } }
 
   // ── v2.1 shared infra: display labels · skeletons/thumbnails · monogram · peek · provenance/camera ──
   const dlabel = n => (n && (n.displayLabel || n.label || n.id)) || '';
@@ -1250,9 +1276,12 @@ function initDashboard(){
   // node size = inbound links (observed), bearing = the page's nav section. Only fog is decorative.
   // Zero-overlap: discs relaxed deterministically; labels placed by a measured screen-space collision pass.
   const nodes = [], byId = {};
-  DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; nodes.push(o); byId[o.id]=o; });
+  // F3 (hygiene-speaks-designer): a folded member drops its own map node (the rep carries it) but still
+  // gets a byId entry — a direct link to its page doc (from the rep's "folded into this" list, or a
+  // stale bookmark) still resolves; it's re-shelved, not hidden.
+  DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; if (!n.foldedInto) nodes.push(o); byId[o.id]=o; });
   DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
-  const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]);
+  const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]&&!byId[e.a].foldedInto&&!byId[e.b].foldedInto);
   const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
   edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
   document.title = DATA.product + ' — design context';
@@ -1385,7 +1414,15 @@ function initDashboard(){
     // regions live in ONE opacity group (§2.5) — that is what makes the whisper track the lit canvas
     // while keeping alpha stacking geometrically impossible. #maphot is the single hover shape above it.
     let html='<div id="mapregions">';
-    regions.forEach((rg,i)=>{ html+=`<div class="mapregion" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
+    // §R rider: paint largest-first (area-descending, index tiebreak — deterministic) so a smaller
+    // district always sits LATER in the DOM than any larger one that contains it, and native hit-testing
+    // (topmost-in-paint-order wins, ties broken by later DOM position) gives the pointer to the smallest
+    // containing region instead of whichever regions.forEach() happened to visit first. data-region keeps
+    // each blob's ORIGINAL index — downstream lookups (regions[+el.dataset.region]) are untouched by the
+    // repaint order. One opacity group (#mapregions, unchanged): reordering children cannot change the
+    // composite — same pixels, same blur, same alpha — only which one wins the hover.
+    const regionOrder = regions.map((_,i)=>i).sort((a,b)=>(regions[b].w*regions[b].h - regions[a].w*regions[a].h) || (a-b));
+    regionOrder.forEach(i=>{ const rg=regions[i]; html+=`<div class="mapregion" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
     html+='</div><div id="maphot" style="display:none"></div>';
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
     // discs
@@ -1696,7 +1733,7 @@ function initDashboard(){
   function renderRail(){
     const el = railTarget(); if(!el) return;
     const n = railSel ? byId[railSel] : null;
-    if (n) renderDetail(el, n); else el.innerHTML = ledgerBody();
+    if (n) renderDetail(el, n); else { el.innerHTML = ledgerBody(); wireHygieneCard(el); }
   }
   function openPanel(n){ activeNode=n; railSel=n.id; renderRail();
     railFade(); pulseDisc(n.id);   // (v2.5.1 F5·3) ledger→detail dissolves; the chosen disc pulses once
@@ -1738,6 +1775,9 @@ function initDashboard(){
     } else {
       const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
       const depthTxt = n.clickDepth==null ? 'not linked from home' : `${n.clickDepth} click${n.clickDepth===1?'':'s'} from home`;
+      // F3 (hygiene-speaks-designer): a folded rep lists its instances as links (they still resolve —
+      // "re-shelved", not hidden); a folded member (opened directly, e.g. a stale bookmark) points back.
+      const foldedMembers = Object.values(byId).filter(x=>!x.locked && x.foldedInto===n.id);
       el.innerHTML = `<div class="railpanel">${CLOSE}<h2>${esc(dlabel(n))}</h2>
         <div class="route">${esc(n.route)}</div>
         ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank" aria-label="open full screenshot">${img2(n.screenshot,'pshot')}</a>`:''}
@@ -1746,6 +1786,8 @@ function initDashboard(){
         <button class="btn primary" id="pnl-expand" style="width:100%;margin-top:12px">Expand ↗ Open the full page doc</button>
         <div class="chiprow" style="margin-top:10px">${pchip('Wireframe on this page', PROMPTS.wireframe(n.id))}${figmaBtn(n.id)}${n.descPending ? pchip('Describe this page', PROMPTS.describeLibrary(), true) : pchip('Ask about this page', PROMPTS.askQuestion(), true)}</div>
         <div class="links" style="margin-top:8px;font-size:12px"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> · <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
+        ${n.foldedInto?`<div class="meta" style="margin-top:6px">Folded into <button class="lnk" data-goto="page/${esc(n.foldedInto)}">${esc(dlabel(byId[n.foldedInto]||{id:n.foldedInto}))}</button> — captured here, shown there.</div>`:''}
+        ${foldedMembers.length?`<h3>Also stands for</h3><div class="desc">${foldedMembers.map(m=>`<button class="lnk" data-goto="page/${esc(m.id)}">${esc(dlabel(m))}</button>`).join(' · ')}</div>`:''}
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
         ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="stateacts"><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span>${s.captured?figmaBtn(n.id, s.name, true):''}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
@@ -2120,11 +2162,184 @@ function initDashboard(){
       <div class="chiprow">${pchip('Copy a wireframe prompt', PROMPTS.wireframe(firstSlug()))}${pchip('Ask a question', PROMPTS.askQuestion(), true)}</div></div>`;
   }
 
+  // ═════════ F4 (hygiene-speaks-designer) — the hygiene ledger card ═════════
+  // Locked copy lives in prds/hygiene-speaks-designer.md §F4 (verbatim, also appended to ux-copy.md).
+  // Source of truth: DASH.overview.hygiene — the SAME live runHygiene() findings (with F1's stable keys
+  // + acknowledged flags) build-index.js computes every rebuild, never the historical hygiene.json snapshot.
+  function pageLabelOf(slug){ const n = byId[slug]; return n ? dlabel(n) : slug; }
+  // ‹A›/‹B› are page display labels, never slugs — the slug rides on the title attr for anyone who needs it.
+  function pgspan(slug){ return `<span title="${esc(slug)}">${esc(pageLabelOf(slug))}</span>`; }
+  function targetSpan(target){ const t = String(target||''); const i = t.indexOf(' › ');
+    return i<0 ? pgspan(t) : `${pgspan(t.slice(0,i))} › ${esc(t.slice(i+3))}`; }
+  function targetPlain(target){ const t = String(target||''); const i = t.indexOf(' › ');
+    return i<0 ? pageLabelOf(t) : `${pageLabelOf(t.slice(0,i))} › ${t.slice(i+3)}`; }
+  function andListHtml(items){ return items.length<2 ? (items[0]||'') : items.slice(0,-1).join(', ')+' and '+items[items.length-1]; }
+
+  function hygieneFindingsAll(){
+    const h = DASH.overview && DASH.overview.hygiene;
+    if (!h || h.error) return [];
+    return [...(h.duplicates||[]), ...(h.orphans||[]), ...(h.identicalStates||[]), ...(h.quality||[])];
+  }
+  function hygieneUnackedWarnCount(){ return hygieneFindingsAll().filter(x=>!x.acknowledged && x.severity==='warn').length; }
+
+  // One row per UNACKED WARNING: {line (HTML), primary:{label,act,...data}, secondary?:{...}}. Info-level
+  // and acknowledged findings never reach here — they collapse into the footer / are excluded (F1/F4).
+  function hygRow(it){
+    const A = pgspan;
+    if (it.kind==='duplicate-content'){
+      const names = it.pages.map(A);
+      const line = names.length===2 ? `${names[0]} and ${names[1]} are the same capture twice.` : `${andListHtml(names)} are the same capture, more than once.`;
+      return { line, primary:{ label:'Fold into one', act:'fold', key:it.key, rep:it.repSlug, members:it.members },
+        secondary:{ label:'Keep both', act:'ack', key:it.key } };
+    }
+    if (it.kind==='same-template'){
+      if (it.matchesRep && it.pages.length===1)
+        return { line: `${A(it.pages[0])} uses the same layout as ${A(it.repSlug)} — one example can stand for both.`,
+          primary:{ label:'Fold into one example', act:'fold', key:it.key, rep:it.repSlug, members:it.members, pattern:it.pattern },
+          secondary:{ label:'Keep both', act:'ack', key:it.key } };
+      const names = (it.matchesRep ? [...it.pages, it.repSlug] : it.pages).map(A);
+      return { line: `${andListHtml(names)} share one layout — one example can stand for all of them.`,
+        primary:{ label:'Fold into one example', act:'fold', key:it.key, rep:it.repSlug, members:it.members, pattern:it.pattern },
+        secondary:{ label:'Keep them all', act:'ack', key:it.key } };
+    }
+    if (it.kind==='orphan')
+      return { line: `Nothing links to ${A(it.page)} — the map can't show how you reach it.`,
+        primary:{ label:'Say how you got there', act:'reached-by', key:it.key, slug:it.page } };
+    if (it.kind==='identical-state'){
+      if (it.variant==='vs-sibling')
+        return { line: `“${esc(it.state)}” and “${esc(it.sibling)}” on ${A(it.page)} are the same view captured twice.`,
+          primary:{ label:'Re-capture it', act:'recapture-state', key:it.key, slug:it.page },
+          secondary:{ label:'Keep both', act:'ack', key:it.key } };
+      return { line: `The state “${esc(it.state)}” on ${A(it.page)} looks identical to the page itself — the click may not have changed anything.`,
+        primary:{ label:'Re-capture it', act:'recapture-state', key:it.key, slug:it.page },
+        secondary:{ label:"It's fine — keep it", act:'ack', key:it.key } };
+    }
+    if (it.kind==='quality'){
+      const slug = String(it.target||'').split(' › ')[0];
+      const T = targetSpan(it.target);
+      const byQ = {
+        'near-empty':         { line:`${T} came back nearly empty — it may have been captured mid-load.`, sec:'It really looks like this' },
+        'blob-images':        { line:`Some images on ${T} were live-only and didn't survive the capture.`, sec:'Keep as is' },
+        'missing-screenshot': { line:`${T} has no screenshot.`, sec:null },
+        'mid-render':         { line:`${T} may have been captured while still loading.`, sec:'Keep as is' },
+      };
+      const m = byQ[it.subKind]; if (!m) return null; // live-only-media is info-only, never a warning row
+      const row = { line:m.line, primary:{ label:'Re-capture', act:'recapture-page', key:it.key, slug } };
+      if (m.sec) row.secondary = { label:m.sec, act:'ack', key:it.key };
+      return row;
+    }
+    return null;
+  }
+  // Info-level footer line — plain text, no buttons; a finding can name a since-pruned page, never a link.
+  function hygInfoLine(it){
+    if (it.kind==='duplicate-content' || it.kind==='same-template') return `${(it.pages||[]).map(pageLabelOf).join(', ')} — ${it.issue}`;
+    if (it.kind==='orphan') return `${pageLabelOf(it.page)} — ${it.issue}`;
+    if (it.kind==='identical-state') return `${pageLabelOf(it.page)} › ${it.state} — ${it.issue}`;
+    if (it.kind==='quality') return `${targetPlain(it.target)} — ${it.issue}`;
+    return it.issue || '';
+  }
+  // "Copy the fix prompt" (tertiary, every warning) — a precise, self-contained instruction for the
+  // designer's AI, page URLs/slugs included: the machine surface when the button can't act live.
+  function hygFixPrompt(it){
+    if (!it) return '';
+    const urlOf = (s) => { const n = byId[s]; return n ? pageUrl(n) : s; };
+    if (it.kind==='duplicate-content')
+      return `In this design-context library, ${it.pages.join(' and ')} (${it.pages.map(urlOf).join(', ')}) capture identical content (contentHash ${it.contentHash}). Fold them into one: run \`node -e "require('./tools/build-index.js')"\` after adding {rep:\"${it.repSlug}\", members:${JSON.stringify(it.members)}} to design-context/annotations.json's hygiene.folds (or POST /api/hygiene/fold on the running dashboard server), then run \`node tools/build-index.js\`.`;
+    if (it.kind==='same-template')
+      return `In this design-context library, ${it.pages.join(', ')} (pattern \`${it.pattern}\`) share the same layout as representative \`${it.repSlug}\`. Fold ${it.members.join(', ')} into ${it.repSlug}: add {rep:\"${it.repSlug}\", members:${JSON.stringify(it.members)}, pattern:\"${it.pattern}\"} to design-context/annotations.json's hygiene.folds (or POST /api/hygiene/fold on the running dashboard server), then run \`node tools/build-index.js\`.`;
+    if (it.kind==='orphan')
+      return `In this design-context library, \`${it.page}\` (${it.route}) has no inbound link from any captured page. If you know how a person reaches it, set design-context/annotations.json → pages[\"${it.page}\"].reachedBy = \"<how you get there>\" (or POST /api/reached-by {slug:\"${it.page}\", note}), then run \`node tools/build-index.js\`. Otherwise link it from its logical parent page.`;
+    if (it.kind==='identical-state')
+      return `In this design-context library, page \`${it.page}\`'s state "${it.state}" is ${it.variant==='vs-sibling'?`identical to sibling state "${it.sibling}"`:'identical to the base page'} — the captured interaction likely didn't change the view. Re-capture it: \`node tools/capture.js --guided --url "${urlOf(it.page)}"\`, driving to the real "${it.state}" state.`;
+    if (it.kind==='quality'){
+      const slug = String(it.target||'').split(' › ')[0];
+      return `In this design-context library, ${it.target} has a capture-quality issue: ${it.issue}. Re-capture it: \`node tools/capture.js --urls "${urlOf(slug)}"\`, or if the capture is actually correct, note why in design-context/annotations.json.`;
+    }
+    return it.issue || '';
+  }
+  function hygBtnHtml(b, primary){
+    const attrs = Object.entries(b).filter(([k])=>k!=='label'&&k!=='act')
+      .map(([k,v])=>`data-hyg-${k}="${esc(Array.isArray(v)?v.join(','):v)}"`).join(' ');
+    return `<button type="button" class="btn${primary?' primary':''}" data-hyg-act="${esc(b.act)}" ${attrs}>${esc(b.label)}</button>`;
+  }
+  function hygieneCardHtml(){
+    const unacked = hygieneFindingsAll().filter(x=>!x.acknowledged);
+    const rows = unacked.filter(x=>x.severity==='warn').map(it=>({it,row:hygRow(it)})).filter(x=>x.row);
+    const infos = unacked.filter(x=>x.severity!=='warn');
+    const N = rows.length;
+    const title = N>0 ? `Worth a look — ${N} thing${N===1?'':'s'} in the library` : 'Library check — all clean';
+    const body = rows.map(({it,row})=>{
+      let noterow = '';
+      if (serverMode && row.primary.act==='reached-by')
+        noterow = `<div class="hygnoterow" data-hyg-noterow="${esc(it.key)}"><input type="text" placeholder="e.g. from the account menu" data-hyg-note="${esc(it.key)}">
+          <button type="button" class="btn primary" data-hyg-act="reached-by-confirm" data-hyg-key="${esc(it.key)}" data-hyg-slug="${esc(it.page)}">Done</button></div>`;
+      else if (serverMode && row.secondary && row.secondary.act==='ack')
+        noterow = `<div class="hygnoterow" data-hyg-noterow="${esc(it.key)}"><input type="text" placeholder="Why keep it? (optional — your AI reads this)" data-hyg-note="${esc(it.key)}">
+          <button type="button" class="btn primary" data-hyg-act="ack-confirm" data-hyg-key="${esc(it.key)}">Done</button></div>`;
+      return `<div class="hygfinding" data-hyg-finding="${esc(it.key)}">
+        <div class="hygline">${row.line}</div>
+        <div class="hygbtns">
+          ${serverMode ? hygBtnHtml(row.primary, true) : ''}
+          ${serverMode && row.secondary ? hygBtnHtml(row.secondary, false) : ''}
+          <button type="button" class="lnk" data-hyg-act="fixprompt" data-hyg-key="${esc(it.key)}">Copy the fix prompt</button>
+        </div>
+        ${noterow}
+      </div>`;
+    }).join('');
+    const footItems = infos.map(it=>`<li>${esc(hygInfoLine(it))}</li>`).join('');
+    const foot = infos.length ? `<details class="hygfoot"><summary>${infos.length} more note${infos.length===1?'':'s'} — nothing needed from you</summary><ul>${footItems}</ul></details>` : '';
+    const fileHint = serverMode ? '' : `<div class="hygfilehint">Fixes need the kit's server — run <code>tools/start.sh</code></div>`;
+    return `<div class="ent hero" id="hygcard"><div class="emeta">the kit</div>
+      <span class="etitle">${esc(title)}</span>
+      ${body}${foot}${fileHint}
+    </div>`;
+  }
+  function wireHygieneCard(root){
+    const card = root.querySelector('#hygcard'); if (!card) return;
+    card.addEventListener('click', async (e)=>{
+      const b = e.target.closest('[data-hyg-act]'); if (!b) return;
+      const act = b.getAttribute('data-hyg-act'), key = b.getAttribute('data-hyg-key');
+      if (act==='fixprompt'){ copyPrompt(hygFixPrompt(hygieneFindingsAll().find(x=>x.key===key))); return; }
+      if (act==='ack' || act==='reached-by'){
+        const row = card.querySelector(`[data-hyg-noterow="${CSS.escape(key)}"]`);
+        if (row){ row.classList.add('open'); row.querySelector('input').focus(); }
+        return;
+      }
+      if (act==='ack-confirm'){
+        const note = card.querySelector(`input[data-hyg-note="${CSS.escape(key)}"]`).value.trim();
+        b.disabled = true; toast('Noting it…', true);
+        const r = await api('/api/hygiene/ack', { key, note: note || null });
+        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        return;
+      }
+      if (act==='reached-by-confirm'){
+        const note = card.querySelector(`input[data-hyg-note="${CSS.escape(key)}"]`).value.trim();
+        if (!note) return toast('Say how you reach it — a word or two is enough');
+        b.disabled = true; toast('Noting it…', true);
+        const r = await api('/api/reached-by', { slug: b.getAttribute('data-hyg-slug'), note });
+        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        return;
+      }
+      if (act==='fold'){
+        const rep = b.getAttribute('data-hyg-rep');
+        const members = (b.getAttribute('data-hyg-members')||'').split(',').filter(Boolean);
+        const pattern = b.getAttribute('data-hyg-pattern') || null;
+        b.disabled = true; toast('Folding into one example…', true);
+        const r = await api('/api/hygiene/fold', { rep, members, pattern, key });
+        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        return;
+      }
+      if (act==='recapture-page'){ runCapture([pageUrl(byId[b.getAttribute('data-hyg-slug')])], b); return; }
+      if (act==='recapture-state'){ toast("You'll drive — the kit records.", true); launchGuided(pageUrl(byId[b.getAttribute('data-hyg-slug')])); return; }
+    });
+  }
+
   // Default rail content (F4·1) — the working ledger. Rendered into #homerail (Home) or #maprail-body (Map).
   function ledgerBody(){
     const evs = DASH.events.slice().reverse().slice(0,5);
     return `<div class="railh">Working ledger</div>
       <div class="led">
+        ${hygieneCardHtml()}
         ${nextSlot()}
         ${evs.map((e,i)=>ledgerEntry(e,true,i===0)).join('')}${''/* (F5·5) i===0 is the newest — it eases in */}
         <div class="ent future"><div class="emeta">someday · the kit</div><span class="etitle">Drift checks land here</span><div class="edetail">"3 pages changed — review side by side"</div></div>
@@ -2133,7 +2348,10 @@ function initDashboard(){
   }
 
   function renderHome(){
-    const I=DASH.identity, pend=DASH.pendingDescriptions||0, nodes=DATA.nodes;
+    // F3 (hygiene-speaks-designer): a folded member drops its own atlas card — the rep's card carries it
+    // ("stands for N" via the existing template badge below). byId still holds every node unfiltered, so
+    // a direct link to a folded member's page doc (from the rep's "folded into this" list) still resolves.
+    const I=DASH.identity, pend=DASH.pendingDescriptions||0, nodes=DATA.nodes.filter(n=>!n.foldedInto);
     const described=nodes.filter(n=>!n.descPending), templates=nodes.filter(n=>n.kind==='template');
     const withStates=nodes.filter(n=>(n.states||[]).some(s=>s.captured));
     const subtitle = pend>0 ? `${I.name} — ${I.downloaded} pages, as they really look` : `${I.name} — ${I.downloaded} pages, all described`;
@@ -2246,6 +2464,9 @@ function initDashboard(){
     const leadsTo=(n.linksTo||[]).slice(0,8), reachedFrom=(n.linkedFrom||[]).slice(0,8);
     const moreFrom=Math.max(0,(n.linkedFrom||[]).length-reachedFrom.length);
     const chip=(id)=>`<button class="lc" data-goto="page/${esc(id)}">${esc(byId[id]?dlabel(byId[id]):id)}</button>`;
+    // F3 (hygiene-speaks-designer): a folded rep's page doc lists its instances as links — nothing is
+    // hidden, it's re-shelved (byId still resolves every folded member's own doc, chip included).
+    const foldedMembers = Object.values(byId).filter(x=>!x.locked && x.foldedInto===slug);
     const hist=[];
     DASH.events.forEach(e=>{ if(e.link&&e.link.page===slug) hist.push({t:e.title,at:e.at,actor:e.actor}); });
     if(!n.descPending) hist.push({t:'Described', at:null, actor:'your AI'});
@@ -2276,7 +2497,9 @@ function initDashboard(){
             <div class="kv"><span>Linked from</span><span>${n.inboundCount||0} pages</span></div>
             <div class="kv"><span>Links out</span><span>${(n.linksTo||[]).length}</span></div>
             <div class="kv"><span>Clicks from home</span><span>${n.clickDepth==null?'not linked from home':n.clickDepth}</span></div>
-            ${n.standsFor?`<div class="kv"><span>Layout template</span><span>stands for ${n.standsFor}</span></div>`:''}</div>
+            ${n.standsFor?`<div class="kv"><span>Layout template</span><span>stands for ${n.standsFor}</span></div>`:''}
+            ${foldedMembers.length?`<div class="kv"><span>Also stands for</span><span class="lchips">${foldedMembers.map(m=>chip(m.id)).join('')}</span></div>`:''}
+            ${n.foldedInto?`<div class="kv"><span>Folded into</span><span class="lchips">${chip(n.foldedInto)}</span></div>`:''}</div>
           <div class="card"><h3 style="margin-top:0">Leads to <span class="ai" title="from the DOM">dom</span></h3>
             <div class="lchips">${leadsTo.map(chip).join('')||'<span class="edetail">—</span>'}</div>
             <h3>Reached from</h3>
