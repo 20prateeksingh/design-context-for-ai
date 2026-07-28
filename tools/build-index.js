@@ -345,6 +345,27 @@ function buildIndex(libDir) {
     p.states = states;
   }
 
+  // 2b·2 (F3 hygiene-speaks-designer): folds — designer-recorded "one example can stand for both"
+  // decisions, DERIVED-VIEW ONLY. A member gets foldedInto: rep; the rep's template/collapsed extends
+  // exactly like a capture-time template collapse (creating one fresh if the rep wasn't already a
+  // representative), pattern from the fold's own recorded `pattern` when given, else the rep's own
+  // route. meta.json is never touched — mutating `pages[slug].meta` here only shapes THIS run's
+  // registry.json/dashboard.html; removing the fold from annotations.json and rebuilding fully restores
+  // (gate). Invalid/pruned rep or member slugs are skipped, not thrown — a stale fold can't break a build.
+  const folds = (annotations.hygiene && Array.isArray(annotations.hygiene.folds)) ? annotations.hygiene.folds : [];
+  for (const fold of folds) {
+    const rep = pages[fold.rep];
+    if (!rep) continue;
+    const validMembers = (fold.members || []).filter(m => pages[m] && m !== fold.rep && !pages[m].foldedInto);
+    if (!validMembers.length) continue;
+    if (!rep.meta.template) {
+      const pat = fold.pattern || rep.meta.route || '/';
+      rep.meta.template = pat; rep.meta.pattern = pat; rep.meta.collapsed = 0;
+    }
+    rep.meta.collapsed += validMembers.length;
+    for (const m of validMembers) pages[m].foldedInto = fold.rep;
+  }
+
   // 2c. the FRONTIER — group the raw per-URL map (`fro`, built in 2a) by pattern.
   // group by id-pattern → merge one-segment-different patterns (same rule as capture's
   // mergeTemplateGroups) → fold prefix-sharing singles into /prefix/:slug groups →
@@ -657,6 +678,8 @@ function buildIndex(libDir) {
       states: p.states, designerNotes: p.notes,
       // additive dashboard-v2 fields (never mutate/remove existing ones): observed inbound count + measured click-depth from home
       inboundCount: p.linkedFrom.length, clickDepth: depths[slug],
+      // F3: fold — set only on a member folded into a representative (derived view; disk untouched)
+      foldedInto: p.foldedInto || null,
       // description = the ai section's FIRST paragraph (one-liner); the full screen doc stays in page.md
       description: p.description ? { text: p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim(), method: 'ai', fullDoc: `pages/${slug}/page.md` } : null,
     }]; })),
@@ -691,6 +714,7 @@ function buildIndex(libDir) {
         states: p.states, notes: p.notes, descPending: !p.description,
         inboundCount: p.linkedFrom.length, clickDepth: depths[slug], section: sectionOf(m.route),
         linksTo: p.linksTo.map(t => t.replace(' (template)', '')), linkedFrom: p.linkedFrom,
+        foldedInto: p.foldedInto || null, // F3: set only on a member folded into a representative
       }; }),
       frontier: frontier.map(f => ({ ...f, section: f.pattern ? sectionOf(f.pattern) : sectionOfUrl(f.url) })),
       edges: [
