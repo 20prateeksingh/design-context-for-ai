@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Context Kit — your product, as design context any AI can read</title>
+<meta name="description" content="A free, open-source kit that captures your product's real screens, tokens, and patterns into a local library — so your AI designs in your product's language, not from generic memory.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%234F46E5'/%3E%3Ccircle cx='8' cy='8' r='2.2' fill='none' stroke='%23fff' stroke-width='1.4'/%3E%3Ccircle cx='13' cy='3.2' r='1.3' fill='%23fff'/%3E%3Ccircle cx='3' cy='4.2' r='1.3' fill='%23fff'/%3E%3Ccircle cx='12.6' cy='12.8' r='1.3' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   docs/index.html — the Design Context Kit's public page.
+
+   ONE self-contained file: inline CSS + JS, no external requests, no fonts fetched, no analytics.
+   Images are sibling files under docs/assets/ — every one a real render of the real product
+   (provenance table lives in prds/landing-page-v1-BUILD-REPORT.md). Works from file://.
+
+   The :root block below is copied VERBATIM from tools/dashboard-template.html — the page is built out
+   of the product's own tokens, which is why it reads like the product. Tokens the dashboard needs only
+   for the map canvas are kept in place rather than pruned, so a future re-copy stays a straight diff.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+  :root { color-scheme:dark;
+          --bg:#08090A; --bg-deep:#050506; --panel:#131316; --panel-2:#1C1C1F; --card:var(--panel);
+          --line:#26262B; --txt:#F5F6F7; --dim:#8A8F98; --rail:var(--panel-2); --link:var(--accent-strong);
+          --canvas:#171A20; --canvas-lit:#1B1F26;
+          --accent:#4F46E5; --accent-strong:#918BEE; --accent-text:#FFFFFF;
+          --ok:#33B074; --bad:#E85D5D; --tpl:#9D7BF5; --warn:#D99A3D;
+          --line-2:color-mix(in srgb, var(--txt) 22%, var(--bg));
+          --elev:0 12px 34px rgba(0,0,0,.55);
+          --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+          --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+          --pad:clamp(16px,4vw,44px);
+          --measure:1040px; }
+
+  * { box-sizing:border-box; margin:0; }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--txt); font:16px/1.6 var(--sans);
+         -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+  a { color:var(--link); }
+  a:hover { text-decoration:underline; }
+  img { max-width:100%; height:auto; display:block; }
+  :focus-visible { outline:2px solid var(--accent-strong); outline-offset:2px; }
+  ::selection { background:var(--accent); color:var(--accent-text); }
+
+  .wrap { max-width:var(--measure); margin:0 auto; padding:0 var(--pad); }
+
+  /* ── the header band, same relationship the dashboard's has: panel over bg, one hairline ── */
+  header.band { background:var(--panel); border-bottom:1px solid var(--line);
+                position:sticky; top:0; z-index:20; }
+  header.band .wrap { display:flex; align-items:center; gap:16px; min-height:56px; }
+  .mark { font-size:15px; font-weight:700; letter-spacing:-.01em; }
+  .mark span { font-weight:400; color:var(--dim); }
+  header.band nav { margin-left:auto; display:flex; align-items:center; gap:6px; }
+  header.band nav a { color:var(--dim); font-size:13.5px; padding:6px 10px; border-radius:8px;
+                      text-decoration:none; }
+  header.band nav a:hover { color:var(--txt); background:var(--panel-2); text-decoration:none; }
+  header.band nav a.ghcta { color:var(--txt); border:1px solid var(--line-2); }
+  @media (max-width:640px){ header.band nav a.hidesm { display:none; } }
+
+  /* ── section rhythm ── */
+  section { padding:76px 0; border-top:1px solid var(--line); }
+  section:first-of-type { border-top:0; }
+  .eyebrow { font:400 11.5px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+             color:var(--dim); margin-bottom:14px; }
+  h2 { font-size:clamp(24px,3.4vw,32px); line-height:1.2; letter-spacing:-.02em; font-weight:650; }
+  h3 { font-size:17px; line-height:1.35; font-weight:600; letter-spacing:-.01em; }
+  .lede { color:var(--dim); font-size:17px; max-width:64ch; margin-top:12px; }
+  .note { color:var(--dim); font-size:13.5px; max-width:70ch; }
+
+  /* ── hero ── */
+  .hero { padding:clamp(56px,9vw,104px) 0 68px; }
+  .hero h1 { font-size:clamp(32px,6.2vw,58px); line-height:1.06; letter-spacing:-.035em;
+             font-weight:680; max-width:19ch; }
+  .hero .sub { color:var(--dim); font-size:clamp(16px,2.1vw,19.5px); line-height:1.55;
+               max-width:62ch; margin-top:20px; }
+  .ctas { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:32px; }
+  .btn { display:inline-flex; align-items:center; gap:9px; border-radius:10px; padding:12px 18px;
+         font-size:15px; font-weight:600; text-decoration:none; border:1px solid transparent; }
+  .btn:hover { text-decoration:none; }
+  .btn-primary { background:var(--txt); color:var(--bg); }
+  .btn-primary:hover { background:#fff; }
+  .btn-ghost { background:var(--panel); color:var(--txt); border-color:var(--line-2); }
+  .btn-ghost:hover { background:var(--panel-2); }
+
+  /* the copyable one-liner — the kit's own "copy a prompt" affordance, same shape */
+  .clone { margin-top:22px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+           display:flex; align-items:stretch; overflow:hidden; max-width:100%; }
+  .clone code { font:400 12.5px/1.5 var(--mono); color:var(--txt); padding:12px 14px; flex:1;
+                overflow-x:auto; white-space:pre; scrollbar-width:thin; }
+  .clone button { flex:none; border:0; border-left:1px solid var(--line); background:var(--panel-2);
+                  color:var(--txt); font:600 12.5px/1 var(--sans); padding:0 15px; cursor:pointer;
+                  min-width:84px; }
+  .clone button:hover { background:#24242A; }
+  .clone button[data-done="1"] { color:var(--ok); }
+
+  /* ── shared figure/panel language: --card + 1px --line + radius 10, like the dashboard's cards ── */
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  figure.shot { background:var(--card); border:1px solid var(--line); border-radius:10px;
+                overflow:hidden; }
+  figure.shot img { border-bottom:1px solid var(--line); }
+  figure.shot figcaption { padding:11px 14px; color:var(--dim); font-size:13px; }
+  .hero figure.shot { margin-top:44px; }
+
+  /* ── how it works: three steps ── */
+  .steps { display:grid; gap:18px; margin-top:36px; }
+  .step { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden;
+          display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:stretch; }
+  .step .body { padding:26px 26px 28px; align-self:center; }
+  .step .n { font:400 11.5px/1 var(--mono); color:var(--dim); letter-spacing:.1em; }
+  .step h3 { margin:10px 0 8px; font-size:19px; }
+  .step p { color:var(--dim); font-size:14.5px; }
+  .step .imgwrap { border-left:1px solid var(--line); background:var(--bg-deep);
+                   display:flex; align-items:center; overflow:hidden; }
+  .step:nth-child(even) .imgwrap { border-left:0; border-right:1px solid var(--line); order:-1; }
+  @media (max-width:800px){
+    .step, .step:nth-child(even) { grid-template-columns:minmax(0,1fr); }
+    .step .imgwrap, .step:nth-child(even) .imgwrap { border:0; border-top:1px solid var(--line); order:0; }
+  }
+
+  /* ── the library anatomy: a file tree that reads like the kit's own INDEX ── */
+  .tree { margin-top:32px; background:var(--card); border:1px solid var(--line); border-radius:10px;
+          overflow:hidden; }
+  .tree .row { display:grid; grid-template-columns:minmax(0,26ch) minmax(0,1fr); gap:6px 24px;
+               padding:11px 18px; border-top:1px solid var(--line); align-items:baseline; }
+  .tree .row:first-child { border-top:0; }
+  .tree .row.head { background:var(--panel-2); }
+  .tree .f { font:400 12.5px/1.5 var(--mono); color:var(--txt); white-space:pre; overflow-x:auto; }
+  .tree .row.dir .f { color:var(--accent-strong); }
+  .tree .d { color:var(--dim); font-size:14px; }
+  @media (max-width:700px){ .tree .row { grid-template-columns:minmax(0,1fr); gap:2px; } }
+
+  /* ── the tour: three feature panels ────────────────────────────────────────────────────────────
+     Default is STACKED — copy first, then the screenshot at the panel's full width. These are shots of
+     a 1440px dashboard; squeezed into a half-width column the treemap's hex labels and the map's ghost
+     ring stop being legible, and an illegible screenshot proves nothing. `.side` is the exception for
+     the portrait ledger crop, which suits a column. */
+  .tour { display:grid; gap:18px; margin-top:36px; }
+  .tour .feat { background:var(--card); border:1px solid var(--line); border-radius:10px;
+                overflow:hidden; }
+  .tour .feat .body { padding:26px; }
+  .tour .feat h3 { margin-bottom:9px; }
+  .tour .feat p { color:var(--dim); font-size:14.5px; max-width:76ch; }
+  .tour .feat .quote { color:var(--txt); font-size:15.5px; line-height:1.5; margin-bottom:10px;
+                       max-width:60ch; }
+  .tour .feat .imgwrap { border-top:1px solid var(--line); background:var(--bg-deep); overflow:hidden;
+                         display:flex; align-items:flex-start; justify-content:center; }
+
+  .tour .feat.side { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
+  .tour .feat.side .body { align-self:center; }
+  .tour .feat.side .imgwrap { border-top:0; border-left:1px solid var(--line); max-height:430px; }
+  @media (max-width:800px){
+    .tour .feat.side { grid-template-columns:minmax(0,1fr); }
+    .tour .feat.side .imgwrap { border-left:0; border-top:1px solid var(--line); max-height:330px; }
+  }
+
+  /* ── Figma ── */
+  .figma { display:grid; gap:18px; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
+           margin-top:34px; align-items:start; }
+  @media (max-width:800px){ .figma { grid-template-columns:minmax(0,1fr); } }
+  .layers { font:400 12.5px/1.85 var(--mono); color:var(--dim); }
+  .layers b { color:var(--txt); font-weight:400; }
+
+  /* ── principles ── */
+  .rules { display:grid; gap:1px; margin-top:34px; background:var(--line);
+           border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .rules li { list-style:none; background:var(--bg); padding:18px 20px; }
+  .rules .k { font-weight:650; font-size:15px; }
+  .rules .v { color:var(--dim); font-size:14.5px; }
+  /* five rules into two columns leaves a hole; the fifth takes the whole row instead */
+  @media (min-width:760px){
+    .rules { grid-template-columns:1fr 1fr; }
+    .rules li:last-child { grid-column:1 / -1; }
+  }
+
+  /* ── get started ── */
+  .req { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+  .req span { font:400 12.5px/1 var(--mono); color:var(--dim); background:var(--panel);
+              border:1px solid var(--line); border-radius:999px; padding:8px 13px; }
+
+  footer { border-top:1px solid var(--line); padding:34px 0 60px; color:var(--dim); font-size:13.5px; }
+  footer .wrap { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; }
+  footer .lic { font:400 12px/1 var(--mono); color:var(--txt); background:var(--panel);
+                border:1px solid var(--line-2); border-radius:999px; padding:7px 12px; }
+  footer .sep { margin-left:auto; }
+
+  /* ══ MOTION (dashboard v2.5.1 §F5 rules, applied here) ═══════════════════════════════════════════
+     Every keyframe declares only `from`; every animation uses fill-mode BACKWARDS. The implicit 100%
+     keyframe IS the element's static value, so an animation cannot land anywhere except where the static
+     layout already was — the settled render is byte-identical to the no-JS render, by construction.
+     Nothing loops, nothing is hidden in the static CSS: with JS off, or under reduced motion, every
+     element is simply already there. Durations 120–450ms, ease-out. */
+  /* The reveal target is each panel's inner copy block rather than the panel itself — the copy is what
+     the motion is about, and keeping the animation off an element that owns a border-radius + overflow
+     clip keeps the compositor out of it. */
+  @keyframes lpRise { from { opacity:0; transform:translateY(12px); } }
+  @keyframes lpFade { from { opacity:0; } }
+  .reveal.in       { animation:lpRise 380ms ease-out backwards; }
+  .reveal.in.d1    { animation-delay:70ms; }
+  .reveal.in.d2    { animation-delay:140ms; }
+  .hero h1.in      { animation:lpRise 400ms ease-out backwards; }
+  .hero .sub.in    { animation:lpRise 400ms ease-out 60ms backwards; }
+  .hero .ctas.in   { animation:lpRise 400ms ease-out 120ms backwards; }
+  .hero .clone.in  { animation:lpFade 320ms ease-out 180ms backwards; }
+  .btn, .clone button, header.band nav a { transition:background-color 140ms ease-out; }
+  @media (prefers-reduced-motion: reduce){
+    html { scroll-behavior:auto; }
+    *,*::before,*::after { transition:none!important; animation:none!important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="band">
+  <div class="wrap">
+    <span class="mark">Design Context <span>Kit</span></span>
+    <nav>
+      <a href="#how" class="hidesm">How it works</a>
+      <a href="#library" class="hidesm">The library</a>
+      <a href="#dashboard" class="hidesm">Dashboard</a>
+      <a class="ghcta" href="https://github.com/20prateeksingh/design-context-for-ai">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ═══ 1 · HERO ══════════════════════════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="wrap">
+      <h1>Your product, as design context any AI can read.</h1>
+      <p class="sub">A free, open-source kit that captures your product's real screens, tokens, and patterns into a local library — so your AI designs in your product's language, not from generic memory.</p>
+
+      <div class="ctas">
+        <a class="btn btn-primary" href="https://github.com/20prateeksingh/design-context-for-ai">Get the kit on GitHub</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+
+      <div class="clone">
+        <code id="clone-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product &amp;&amp; cd my-product &amp;&amp; tools/start.sh</code>
+        <button type="button" id="clone-copy" data-for="clone-cmd" aria-label="Copy the clone command">Copy</button>
+      </div>
+
+      <figure class="shot">
+        <img src="assets/hero-map.png" width="1680" height="1050"
+             alt="The kit's dashboard on the Map tab: eight captured pages of xflowpay.com arranged in rings around the home page, with locked pages drawn as dashed ghosts in the fog, and a working ledger down the right side.">
+        <figcaption>The Map, on a real capture of xflowpay.com — eight pages downloaded, twenty-one still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ═══ 2 · HOW IT WORKS ══════════════════════════════════════════════════════════════════════ -->
+  <section id="how">
+    <div class="wrap">
+      <p class="eyebrow">How it works</p>
+      <h2>Three steps, and only the first one is yours.</h2>
+      <p class="lede">You run one script. The kit does the capture and tells you what it did. Then your AI has a real product to design against instead of a description of one.</p>
+
+      <div class="steps">
+
+        <article class="step">
+          <div class="body reveal">
+            <p class="n">STEP 1</p>
+            <h3>Run one script</h3>
+            <p><code>tools/start.sh</code> installs what it needs, starts a local server, and opens the dashboard. The dashboard asks three things — your product's URL, whether you sign in to use it, and what kind of product it is. You never answer a question in the terminal.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/step-onboard.png" width="1200" height="660"
+                 alt="The dashboard's onboarding screen, headed 'Set up your design context', asking whether you sign in to use the product and for the address you sign in to.">
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="body reveal">
+            <p class="n">STEP 2</p>
+            <h3>The kit captures</h3>
+            <p>It follows your product's links and downloads each page as a snapshot: the real HTML, a screenshot, every word of copy, and the styles it actually uses. Pages that share a layout collapse to one example, with the count kept. You watch it land, page by page, and it tells you what it capped or skipped.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/step-capture.png" width="1200" height="635"
+                 alt="The dashboard mid-capture: counters reading 4 pages captured, 1 template collapsed, 0 skipped, 18 nav pages found, above a live log of the capture run.">
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="body reveal">
+            <p class="n">STEP 3</p>
+            <h3>Your AI designs grounded</h3>
+            <p>Point Claude Code, Cursor, or a chat window at the library and ask for a change. A wireframe comes back built on the captured page itself — your product's own shell, spacing and content, reduced to lo-fi, with the new part marked as new. Then take any page into Figma in one paste.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/step-design.png" width="1200" height="608"
+                 alt="A wireframe round on the captured Stablecoin Payments page: the real page rendered in grayscale, with the 'How it works' section replaced by a dashed region tagged 'NEW: FLOW SPINE'.">
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 3 · WHAT YOUR AI ACTUALLY GETS ════════════════════════════════════════════════════════ -->
+  <section id="library">
+    <div class="wrap">
+      <p class="eyebrow">What your AI actually gets</p>
+      <h2>A folder of facts, with an entry point for machines.</h2>
+      <p class="lede">Everything under <code>design-context/</code> was extracted from the real product. AI tools start at <code>registry.json</code>; you start at <code>INDEX.md</code>. Nothing here is a summary of a summary.</p>
+
+      <div class="tree">
+        <div class="row head dir">
+          <span class="f">design-context/</span>
+          <span class="d">the captured library — one workspace, one product</span>
+        </div>
+        <div class="row">
+          <span class="f">├── registry.json</span>
+          <span class="d">the machine map: every page keyed by slug, with route, label, files, link graph, template info and a labelled description. The file to point an AI at.</span>
+        </div>
+        <div class="row">
+          <span class="f">├── INDEX.md</span>
+          <span class="d">the same map rendered for a person to read, with the prose framing.</span>
+        </div>
+        <div class="row">
+          <span class="f">├── tokens.json</span>
+          <span class="d">the colours, type sizes, spacing steps and radii the product actually uses, each with the count of times it was seen.</span>
+        </div>
+        <div class="row">
+          <span class="f">├── ia/sitemap.json</span>
+          <span class="d">your product's navigation as it was found, not as anyone remembers it.</span>
+        </div>
+        <div class="row dir">
+          <span class="f">└── pages/&lt;slug&gt;/</span>
+          <span class="d">one folder per captured page</span>
+        </div>
+        <div class="row">
+          <span class="f">    ├── page.md</span>
+          <span class="d">the page's digest — facts, link graph, and a "what this page is" section your AI writes and the kit labels <code>method: ai</code>.</span>
+        </div>
+        <div class="row">
+          <span class="f">    ├── page.html</span>
+          <span class="d">the editable baseline. Opens in a browser, and is what wireframes are built on top of.</span>
+        </div>
+        <div class="row">
+          <span class="f">    ├── screenshot.png</span>
+          <span class="d">what the page looked like when it was captured.</span>
+        </div>
+        <div class="row">
+          <span class="f">    ├── content.md</span>
+          <span class="d">every word on the page, verbatim.</span>
+        </div>
+        <div class="row">
+          <span class="f">    ├── computed-tokens.json</span>
+          <span class="d">this page's own style tally — the colours, type, spacing, radii and shadows it uses.</span>
+        </div>
+        <div class="row">
+          <span class="f">    └── meta.json</span>
+          <span class="d">route, title, nav label, the outbound links, the capture's viewport and timestamp, and a content hash that tells you what changed on a re-capture.</span>
+        </div>
+      </div>
+
+      <p class="note" style="margin-top:16px">Captured a product you sign in to? The library then holds your real account data. It stays in your folder — and the browser profile the login created is gitignored and never leaves your machine.</p>
+    </div>
+  </section>
+
+  <!-- ═══ 4 · THE DASHBOARD TOUR ════════════════════════════════════════════════════════════════ -->
+  <section id="dashboard">
+    <div class="wrap">
+      <p class="eyebrow">The dashboard</p>
+      <h2>The part that refuses to guess.</h2>
+      <p class="lede">The dashboard is one self-contained HTML file the kit generates beside the library. It shows what was captured, what wasn't, and where every number came from.</p>
+
+      <div class="tour">
+
+        <article class="feat">
+          <div class="body reveal">
+            <h3>The Map</h3>
+            <p class="quote">Rings are honest clicks-from-home; the fog is what you haven't captured yet.</p>
+            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog — click one to unlock it. Here it is on Wikipedia: eight pages downloaded out of seven hundred and twenty-nine discovered, so almost all of it is still fog. The kit says so instead of rounding up.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/tour-map.png" width="1360" height="850"
+                 alt="The Map tab on a capture of en.wikipedia.org: eight captured pages ringed around the main page, many dashed ghost pages scattered in the dark, and a footer reading '1% of the known world explored'.">
+          </div>
+        </article>
+
+        <article class="feat">
+          <div class="body reveal">
+            <h3>Design language</h3>
+            <p class="quote">Measured from your product, or absent.</p>
+            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages with the count and page-spread behind each value — and a treemap sized by how often each colour actually appears. The panel says <code>method: heuristic</code> in its own header: this is evidence of how the product is styled today, not a claim about its authored tokens.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/tour-tokens.png" width="1400" height="786"
+                 alt="The Design language tab: a treemap where one navy colour fills 86.1% of the area, above a type ramp and a spacing ladder, each row annotated with how many times the value was seen.">
+          </div>
+        </article>
+
+        <article class="feat side">
+          <div class="body reveal">
+            <h3>The working ledger</h3>
+            <p class="quote">It borrows your product's own colour — observed, never guessed.</p>
+            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next. And the accent the dashboard wears is lifted from the product you captured — the entry names the hex and how many pages it was seen on.</p>
+          </div>
+          <div class="imgwrap">
+            <img src="assets/tour-ledger.png" width="700" height="1660"
+                 alt="The working ledger: cards reading 'Library check — all clean', 'Make your first thing', and 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 3 pages'.">
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 5 · STRAIGHT INTO FIGMA ═══════════════════════════════════════════════════════════════ -->
+  <section id="figma">
+    <div class="wrap">
+      <p class="eyebrow">Straight into Figma</p>
+      <h2>Click ⧉ Copy for Figma. Paste. Editable auto-layout layers — no plugin, no Dev Mode, no paid seat.</h2>
+      <p class="lede">The button sits on every captured page and every captured state. The conversion happens locally, in your browser, from the snapshot's real DOM — so what lands in Figma is the product's own structure as nested auto-layout frames and real text layers, not a flat image.</p>
+
+      <div class="figma">
+        <figure class="shot">
+          <img src="assets/figma-before.png" width="1400" height="504"
+               alt="A page doc in the dashboard for the Stablecoin Payments page, with the actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML'.">
+          <figcaption>Where the button lives: any page doc, any state, the Home atlas panel, the Map panel.</figcaption>
+        </figure>
+
+        <div class="panel">
+          <h3 style="margin-bottom:4px">Layer names from a real paste</h3>
+          <p class="note" style="margin:0 0 12px">Read back out of the Figma file a pasted page landed in — frames and text, nested, editable.</p>
+          <p class="layers"><b>Html → Body</b> &nbsp;1718 × 2137<br>
+            &nbsp;└ <b>Section</b><br>
+            &nbsp; &nbsp;└ <b>Container</b><br>
+            &nbsp; &nbsp; &nbsp;├ <b>Background+Border</b><br>
+            &nbsp; &nbsp; &nbsp;│ &nbsp;└ <b>Text</b><br>
+            &nbsp; &nbsp; &nbsp;├ <b>Container</b> → <b>Text</b><br>
+            &nbsp; &nbsp; &nbsp;└ <b>Margin</b> → <b>Container</b> → <b>Text</b></p>
+          <p class="note" style="margin-top:14px">Arrange or restyle freely; your Figma library stays untouched. One caveat stated plainly: to keep the pasted text as text, the converter fetches public font files from a CDN during a copy — that single request is the only time the kit reaches the network on your behalf, and it carries none of your data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · PRINCIPLES ════════════════════════════════════════════════════════════════════════ -->
+  <section id="rules">
+    <div class="wrap">
+      <p class="eyebrow">The rules it lives by</p>
+      <h2>Boring on purpose.</h2>
+
+      <ul class="rules">
+        <li><span class="k">Local-only</span> <span class="v">— captures never leave your machine.</span></li>
+        <li><span class="k">Read-only</span> <span class="v">— it follows links, never clicks your product's buttons.</span></li>
+        <li><span class="k">Never touches credentials</span> <span class="v">— you log in, in your own browser window.</span></li>
+        <li><span class="k">Measured or absent</span> <span class="v">— nothing on the dashboard is invented.</span></li>
+        <li><span class="k">Any AI</span> <span class="v">— Claude Code, Cursor, or a chat window; the prompts ship in the box.</span></li>
+      </ul>
+
+      <p class="note" style="margin-top:18px">Two disclosures those lines earn: capture dismisses a cookie banner when one blocks the page, and it logs that it did — the single exception to never clicking. And each page's one-line description is written by your AI, which is why the dashboard labels it <code>method: ai</code> everywhere it appears. Everything else was extracted deterministically.</p>
+    </div>
+  </section>
+
+  <!-- ═══ 7 · GET STARTED ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="start">
+    <div class="wrap">
+      <p class="eyebrow">Get started</p>
+      <h2>Copy the repo into a folder named after your product.</h2>
+      <p class="lede">One workspace, one product. Then run the script and follow the dashboard.</p>
+
+      <div class="clone" style="margin-top:26px">
+        <code id="start-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product &amp;&amp; cd my-product &amp;&amp; tools/start.sh</code>
+        <button type="button" id="start-copy" data-for="start-cmd" aria-label="Copy the clone command">Copy</button>
+      </div>
+
+      <div class="req">
+        <span>Node 18 or newer</span>
+        <span>macOS or Linux</span>
+        <span>no account, no key, no signup</span>
+      </div>
+
+      <p class="lede" style="margin-top:26px">Using Claude Code? Open it and paste: <em>“Set up the design context kit from https://github.com/20prateeksingh/design-context-for-ai in a new folder.”</em> — it will do the rest. Full walkthrough in <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/GETTING_STARTED.md">GETTING_STARTED.md</a>.</p>
+
+      <p class="note" style="margin-top:22px">This page has no analytics. Like the kit: local-only.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="lic">MIT</span>
+    <span>built in public — <a href="https://github.com/20prateeksingh/design-context-for-ai">20prateeksingh/design-context-for-ai</a></span>
+    <span class="sep">Figma paste powered by <a href="https://www.npmjs.com/package/@figit/dom-to-figma">@figit/dom-to-figma</a> (MIT)</span>
+  </div>
+</footer>
+
+<script>
+/* ── copy the one-liner. Two paths, because this page must also work from file:// with the network off:
+   the async Clipboard API where it is allowed, and a selected-textarea execCommand fallback where it is
+   not. Every failure path is caught — nothing reaches the console. ─────────────────────────────────── */
+(function(){
+  function legacyCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly','');
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    var ok = false;
+    try { ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); }
+    catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  function flash(btn, ok){
+    var was = btn.getAttribute('data-label') || btn.textContent;
+    btn.setAttribute('data-label', was);
+    btn.textContent = ok ? 'Copied' : 'Press ⌘C';
+    btn.setAttribute('data-done', ok ? '1' : '0');
+    window.setTimeout(function(){
+      btn.textContent = btn.getAttribute('data-label');
+      btn.removeAttribute('data-done');
+    }, 1800);
+  }
+  var btns = document.querySelectorAll('button[data-for]');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function(){
+      var btn = this;
+      var src = document.getElementById(btn.getAttribute('data-for'));
+      if (!src) return;
+      var text = src.textContent;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function(){ flash(btn, true); },
+          function(){ flash(btn, legacyCopy(text)); }
+        );
+      } else {
+        flash(btn, legacyCopy(text));
+      }
+    });
+  }
+})();
+
+/* ── reveal on first entry. Nothing is hidden in the static CSS, so this only ever ADDS a brief
+   from-only animation as an element scrolls in; with JS off, or under reduced motion, the page is
+   already in its settled state.
+   The `in` class is TRANSIENT: it is removed on animationend, so once the page has settled the DOM
+   carries no animation classes at all and is identical to the reduced-motion DOM. That matters for
+   more than tidiness — an element still carrying a transform animation keeps its own compositing
+   layer, and text on a composited layer is antialiased differently (measured: 159 pixels' worth).
+   Dropping the class hands the element back to the normal cascade, so the settled render is
+   pixel-identical with motion on and off. ────────────────────────────────────────────────────── */
+(function(){
+  var reduce = false;
+  try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (reduce || !('IntersectionObserver' in window)) return;
+
+  function clear(e){ e.currentTarget.classList.remove('in'); }
+  function play(el){
+    el.addEventListener('animationend', clear, { once: true });
+    el.addEventListener('animationcancel', clear, { once: true });
+    el.classList.add('in');
+  }
+
+  var hero = document.querySelectorAll('.hero h1, .hero .sub, .hero .ctas, .hero .clone');
+  for (var h = 0; h < hero.length; h++) play(hero[h]);
+
+  var io = new IntersectionObserver(function(entries){
+    for (var i = 0; i < entries.length; i++) {
+      if (!entries[i].isIntersecting) continue;
+      play(entries[i].target);
+      io.unobserve(entries[i].target);
+    }
+  }, { rootMargin: '0px 0px -12% 0px', threshold: 0.06 });
+
+  var targets = document.querySelectorAll('.reveal');
+  for (var t = 0; t < targets.length; t++) io.observe(targets[t]);
+})();
+</script>
+</body>
+</html>
