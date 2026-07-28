@@ -1,5 +1,27 @@
 # UX copy canon
 
+## 2026-07-28 — fold loop + guided-public fix (F1–F4)
+
+`prds/v1-fix-fold-loop-guided-public.md`. Guided capture's GUIDED branch (`tools/capture.js`) gained a
+public/logged-out path (F3); new terminal strings below, `<url>` = the guided session's start URL.
+
+**Profile genuinely required** (product marked logged-in, no profile — new, replaces a dead-end that
+pointed at `login.js` for a site with no login):
+`This product is marked as logged-in — run: node tools/login.js --url <url> (you'll log in yourself; the kit never sees your password)`
+
+**Profile locked by another window** (changed — added the ⌘Q hint, darwin only):
+`The capture profile is open in another window (login.js?). Quit it with ⌘Q — ⌘W leaves Chrome running and holding the lock and re-run.`
+> Superseded (struck 2026-07-28): `The capture profile is open in another window (login.js?). Close it and re-run.` — non-darwin platforms keep the platform-neutral `Close it fully and re-run.` clause.
+
+**No profile, public fallback** (info line, mirrors the selective-pull branch's existing
+`no browser profile — capturing logged-out (fine for public pages).`, adapted to guided):
+`no browser profile — guided capture runs logged-out (fine for public pages).`
+
+**Session banner** (mode-aware): `🚀 Guided capture (logged-out) — <url>` when ephemeral, unchanged
+`🚀 Guided capture — <url>` otherwise; body line reads `A browser opens in a fresh, signed-out session.`
+or `A browser opens on your logged-in session.` to match.
+
+
 Locked, designer-facing strings shipped in the dashboard and terminal report. Change one, review the
 build brief that introduced it; this file is the single source of truth for exact wording.
 

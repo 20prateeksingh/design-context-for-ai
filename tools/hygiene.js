@@ -19,7 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { extractPathRefs } = require('./path-refs.js');
+const { extractPathRefs, expectedAbsentReason } = require('./path-refs.js');
 
 const NEAR_EMPTY_CHARS = 200;   // content.md shorter than this = suspiciously thin
 const MIDLOAD_CHARS = 500;      // + loading markers below this = probably captured mid-render
@@ -156,7 +156,11 @@ function runHygiene(outDir) {
   }
   const byPattern = {};
   for (const s of slugs) {
-    if (pages[s].template) continue;               // already a collapsed representative
+    // F1: a fold and a capture-time collapse must be indistinguishable here — pages[s].template marks
+    // the former (auto-collapsed at capture), pages[s].foldedInto marks the latter (a designer's later
+    // fold decision, derived by build-index.js). Without the second check, a folded member kept
+    // re-entering byPattern and re-reporting the exact finding the fold was performed to answer.
+    if (pages[s].template || pages[s].foldedInto) continue;
     const pat = patternize(pages[s].route);
     (byPattern[pat] = byPattern[pat] || []).push(s);
   }
@@ -246,6 +250,10 @@ function runHygiene(outDir) {
     if (!text) continue;
     for (const ref of extractPathRefs(text)) {
       if (fs.existsSync(path.join(workspaceRoot, ref))) continue;
+      // F4: designer-owned, appears-later files (annotations.json, product.json, ux-copy.md) are
+      // referenced conditionally ("if it exists") by design — a pristine workspace hasn't created them
+      // yet, and that's correct, not broken. Only a genuinely bad reference still fires below.
+      if (expectedAbsentReason(ref)) continue;
       findings.quality.push({
         kind: 'quality', subKind: 'broken-path-ref', severity: 'info', target: file,
         issue: `${file} references \`${ref}\`, which doesn't exist in this workspace`,
@@ -299,7 +307,25 @@ function formatHygiene(f) {
   return lines.join('\n');
 }
 
-module.exports = { runHygiene, formatHygiene, renderDuplicate };
+// F2: stale-ack repair — a fresh same-template group (no pre-existing representative) keys itself with
+// EVERY member's slug, the soon-to-be rep included (matchesRep is false at finding time). The instant a
+// fold records that same rep+members, matchesRep flips true and the rep permanently drops out of the
+// group hygiene ever re-collects (F1, above, also now excludes every folded member outright) — so an ack
+// stored under the "rep included" key can never be matched again, on any future run. Detect that exact
+// shape per recorded fold and drop it; no other ack is touched.
+function pruneStaleAcks(ann) {
+  const folds = (ann && ann.hygiene && Array.isArray(ann.hygiene.folds)) ? ann.hygiene.folds : [];
+  const acks = (ann && ann.hygiene && ann.hygiene.acks) || {};
+  const removed = [];
+  for (const fold of folds) {
+    if (!fold.rep || !Array.isArray(fold.members) || !fold.members.length) continue;
+    const staleKey = makeKey('same-template', fold.pattern || '', sortedJoin([fold.rep, ...fold.members]));
+    if (Object.prototype.hasOwnProperty.call(acks, staleKey)) { delete acks[staleKey]; removed.push(staleKey); }
+  }
+  return removed;
+}
+
+module.exports = { runHygiene, formatHygiene, renderDuplicate, makeKey, sortedJoin, pruneStaleAcks };
 
 if (require.main === module) {
   const outDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');

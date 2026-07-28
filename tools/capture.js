@@ -721,22 +721,38 @@ if (require.main === module) (async () => {
     const OUT_DIR = path.join(KIT_DIR, 'design-context');
     fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
     if (!START_URL) { console.error('Usage: node capture.js --guided --url <startUrl> [--profile default]'); process.exit(1); }
-    if (!fs.existsSync(PROFILE_DIR)) {
-      console.error(`\n❌  Guided capture needs your logged-in profile.\n   Run first: node tools/login.js --url ${START_URL}\n`);
+    // F3: mirror the selective-pull's publicFallback — a product with no profile AND no recorded
+    // logged-in signal (or an explicit --logged-out) runs guided ephemerally instead of hard-requiring
+    // login.js, exactly like the selective-pull branch already does 140 lines below. Only a product the
+    // designer actually MARKED logged-in (CFG.loggedIn === true), with no profile, is a real dead end —
+    // that gets its own message, distinct from the profile-LOCKED case below.
+    const noProfile = !fs.existsSync(PROFILE_DIR);
+    const guidedEphemeral = LOGGED_OUT || (noProfile && CFG.loggedIn !== true);
+    if (noProfile && !guidedEphemeral) {
+      console.error(`❌ This product is marked as logged-in — run: node tools/login.js --url ${START_URL} (you'll log in yourself; the kit never sees your password)`);
       process.exit(1);
     }
     const QUIT_HINT = process.platform === 'darwin' ? 'press ⌘Q to QUIT the browser (⌘W / closing the window is not enough — Chrome keeps running)' : 'fully quit the browser window (closing it may not end the process)';
-    console.log(`\n🚀 Guided capture — ${START_URL}`);
-    console.log(`   A browser opens on your logged-in session. A pill sits at the bottom:`);
+    console.log(`\n🚀 Guided capture${guidedEphemeral ? ' (logged-out)' : ''} — ${START_URL}`);
+    if (guidedEphemeral && noProfile) console.log(`   ℹ no browser profile — guided capture runs logged-out (fine for public pages).`);
+    console.log(`   A browser opens ${guidedEphemeral ? 'in a fresh, signed-out session' : 'on your logged-in session'}. A pill sits at the bottom:`);
     console.log(`   it turns red on a URL never captured, green (with the time) on one already in`);
     console.log(`   the library. Drive to any state and click 📸 Capture.`);
     console.log(`   When you're done, ${QUIT_HINT} — that ends the session, rebuilds the index, and runs the hygiene check.\n`);
-    let gctx;
+    let gctx, gbrowser = null;
     try {
-      gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
+      if (guidedEphemeral) {
+        gbrowser = await chromium.launch({ headless: false });
+        gctx = await gbrowser.newContext({ viewport: null });
+      } else {
+        gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
+      }
     } catch (e) {
-      if (/existing browser session|already in use/i.test(e.message)) {
-        console.error(`\n❌  The capture profile is open in another window (login.js?). Close it and re-run.\n`);
+      // F3: profile-ABSENT is handled above and never reaches here — this catch is only the profile-
+      // LOCKED-by-another-window case (persistent-context launch only), which is why the ⌘Q hint belongs
+      // only here, not on the absent-profile message above.
+      if (!guidedEphemeral && /existing browser session|already in use/i.test(e.message)) {
+        console.error(`❌ The capture profile is open in another window (login.js?). ${process.platform === 'darwin' ? 'Quit it with ⌘Q — ⌘W leaves Chrome running and holding the lock' : 'Close it fully'} and re-run.`);
         process.exit(1);
       }
       throw e;
@@ -822,6 +838,7 @@ if (require.main === module) (async () => {
     const endSession = () => { if (ending) return; ending = true; gctx.close().catch(() => {}); };
     process.on('SIGTERM', endSession); process.on('SIGINT', endSession);
     await new Promise((resolve) => gctx.on('close', resolve));
+    if (gbrowser) await gbrowser.close().catch(() => {});   // F3: the ephemeral (logged-out) path owns a browser process the persistent-context path never has
     const endedAt = new Date().toISOString();
     console.log(`\n✅  Guided session ended — ${captures.length} state(s) captured.`);
     // ── Session persistence (F4·1, additive + absent-safe) — append this session to guided-sessions.json.
