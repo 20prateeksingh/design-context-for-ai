@@ -172,8 +172,15 @@ function startGuided(startUrl, res) {
   busy = true;
   const startedAt = new Date().toISOString();
   guidedJob = { running: true, code: null, startedAt, startUrl: url, captures: [], lastCapture: null, capturing: false, child: null, errTail: [], _partial: '' };
+  // F3: pass the product's logged-in signal through via --config — the same product.json path
+  // startCapture already reads. Without it, the guided child's CFG.loggedIn is always unset, so it can
+  // neither take the ephemeral public-fallback path (F3, capture.js) nor correctly surface "this product
+  // is marked as logged-in" when a profile really is required — it only ever saw the old hard "you need
+  // to log in" exit, regardless of what the designer answered in onboarding.
+  const cfgPath = path.join(LIB, 'product.json');
+  const cliArgs = ['--guided', '--url', url, ...(fs.existsSync(cfgPath) ? ['--config', cfgPath] : [])];
   console.log(`▶ guided ${url}`);
-  const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), '--guided', '--url', url], { cwd: __dirname });
+  const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), ...cliArgs], { cwd: __dirname });
   guidedJob.child = child;   // held so /api/guided/stop (and server shutdown) can end the session cleanly
   child.stdout.on('data', pushGuidedOutput);
   child.stderr.on('data', pushGuidedOutput);
@@ -185,8 +192,15 @@ function startGuided(startUrl, res) {
     // profile is locked by another capture/login window. Surface WHY instead of a silent reload.
     let error = null;
     if (code && code !== 0 && captured === 0 && fast) {
-      const tail = (guidedJob ? guidedJob.errTail : []).filter(l => /profile|another window|locked|in use|login|❌/i.test(l));
-      error = (tail[tail.length - 1] || 'Guided capture couldn’t start — the browser profile may be open in another window. Close any capture/login window and try again.').replace(/^❌\s*/, '');
+      // F3: profile-ABSENT (product marked logged-in, no profile — capture.js's own message names the
+      // exact fix) is a different failure than profile-LOCKED (another window holds it — needs ⌘Q, not
+      // ⌘W). Matching each shape explicitly means a lock-flavoured fallback can never misdirect an
+      // absent-profile failure again — that misdirection is the bug this whole fix train started from.
+      const tail = guidedJob ? guidedJob.errTail : [];
+      const absentLine = tail.find(l => /marked as logged-in/i.test(l));
+      const lockedLine = tail.find(l => /another window|locked|in use/i.test(l));
+      const line = absentLine || lockedLine || tail[tail.length - 1];
+      error = (line || 'Guided capture couldn’t start — the browser profile may be open in another window. Close any capture/login window and try again.').replace(/^❌\s*/, '');
     }
     busy = false;
     if (guidedJob) { guidedJob.running = false; guidedJob.code = code; }
@@ -359,10 +373,14 @@ const server = http.createServer((req, res) => {
         ann.hygiene = ann.hygiene || {};
         ann.hygiene.acks = ann.hygiene.acks || {};
         ann.hygiene.acks[key] = { note, at: new Date().toISOString() };
+        // F2: same self-heal as the fold endpoint — any hygiene-block write is a chance to drop a stale
+        // pre-fix ack (see pruneStaleAcks in hygiene.js) rather than leaving it as inert cruft.
+        let repaired = [];
+        try { repaired = require('./hygiene.js').pruneStaleAcks(ann); } catch (_) {}
         try { fs.writeFileSync(annPath, JSON.stringify(ann, null, 2), 'utf8'); }
         catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
         if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ hygiene-ack post-build: ${e.message.split('\n')[0]}`); } }
-        console.log(`✓ hygiene ack ${key}${note ? ' — ' + note : ''}`);
+        console.log(`✓ hygiene ack ${key}${note ? ' — ' + note : ''}${repaired.length ? ` (repaired ${repaired.length} stale ack${repaired.length > 1 ? 's' : ''})` : ''}`);
         return json(res, 200, { ok: true });
       }
 
@@ -380,18 +398,34 @@ const server = http.createServer((req, res) => {
           if (!fs.existsSync(path.join(LIB, 'pages', m))) return json(res, 404, { ok: false, error: `unknown member slug: ${m}` });
         }
         const pattern = data.pattern == null ? null : String(data.pattern).trim().slice(0, 300) || null;
-        const key = data.key == null ? null : String(data.key).trim() || null;
+        // F2: the ack key is a contract, not a guess — recompute it server-side from the LIVE finding
+        // this fold answers (hygiene.js's own key builder), never from whatever key the browser sends.
+        // A browser-held key can be correct the instant it's read and wrong the instant this very fold
+        // is applied (matchesRep flips false→true, which changes the key's shape) — hygiene.js, asked
+        // right now, is the only source of truth.
+        let key = null;
+        try {
+          const { runHygiene } = require('./hygiene.js');
+          const live = runHygiene(LIB);
+          const memberSet = new Set(members);
+          const match = live.duplicates.find(f => f.repSlug === rep && f.members.length === memberSet.size && f.members.every(m => memberSet.has(m)));
+          if (match) key = match.key;
+        } catch (_) {}
         const annPath = path.join(LIB, 'annotations.json');
         const ann = fs.existsSync(annPath) ? JSON.parse(fs.readFileSync(annPath, 'utf8')) : { pages: {} };
         ann.hygiene = ann.hygiene || {};
         ann.hygiene.folds = ann.hygiene.folds || [];
         ann.hygiene.folds.push({ rep, members, pattern, at: new Date().toISOString() });
         if (key) { ann.hygiene.acks = ann.hygiene.acks || {}; ann.hygiene.acks[key] = { note: null, at: new Date().toISOString() }; }
+        // F2: repair — any pre-existing ack stuck under the old "rep included in the key" shape (this
+        // exact fold's own signature) is stale as of this write; drop it so it doesn't sit as cruft.
+        let repaired = [];
+        try { repaired = require('./hygiene.js').pruneStaleAcks(ann); } catch (_) {}
         try { fs.writeFileSync(annPath, JSON.stringify(ann, null, 2), 'utf8'); }
         catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
         if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ hygiene-fold post-build: ${e.message.split('\n')[0]}`); } }
-        console.log(`⧉ fold ${members.join(', ')} → ${rep}`);
-        return json(res, 200, { ok: true });
+        console.log(`⧉ fold ${members.join(', ')} → ${rep}${repaired.length ? ` (repaired ${repaired.length} stale ack${repaired.length > 1 ? 's' : ''})` : ''}`);
+        return json(res, 200, { ok: true, ackKey: key, staleAcksRepaired: repaired.length });
       }
 
       // F4 wiring: "Say how you got there" on an orphan finding — records the designer's own account of
