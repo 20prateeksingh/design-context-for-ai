@@ -99,7 +99,24 @@
                 overflow:hidden; }
   figure.shot img { border-bottom:1px solid var(--line); }
   figure.shot figcaption { padding:11px 14px; color:var(--dim); font-size:13px; }
-  .hero figure.shot { margin-top:44px; }
+
+  /* The hero map breaks out past the text measure — the map IS the product's signature surface, and at
+     the measure's width it read as a diagram rather than as territory (v1.1 F1). Its own container, so
+     the breakout needs no negative margins or 100vw: it simply has a wider max-width than .wrap. */
+  .heroshot { max-width:1180px; margin:44px auto 0; padding:0 16px; }
+  .heroshot figure.shot { margin:0; }
+
+  /* ══ F2 · the cut edge ═══════════════════════════════════════════════════════════════════════════
+     Every shipped image is a complete framed panel — the frame is a real component's own bounding box or
+     a whole browser window (see prds/landing-page-v1.1-shots/assets.sh). ONE surface is genuinely taller
+     than any frame it can live in: the dashboard's working ledger, an endless scrolling rail. Its asset is
+     cut at a MEASURED card boundary (below the 3rd entry, so no card is sliced), and this mask fades that
+     last 22px to the page background so the edge reads as designed rather than as a guillotine.
+     This is presentation, not evidence: nothing inside the frame is altered, added or retouched.
+     The mask wraps the IMAGE, not the panel, so it sits exactly on the asset's cut edge. */
+  .fadeb { display:block; position:relative; width:100%; }
+  .fadeb::after { content:""; position:absolute; left:0; right:0; bottom:0; height:22px; pointer-events:none;
+                  background:linear-gradient(to bottom, rgba(8,9,10,0), var(--bg)); }
 
   /* ── how it works: three steps ── */
   .steps { display:grid; gap:18px; margin-top:36px; }
@@ -145,13 +162,34 @@
   .tour .feat .imgwrap { border-top:1px solid var(--line); background:var(--bg-deep); overflow:hidden;
                          display:flex; align-items:flex-start; justify-content:center; }
 
+  /* The ledger rail is portrait, so it takes a column. v1 capped the column at 430px and let overflow
+     cut the image — a second accidental edge, in the LAYOUT rather than in the asset (v1.1 F2). The asset
+     is now cut at a measured card boundary instead, and the column simply shows all of it. */
   .tour .feat.side { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
   .tour .feat.side .body { align-self:center; }
-  .tour .feat.side .imgwrap { border-top:0; border-left:1px solid var(--line); max-height:430px; }
+  .tour .feat.side .imgwrap { border-top:0; border-left:1px solid var(--line); align-items:center;
+                              justify-content:center; padding:26px; }
+  /* the rail asset is 340 CSS px wide in the product; shown at 400 it stays crisp on a 2× screen and
+     keeps the panel's two columns in proportion */
+  .tour .feat.side .imgwrap .fadeb { max-width:400px; }
   @media (max-width:800px){
     .tour .feat.side { grid-template-columns:minmax(0,1fr); }
-    .tour .feat.side .imgwrap { border-left:0; border-top:1px solid var(--line); max-height:330px; }
+    .tour .feat.side .imgwrap { border-left:0; border-top:1px solid var(--line); }
   }
+
+  /* ── the map gallery (v1.1 F3): one real capture per product, at a size where a map is its shape ──
+     Wraps, never scrolls sideways — the gate checks that at 360 / 768 / 1440. */
+  .gal { display:grid; gap:14px; margin-top:34px; padding:0;
+         grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); }
+  .gal li { list-style:none; background:var(--card); border:1px solid var(--line); border-radius:10px;
+            overflow:hidden; }
+  .gal li img { border-bottom:1px solid var(--line); }
+  .gal .cap { display:flex; align-items:center; gap:8px; padding:9px 11px; font:400 12px/1.35 var(--mono);
+              color:var(--dim); }
+  .gal .cap .sw { flex:none; width:9px; height:9px; border-radius:3px; }
+  .gal .cap b { color:var(--txt); font-weight:400; }
+  .gal .cap .hex { margin-left:auto; }
+  @media (max-width:420px){ .gal { grid-template-columns:minmax(0,1fr); } }
 
   /* ── Figma ── */
   .figma { display:grid; gap:18px; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
@@ -217,6 +255,7 @@
       <a href="#how" class="hidesm">How it works</a>
       <a href="#library" class="hidesm">The library</a>
       <a href="#dashboard" class="hidesm">Dashboard</a>
+      <a href="#anyproduct" class="hidesm">Any product</a>
       <a class="ghcta" href="https://github.com/20prateeksingh/design-context-for-ai">GitHub</a>
     </nav>
   </div>
@@ -240,10 +279,13 @@
         <button type="button" id="clone-copy" data-for="clone-cmd" aria-label="Copy the clone command">Copy</button>
       </div>
 
+    </div>
+
+    <div class="heroshot">
       <figure class="shot">
-        <img src="assets/hero-map.png" width="1680" height="1050"
-             alt="The kit's dashboard on the Map tab: eight captured pages of xflowpay.com arranged in rings around the home page, with locked pages drawn as dashed ghosts in the fog, and a working ledger down the right side.">
-        <figcaption>The Map, on a real capture of xflowpay.com — eight pages downloaded, twenty-one still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+        <img src="assets/hero-map.webp" width="2200" height="1696"
+             alt="The kit's dashboard on the Map tab: a real capture of xflowpay.com, with the landing page lit at the centre and seventeen captured pages ringed one click out, each drawn as a disc of its own screenshot, and dashed ghost pages scattered through the fog beyond them. The footer reads '11% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <figcaption>The Map, on a real capture of xflowpay.com — eighteen pages downloaded, one hundred and forty-six still ghosts in the fog. Rings are measured clicks from home.</figcaption>
       </figure>
     </div>
   </section>
@@ -264,8 +306,8 @@
             <p><code>tools/start.sh</code> installs what it needs, starts a local server, and opens the dashboard. The dashboard asks three things — your product's URL, whether you sign in to use it, and what kind of product it is. You never answer a question in the terminal.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/step-onboard.png" width="1200" height="660"
-                 alt="The dashboard's onboarding screen, headed 'Set up your design context', asking whether you sign in to use the product and for the address you sign in to.">
+            <img src="assets/step-onboard.webp" width="1280" height="1520"
+                 alt="The dashboard's onboarding screen, headed 'Set up your design context': three questions — whether you sign in to use the product, the address you sign in to, and what kind of product it is — above a 'Start capture' button.">
           </div>
         </article>
 
@@ -276,8 +318,8 @@
             <p>It follows your product's links and downloads each page as a snapshot: the real HTML, a screenshot, every word of copy, and the styles it actually uses. Pages that share a layout collapse to one example, with the count kept. You watch it land, page by page, and it tells you what it capped or skipped.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/step-capture.png" width="1200" height="635"
-                 alt="The dashboard mid-capture: counters reading 4 pages captured, 1 template collapsed, 0 skipped, 18 nav pages found, above a live log of the capture run.">
+            <img src="assets/step-capture.webp" width="1400" height="1450"
+                 alt="The dashboard mid-capture, headed 'Capture in progress': counters reading 6 pages captured, 1 template collapsed, 0 skipped, 18 nav pages found, above a live log that includes the line 'dismissed banner via dismiss (logged)' and six captured pages with their sizes.">
           </div>
         </article>
 
@@ -288,8 +330,8 @@
             <p>Point Claude Code, Cursor, or a chat window at the library and ask for a change. A wireframe comes back built on the captured page itself — your product's own shell, spacing and content, reduced to lo-fi, with the new part marked as new. Then take any page into Figma in one paste.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/step-design.png" width="1200" height="608"
-                 alt="A wireframe round on the captured Stablecoin Payments page: the real page rendered in grayscale, with the 'How it works' section replaced by a dashed region tagged 'NEW: FLOW SPINE'.">
+            <img src="assets/step-design.webp" width="1500" height="663"
+                 alt="A wireframe round on the captured Stablecoin Payments page: the product's real navigation bar in grayscale above a dashed region tagged 'NEW: FLOW SPINE', holding three numbered steps — create wallet addresses, buyer sends stablecoins, user withdraws in INR — each with small chips of supporting detail.">
           </div>
         </article>
 
@@ -372,11 +414,11 @@
           <div class="body reveal">
             <h3>The Map</h3>
             <p class="quote">Rings are honest clicks-from-home; the fog is what you haven't captured yet.</p>
-            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog — click one to unlock it. Here it is on Wikipedia: eight pages downloaded out of seven hundred and twenty-nine discovered, so almost all of it is still fog. The kit says so instead of rounding up.</p>
+            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog — click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering thirteen blog pages is selected: the kit offers one example of the shape rather than all thirteen, because thirteen near-duplicates teach your AI nothing new. Eleven per cent of this product is explored, and the kit says so instead of rounding up.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/tour-map.png" width="1360" height="850"
-                 alt="The Map tab on a capture of en.wikipedia.org: eight captured pages ringed around the main page, many dashed ghost pages scattered in the dark, and a footer reading '1% of the known world explored'.">
+            <img src="assets/tour-map.webp" width="1900" height="1188"
+                 alt="The Map tab with a frontier ghost selected: the hovered ghost reads '/blog/:var — not downloaded yet — linked from 18 pages — click to unlock', and the rail panel is headed 'Locked — not downloaded yet' with the line '13 pages share this layout — one example covers the shape for your AI', a 'Get one example' button, a quieter 'Download all 13', and a checkbox list of the specific URLs.">
           </div>
         </article>
 
@@ -384,11 +426,11 @@
           <div class="body reveal">
             <h3>Design language</h3>
             <p class="quote">Measured from your product, or absent.</p>
-            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages with the count and page-spread behind each value — and a treemap sized by how often each colour actually appears. The panel says <code>method: heuristic</code> in its own header: this is evidence of how the product is styled today, not a claim about its authored tokens.</p>
+            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages — every value carrying the count and page-spread behind it, as here, where the product's darkest navy is <code>×31,920</code> across all eighteen pages and the accent is <code>×141</code> across four. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out — values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/tour-tokens.png" width="1400" height="786"
-                 alt="The Design language tab: a treemap where one navy colour fills 86.1% of the area, above a type ramp and a spacing ladder, each row annotated with how many times the value was seen.">
+            <img src="assets/tour-tokens.webp" width="1900" height="609"
+                 alt="The Design language tab: a provenance strip reading 'Everything below is method: heuristic — values observed on the captured pages, aggregated and clustered by statistics — they are evidence of how the product is styled today, not its authored design tokens', above a Palette / Proportions toggle and twenty-one colour swatches, each labelled with its hex, how many times it was seen and on how many pages — #1F2741 ×31,920 on 18 pages, down to #E4E9FF ×5 on 5 pages.">
           </div>
         </article>
 
@@ -396,11 +438,11 @@
           <div class="body reveal">
             <h3>The working ledger</h3>
             <p class="quote">It borrows your product's own colour — observed, never guessed.</p>
-            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next. And the accent the dashboard wears is lifted from the product you captured — the entry names the hex and how many pages it was seen on.</p>
+            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next — here, ten pages have landed that your AI hasn't read yet, so that is what it asks for, with the prompt ready to copy. And the accent the dashboard wears is lifted from the product you captured: the entry names the hex and how many pages it was seen on.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/tour-ledger.png" width="700" height="1660"
-                 alt="The working ledger: cards reading 'Library check — all clean', 'Make your first thing', and 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 3 pages'.">
+            <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="990"
+                 alt="The working ledger: 'Library check — all clean — 1 more note, nothing needed from you'; then 'NEXT · NEW PAGES WAITING — Let your AI read your 10 new pages', with a 'Copy the describe prompt' button; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
           </div>
         </article>
 
@@ -408,7 +450,61 @@
     </div>
   </section>
 
-  <!-- ═══ 5 · STRAIGHT INTO FIGMA ═══════════════════════════════════════════════════════════════ -->
+  <!-- ═══ 5 · ANY PRODUCT — THE MAP GALLERY ═════════════════════════════════════════════════════
+       Seven real workspaces, seven real Map panes, each wearing the accent the kit measured in that
+       product's own pages. At tile scale a map is its shape — discs, fog, accent — which is the point:
+       nothing here is a mockup of a product, it is the kit's own output on seven different ones. -->
+  <section id="anyproduct">
+    <div class="wrap">
+      <p class="eyebrow">Any product</p>
+      <h2>Seven products, seven maps.</h2>
+      <p class="lede">Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Same kit, same one script, nothing set per product.</p>
+
+      <ul class="gal">
+        <li>
+          <img src="assets/tile-flipkart.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of flipkart.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+          <span class="cap"><span class="sw" style="background:#2874F0"></span><b>flipkart.com</b><span class="hex">#2874F0</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-amazon.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of amazon.in: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+          <span class="cap"><span class="sw" style="background:#2162A1"></span><b>amazon.in</b><span class="hex">#2162A1</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-espncricinfo.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of espncricinfo.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+          <span class="cap"><span class="sw" style="background:#0860C4"></span><b>espncricinfo.com</b><span class="hex">#0860C4</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-airbnb.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of airbnb.co.in: a small cluster of seven page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured crimson accent.">
+          <span class="cap"><span class="sw" style="background:#DA1249"></span><b>airbnb.co.in</b><span class="hex">#DA1249</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-wikipedia.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of en.wikipedia.org: an arc of pale page discs beside a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+          <span class="cap"><span class="sw" style="background:#3366CC"></span><b>en.wikipedia.org</b><span class="hex">#3366CC</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-xflowpay.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of xflowpay.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured indigo accent.">
+          <span class="cap"><span class="sw" style="background:#5E76E3"></span><b>xflowpay.com</b><span class="hex">#5E76E3</span></span>
+        </li>
+        <li>
+          <img src="assets/tile-github.webp" width="640" height="493"
+               alt="The kit's Map pane on a capture of github.com: a small ring of page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured green accent.">
+          <span class="cap"><span class="sw" style="background:#5FED83"></span><b>github.com</b><span class="hex">#5FED83</span></span>
+        </li>
+      </ul>
+
+      <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Nothing was configured per product — where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo — absent rather than invented.</p>
+
+      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape — how many pages, how far from home, how much fog — which is all this section claims. Every full-size dashboard view on this page is of one product, <code>xflowpay.com</code>, captured by the person who built the kit.</p>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · STRAIGHT INTO FIGMA ═══════════════════════════════════════════════════════════════ -->
   <section id="figma">
     <div class="wrap">
       <p class="eyebrow">Straight into Figma</p>
@@ -417,8 +513,8 @@
 
       <div class="figma">
         <figure class="shot">
-          <img src="assets/figma-before.png" width="1400" height="504"
-               alt="A page doc in the dashboard for the Stablecoin Payments page, with the actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML'.">
+          <img src="assets/figma-before.webp" width="1600" height="1860"
+               alt="A page doc in the dashboard for the Stablecoin Payments page: an actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML', the captured page's screenshot below it, and a rail listing what the page is, its link counts, and its capture history.">
           <figcaption>Where the button lives: any page doc, any state, the Home atlas panel, the Map panel.</figcaption>
         </figure>
 
@@ -438,7 +534,7 @@
     </div>
   </section>
 
-  <!-- ═══ 6 · PRINCIPLES ════════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ 7 · PRINCIPLES ════════════════════════════════════════════════════════════════════════ -->
   <section id="rules">
     <div class="wrap">
       <p class="eyebrow">The rules it lives by</p>
@@ -456,7 +552,7 @@
     </div>
   </section>
 
-  <!-- ═══ 7 · GET STARTED ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ 8 · GET STARTED ═══════════════════════════════════════════════════════════════════════ -->
   <section id="start">
     <div class="wrap">
       <p class="eyebrow">Get started</p>
