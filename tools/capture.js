@@ -97,6 +97,24 @@ function isCapturable(url, origin) {
   } catch { return false; }
 }
 
+// Off-origin link targets this page points to but the crawl will never follow (same-origin-only, above).
+// Recorded so the frontier's blind spot is visible instead of silently dropped (F11) — e.g. a marketing
+// site's every "Sign in" button pointing at app.example.com, which never shows up anywhere otherwise.
+// Only the origin check matters here — SKIP_PATH/SKIP_EXT are about what to crawl, not what to report.
+function offOriginHostsOf(hrefs, origin) {
+  let originHost; try { originHost = stripWww(new URL(origin).hostname.toLowerCase()); } catch { return []; }
+  const hosts = new Set();
+  for (const h of hrefs) {
+    try {
+      const u = new URL(h);
+      if (!/^https?:$/.test(u.protocol)) continue;
+      const host = stripWww(u.hostname.toLowerCase());
+      if (host !== originHost) hosts.add(host);
+    } catch (_) {}
+  }
+  return [...hosts].sort();
+}
+
 // Deterministic route-pattern detection: id-like segments → :id
 const looksLikeId = (seg) =>
   /^\d+$/.test(seg) ||
@@ -228,8 +246,13 @@ async function discoverNav(page, origin) {
   const found = await page.evaluate(() => {
     const scopes = Array.from(document.querySelectorAll('nav, [role="navigation"], aside, header'));
     const grab = (root) => Array.from(root.querySelectorAll('a[href]')).map(a => {
-      // aria-label first (clean, singular); innerText concatenates hover/badge dupes ("Homes Homes")
-      let label = (a.getAttribute('aria-label') || a.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      // aria-label first (clean, singular); otherwise the anchor's OWN heading — not its whole subtree,
+      // which concatenates a heading + description run together on nav-dropdown anchors ("Xflow Receiving
+      // AccountsOur version of virtual foreign currency accounts…"); innerText is the last-resort fallback.
+      const head = a.querySelector('h1,h2,h3,h4,h5,h6,strong,b,[class*="title"],[class*="label"]');
+      let label = (a.getAttribute('aria-label') || (head && head.innerText) || a.innerText || '')
+        .trim().replace(/\s+/g, ' ');
+      if (label.length > 60) label = label.slice(0, 60).replace(/\s+\S*$/, '') + '…'; // never cut mid-word
       label = label.split(' ').filter((w, i, ws) => w !== ws[i - 1]).join(' '); // drop consecutive dupes
       return { href: a.href, label };
     });
@@ -468,6 +491,7 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
     title, navLabel: meta.label || null,
     template: meta.template || null, collapsed: meta.collapsed || 0,
     linksOut: [...new Set(outLinks)].slice(0, 200),
+    offOriginHosts: offOriginHostsOf(linksOut, origin), // F11: hosts this page links to that the crawl can't follow
     capturedAt: new Date().toISOString(), viewport: VIEWPORT,
     source: 'scrape', method, contentHash: contentHash(html),
     // method: 'guided' — reached by a human interaction (click/wizard), not URL navigation.
