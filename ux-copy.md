@@ -1,5 +1,61 @@
 # UX copy canon
 
+## 2026-07-28 — landing v1.1 (Prateek's feedback round: richer hero · no accidental crops · the map gallery)
+
+`prds/landing-page-v1.1-feedback.md`. **Every locked v1 string above is untouched** — checked
+programmatically this round (25 locked strings, 0 missing; banned words, 0 present). What follows is the
+new and changed copy only.
+
+**New section — the map gallery** (sits between the dashboard tour and the Figma section; nav gains one
+item, `Any product`):
+
+| Slot | String |
+|---|---|
+| Eyebrow | `ANY PRODUCT` |
+| Headline | `Seven products, seven maps.` |
+| Lede | `Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Same kit, same one script, nothing set per product.` |
+
+Tile captions — product host + the accent hex **measured** in that product's own pages
+(`tokens.brand.seed`, `source: "observed"` in all seven):
+`flipkart.com · #2874F0` · `amazon.in · #2162A1` · `espncricinfo.com · #0860C4` ·
+`airbnb.co.in · #DA1249` · `en.wikipedia.org · #3366CC` · `xflowpay.com · #5E76E3` ·
+`github.com · #5FED83`
+
+The two small-print lines under the strip, both load-bearing for the honesty claim:
+
+> `Every hex above was measured, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Nothing was configured per product — where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured #2162A1 paints as #2367A9. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo — absent rather than invented.`
+
+> `These maps are shown small on purpose. At this size a captured product is only its shape — how many pages, how far from home, how much fog — which is all this section claims. Every full-size dashboard view on this page is of one product, xflowpay.com, captured by the person who built the kit.`
+
+**Hero caption — changed** (the numbers are now the real ones for the shipped capture; 18 downloaded,
+164 discovered, so 146 locked):
+
+- was: `The Map, on a real capture of xflowpay.com — eight pages downloaded, twenty-one still ghosts in the fog. Rings are measured clicks from home.`
+- now: `The Map, on a real capture of xflowpay.com — eighteen pages downloaded, one hundred and forty-six still ghosts in the fog. Rings are measured clicks from home.`
+
+**Dashboard tour — the three panel quotes are unchanged.** Their body prose changed to match the reshot
+images:
+
+- **The Map** now shows a selected frontier ghost, so the body earns the "click one to unlock it" claim:
+  `…click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering thirteen blog pages is selected: the kit offers one example of the shape rather than all thirteen, because thirteen near-duplicates teach your AI nothing new. Eleven per cent of this product is explored, and the kit says so instead of rounding up.`
+- **Design language** now shows the Palette view, whose swatches carry the counts the copy claims:
+  `…every value carrying the count and page-spread behind it, as here, where the product's darkest navy is ×31,920 across all eighteen pages and the accent is ×141 across four. One toggle re-reads the same colours as a treemap of how often each appears.`
+- **The working ledger** gains one clause, because the shipped shot's top slot is a real pending action:
+  `…here, ten pages have landed that your AI hasn't read yet, so that is what it asks for, with the prompt ready to copy.`
+
+### Nothing was softened to fit an image
+
+Every number above was read out of the shipped workspace's `registry.json` / `tokens.json` at build time,
+not carried over from v1. Where the product's own render disagreed with a planned line, the line changed
+— never the render. The one case where that cost the brief its preferred hero product is written up in
+`prds/landing-page-v1.1-feedback-BUILD-REPORT.md` (§ "The hero the brief asked for, and why it isn't the
+one that shipped").
+
+> **Still stale (unchanged, still out of scope):** the Use-it tab's Figma paragraph in
+> `tools/dashboard-template.html` still ends `No plugin, no Dev Mode, no network.` — the same false claim
+> v1 flagged (it has drifted from line 2873 to **line 2984**). Fix it to `no paid seat` in the next build
+> that touches the template. The Use-it screenshot is still deliberately kept off the landing page.
+
 ## 2026-07-28 — diversity-sweep fix train (D1–D8)
 
 `prds/v1-fix-diversity.md`, off `prds/v1-diversity-uat-REPORT.md`. New/changed designer-facing strings only — D5 (heading extraction) and D8 (directed gate) introduced no copy.
