@@ -87,6 +87,7 @@ function qualityChecks(dir, label) {
   const html = fileText(path.join(dir, 'page.html'));
   const content = fileText(path.join(dir, 'content.md'));
   const contentBody = content.replace(/^#.*$/m, '').replace(/^Source:.*$/m, '').trim();
+  const meta = readJSON(path.join(dir, 'meta.json')) || {};
   const push = (subKind, severity, issue, action) =>
     out.push({ kind: 'quality', subKind, severity, target: label, issue, action, key: makeKey('quality', subKind, label) });
   if (!fileSize(path.join(dir, 'screenshot.png'))) push('missing-screenshot', 'warn', 'missing or empty screenshot', 're-capture');
@@ -109,8 +110,22 @@ function qualityChecks(dir, label) {
   if (blob.media) push('live-only-media', 'info',
     `${blob.media} video/audio element(s) stream from a live-only blob: URL — a snapshot can't carry video`,
     'nothing to do — the poster frame is what the baseline shows');
-  if (contentBody.length < MIDLOAD_CHARS && /role="progressbar"|class="[^"]*(skeleton|shimmer|spinner|loading)/i.test(html))
-    push('mid-render', 'warn', 'loading markers + thin content — possibly captured mid-render', 'wait for load, re-capture');
+  // D1: measured, not guessed. capture.js counts loading indicators actually VISIBLE in the live DOM
+  // at snapshot time (`meta.json.visibleLoadingMarkers`) — content length is no longer consulted at
+  // all, since it was never correlated with the real thing this check claims to detect (a login page
+  // can be short AND fully rendered; a long page can carry a small unresolved fragment). Pre-fix
+  // captures (no such field yet) fall back to the old static heuristic, demoted to info — it was
+  // never reliable enough to warn on, only to hint "re-capture to get a real answer."
+  if (typeof meta.visibleLoadingMarkers === 'number') {
+    if (meta.visibleLoadingMarkers > 0)
+      push('mid-render', 'warn', `${meta.visibleLoadingMarkers} loading indicator(s) still visible in the captured DOM — possibly captured mid-render`, 'wait for load, re-capture');
+  } else if (contentBody.length < MIDLOAD_CHARS && /role="progressbar"|class="[^"]*(skeleton|shimmer|spinner|loading)/i.test(html)) {
+    push('mid-render', 'info', 'loading markers + thin content — possibly captured mid-render (re-capture to measure)', 'wait for load, re-capture');
+  }
+  // D6: an honest partial beats a corrupted whole — info-level, since this was a deliberate capture-time
+  // trade-off (see capture.js's writeSnapshot), not a defect to fix.
+  if (meta.screenshotTruncated)
+    push('screenshot-truncated', 'info', `screenshot shows the first ${meta.screenshotTruncated.shownPx}px of a ${meta.screenshotTruncated.fullPx}px page`, 'informational — content.md has the full page; nothing to do');
   return out;
 }
 

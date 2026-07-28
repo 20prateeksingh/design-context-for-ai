@@ -1243,6 +1243,32 @@ function mountFileBanner(){
   };
 }
 
+// D4 — the dashboard must never hide a fully-blocked capture attempt behind the pristine first-run
+// wizard (the kit's own "report honestly" rule). Rides F7's exact banner mechanism above (same
+// .filebanner class, same --fb-h var) rather than touching showWizard()/mountOnboard() — a fully-blocked
+// attempt and a never-attempted workspace both show the wizard, but only one of them gets this banner
+// above it. Canon strings, dated in ux-copy.md.
+function mountAttemptBanner(a){
+  const n = a.blockedCount || a.skipped || 0;
+  const one = n === 1;
+  let msg = `<b>Your last capture couldn't download anything</b> — ${n} page${one?'':'s'} ${one?'was':'were'} blocked by the site. `
+    + `The wizard below re-runs it; if this keeps happening, the site may not allow automated capture.`;
+  if (a.headless) msg += ` Blocked pages + --headless often means the site rejects headless browsers — retry without --headless (a browser window will open).`;
+  const el = document.createElement('div');
+  el.className = 'filebanner';
+  el.innerHTML = `<div class="fb-body">${msg}</div>`
+    + `<button type="button" class="fb-close" aria-label="dismiss this notice">×</button>`;
+  document.body.insertBefore(el, document.body.firstChild);
+  const setH = () => document.documentElement.style.setProperty('--fb-h', el.offsetHeight + 'px');
+  setH();
+  window.addEventListener('resize', setH);
+  el.querySelector('.fb-close').onclick = () => {
+    el.remove();
+    document.documentElement.style.setProperty('--fb-h', '0px');
+    window.removeEventListener('resize', setH);
+  };
+}
+
 // ═════════════════════════ BOOT ══════════════════════════════════════════════
 (async function boot(){
   // v2.4: the top bar carries the KIT's identity ("AI Design context") in every mode — the per-product
@@ -1253,6 +1279,7 @@ function mountFileBanner(){
   if (location.protocol === 'file:') serverMode = false;
   else try { STATUS = await (await fetch('/api/status')).json(); serverMode = true; } catch(_){ serverMode = false; }
   mountFileBanner();
+  if (serverMode && STATUS.lastAttempt) mountAttemptBanner(STATUS.lastAttempt);
   if (serverMode && STATUS.capture && STATUS.capture.running){ mountOnboard(); showProgress(true); attachStream(); return; } // kill-resilience resume
   if (serverMode && STATUS.firstRun){ mountOnboard(); showWizard(); return; }
   if (DASH) initDashboard();

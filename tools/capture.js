@@ -64,6 +64,10 @@ const NO_DISMISS = hasFlag('--no-dismiss');
 // says loggedIn:false. Otherwise logged-in (rides the persistent profile from login.js) — the default.
 const LOGGED_OUT = hasFlag('--logged-out') || LOGIN_PAGE || CFG.loggedIn === false;
 const VIEWPORT = { width: 1440, height: 900 };
+// D6: see writeSnapshot's screenshot step — chosen from real captured evidence (clean up to ~9.8k px on
+// some products, corrupted from ~10.7k px on others; no universal safe height), not the originally
+// hypothesized 16,384px GPU texture limit, which direct testing refuted.
+const SAFE_SCREENSHOT_HEIGHT = 8000;
 
 const KIT_DIR = path.join(__dirname, '..');
 const PROFILE_DIR = path.join(KIT_DIR, 'profiles', PROFILE);
@@ -456,6 +460,29 @@ async function classifyBadPage(page) {
   });
 }
 
+// D1: measure, don't guess — count loading indicators (same signature hygiene.js's old heuristic
+// looked for: role="progressbar", class matching skeleton/shimmer/spinner/loading) that are ACTUALLY
+// VISIBLE in the live DOM at snapshot time. Ground truth written once, at capture; hygiene.js reads
+// it instead of re-guessing from content length + a static regex over serialized HTML.
+const LOADING_MARKER_SELECTOR = '[role="progressbar"], [class*="skeleton" i], [class*="shimmer" i], [class*="spinner" i], [class*="loading" i]';
+async function countVisibleLoadingMarkers(page) {
+  return await page.evaluate((sel) => {
+    const isVisible = (el) => {
+      if (el.offsetParent === null) return false; // display:none or a display:none ancestor
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      const style = getComputedStyle(el);
+      if (style.visibility === 'hidden' || parseFloat(style.opacity) === 0) return false;
+      return true;
+    };
+    const visible = Array.from(document.querySelectorAll(sel)).filter(isVisible);
+    return {
+      count: visible.length,
+      selectors: visible.slice(0, 5).map(el => el.tagName.toLowerCase() + (el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : '')),
+    };
+  }, LOADING_MARKER_SELECTOR).catch(() => ({ count: 0, selectors: [] }));
+}
+
 // ── Snapshot the CURRENTLY-LOADED page → pages/<subdir||slug>/ ────────────────
 // No navigation: the caller has already positioned the page (capturePage navigates first;
 // guided capture lets the human navigate/click). Reused by both so the artifact shape is identical.
@@ -474,17 +501,36 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
   // (so the pill never lands in the PNG), then restore it — the designer keeps seeing the "Capturing…"
   // pill through the slower passes below. No-op for the automated crawl (no such element).
   await page.evaluate(() => document.querySelectorAll('[id^="__dck"]').forEach(e => { e.dataset.dckVis = e.style.visibility; e.style.visibility = 'hidden'; })).catch(() => {});
-  await page.screenshot({ path: path.join(dir, 'screenshot.png'), fullPage: true }).catch(async () => {
-    await page.screenshot({ path: path.join(dir, 'screenshot.png') }); // fullPage can fail on huge pages
-  });
+  // D6: Playwright's fullPage screenshot scroll-and-stitches a tall page in viewport-sized tiles, and a
+  // page with sticky/fixed header or sidebar chrome (confirmed on real MDN AND Wikipedia captures) gets
+  // that chrome re-rendered fresh at each tile boundary — it ends up duplicated, overlaid on top of the
+  // content still scrolling underneath. This was suspected to track Chromium's 16,384px GPU texture
+  // limit; direct evidence refutes that — corruption reproduced as low as ~10,700px on MDN while a
+  // GitHub/Amazon page past 9,700px stayed clean (whether the PAGE has sticky chrome decides it, not a
+  // fixed height). With no universal safe "let it stitch" height, a single-shot capture of just the top
+  // slice — at a resized viewport, so Chromium never tiles at all — trades a full (but sometimes
+  // corrupted) shot for an honest, always-clean partial one.
+  const fullPx = await page.evaluate(() => document.documentElement.scrollHeight).catch(() => 0);
+  let screenshotTruncated = null;
+  if (fullPx > SAFE_SCREENSHOT_HEIGHT) {
+    await page.setViewportSize({ width: VIEWPORT.width, height: SAFE_SCREENSHOT_HEIGHT });
+    await page.screenshot({ path: path.join(dir, 'screenshot.png') });
+    await page.setViewportSize({ width: VIEWPORT.width, height: VIEWPORT.height });
+    screenshotTruncated = { shownPx: SAFE_SCREENSHOT_HEIGHT, fullPx };
+  } else {
+    await page.screenshot({ path: path.join(dir, 'screenshot.png'), fullPage: true }).catch(async () => {
+      await page.screenshot({ path: path.join(dir, 'screenshot.png') }); // fullPage can fail on huge pages
+    });
+  }
   await page.evaluate(() => document.querySelectorAll('[id^="__dck"]').forEach(e => { e.style.visibility = e.dataset.dckVis || ''; delete e.dataset.dckVis; })).catch(() => {});
 
-  // 2. verbatim copy + computed tokens + outbound links (read-only DOM passes)
-  const [content, tokens, linksOut, title] = [
+  // 2. verbatim copy + computed tokens + outbound links + loading markers (read-only DOM passes)
+  const [content, tokens, linksOut, title, loadingMarkers] = [
     await extractContent(page),
     await tallyComputedTokens(page),
     await page.evaluate(() => [...new Set(Array.from(document.querySelectorAll('a[href]')).map(a => a.href))]),
     await page.title(),
+    await countVisibleLoadingMarkers(page),
   ];
 
   // 3. self-contained editable snapshot (blobs first — resolved ones become data: and the pass below skips them)
@@ -511,6 +557,10 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
     offOriginHosts: offOriginHostsOf(linksOut, origin), // F11: hosts this page links to that the crawl can't follow
     capturedAt: new Date().toISOString(), viewport: VIEWPORT,
     source: 'scrape', method, contentHash: contentHash(html),
+    // D1: ground truth for hygiene's mid-render check — see countVisibleLoadingMarkers above.
+    visibleLoadingMarkers: loadingMarkers.count,
+    ...(loadingMarkers.count ? { visibleLoadingMarkerSelectors: loadingMarkers.selectors } : {}),
+    ...(screenshotTruncated ? { screenshotTruncated } : {}),
     // method: 'guided' — reached by a human interaction (click/wizard), not URL navigation.
     // reachedBy records HOW, so a state with no inbound link is explained, not mysterious.
     ...(meta.reachedBy ? { reachedBy: meta.reachedBy } : {}),
@@ -1142,7 +1192,7 @@ if (require.main === module) (async () => {
 
   const manifest = {
     kit: 'design-context-kit v0.1', product: PRODUCT, startUrl: START_URL, resolvedOrigin: origin,
-    capturedAt: new Date().toISOString(), depth: DEPTH, cap: CAP, capped,
+    capturedAt: new Date().toISOString(), depth: DEPTH, cap: CAP, capped, headless: HEADLESS,
     counts: { captured: results.ok.length, skipped: results.skipped.length, failed: results.failed.length },
     pages: results.ok, skipped: results.skipped, failed: results.failed,
     actions: actionLog,
@@ -1162,6 +1212,14 @@ if (require.main === module) (async () => {
   console.log(`✅  Captured: ${results.ok.length} pages → design-context/`);
   if (results.skipped.length) console.log(`⏭️  Skipped: ${results.skipped.map(s => `${s.slug} (${s.reason})`).join(', ')}`);
   if (results.failed.length) console.log(`❌  Failed: ${results.failed.map(f => f.slug).join(', ')}`);
+  // D2: a block that's specific to headless Chromium (a site-side bot check, not a broken kit or a
+  // down site) looks identical to any other failure unless the run says so. Message only — no
+  // user-agent games, no evasion: a block is the site's answer and the kit respects it either way.
+  const blockedCount = results.skipped.filter(s => s.reason === 'blocked').length;
+  const attempted = results.ok.length + results.skipped.length + results.failed.length;
+  if (HEADLESS && attempted > 0 && (results.ok.length === 0 || blockedCount > attempted / 2)) {
+    console.log(`⚠  Blocked pages + --headless often means the site rejects headless browsers — retry without --headless (a browser window will open).`);
+  }
   if (capped) console.log(`⚠  ${capped} candidates beyond the cap — raise --cap to include them`);
   console.log(`🧭  Sitemap: design-context/ia/sitemap.json`);
   console.log(`\nOpen design-context/INDEX.md for the map — any pages/<slug>/page.html is your editable design baseline.\n`);
