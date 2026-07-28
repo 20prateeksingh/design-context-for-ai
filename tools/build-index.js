@@ -446,21 +446,58 @@ function buildIndex(libDir) {
   const repByWild = new Map([...byPattern].map(([p, s]) => [wildNorm(p), s]));
   const groupsByPat = new Map();
   for (const f of fro.values()) { const k = f.pattern; if (!groupsByPat.has(k)) groupsByPat.set(k, []); groupsByPat.get(k).push(f); }
-  let changed = true;
-  while (changed) { // merge pass
-    changed = false; const keys = [...groupsByPat.keys()];
-    outer:
-    for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
-      const a = keys[i].split('/'), b = keys[j].split('/');
-      if (a.length !== b.length) continue;
-      let diff = -1, ok = true;
-      for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) { if (diff !== -1) { ok = false; break; } diff = k; }
-      if (!ok || diff === -1 || (!WILD(a[diff]) && !WILD(b[diff]))) continue;
-      const merged = a.map((s, k) => k === diff ? ':var' : s).join('/');
-      const items = [...groupsByPat.get(keys[i]), ...groupsByPat.get(keys[j])];
-      groupsByPat.delete(keys[i]); groupsByPat.delete(keys[j]); groupsByPat.set(merged, items);
-      changed = true; break outer;
+  // Merge pass (perf-frontier-merge): two keys are mergeable iff same segment count and they
+  // differ at exactly one segment with at least one side WILD there — a property of the two
+  // strings themselves that can never flip while both are alive. So a live pair, once found
+  // incompatible, stays incompatible forever; only a freshly-created merged key needs checking
+  // against what's still alive. The old code re-scanned every pair from scratch on every single
+  // merge (that restart is what made this O(k²) per merge); this indexes keys by "signature"
+  // (length + differing position + the other segments) so mergeable pairs are found via hash
+  // lookup instead of brute force, while reproducing the exact same greedy pick order — first by
+  // original Map-iteration rank, then by rank of partner — because merge order is NOT
+  // interchangeable here: a key can be claimed by only one of two independently-eligible
+  // partners, and which one it takes changes the final grouping (verified against the old
+  // algorithm's output, byte-for-byte, on all 9 workspaces).
+  const sigOf = (segs, pos) => segs.length + '|' + pos + '|' + segs.map((s, k) => k === pos ? ' ' : s).join('/');
+  const sigBuckets = new Map(); // sig -> Set(key)
+  const partners = new Map();   // key -> Set(key) of currently-known mergeable partners
+  const segsOf = new Map();     // key -> its '/'.split() segments, cached
+  const addKey = (key) => {
+    const segs = key.split('/');
+    segsOf.set(key, segs); partners.set(key, new Set());
+    for (let pos = 0; pos < segs.length; pos++) {
+      const sig = sigOf(segs, pos);
+      let bucket = sigBuckets.get(sig);
+      if (!bucket) { bucket = new Set(); sigBuckets.set(sig, bucket); }
+      for (const other of bucket) {
+        if (!WILD(segs[pos]) && !WILD(segsOf.get(other)[pos])) continue;
+        partners.get(key).add(other); partners.get(other).add(key);
+      }
+      bucket.add(key);
     }
+  };
+  const removeKey = (key) => {
+    const segs = segsOf.get(key);
+    for (let pos = 0; pos < segs.length; pos++) sigBuckets.get(sigOf(segs, pos)).delete(key);
+    for (const other of partners.get(key)) partners.get(other).delete(key);
+    partners.delete(key); segsOf.delete(key);
+  };
+  for (const key of groupsByPat.keys()) addKey(key);
+  for (;;) {
+    const keys = [...groupsByPat.keys()];
+    const i = keys.find(k => partners.get(k).size > 0);
+    if (i === undefined) break; // fixed point — no live pair left that can merge
+    const j = keys.find(k => partners.get(i).has(k)); // i's partners all rank after i (else they'd have been found first)
+    const a = segsOf.get(i), b = segsOf.get(j);
+    let diff = -1;
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) { diff = k; break; }
+    const merged = a.map((s, k) => k === diff ? ':var' : s).join('/');
+    const items = [...groupsByPat.get(i), ...groupsByPat.get(j)];
+    removeKey(i); removeKey(j);
+    groupsByPat.delete(i); groupsByPat.delete(j); groupsByPat.set(merged, items);
+    // merged can coincide with a still-live third key's string (rare) — its index entry is
+    // already correct for that string, so only index it if it's genuinely new.
+    if (!partners.has(merged)) addKey(merged);
   }
   const singles = [];
   const frontier = []; let gi = 0;
