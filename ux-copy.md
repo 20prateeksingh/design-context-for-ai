@@ -3,6 +3,72 @@
 Locked, designer-facing strings shipped in the dashboard and terminal report. Change one, review the
 build brief that introduced it; this file is the single source of truth for exact wording.
 
+## 2026-07-28 — landing (docs/index.html, the kit's public page)
+
+`prds/landing-page-v1.md`. New canon: every string below ships on the public page at
+`docs/index.html`. The page's headline and sub are locked by the brief; the principles strip is locked
+verbatim; body prose is written in the same register (plain, no superlatives — "magic", "10x",
+"revolutionary" are banned words).
+
+**H1** (locked): `Your product, as design context any AI can read.`
+
+**Sub** (locked): `A free, open-source kit that captures your product's real screens, tokens, and patterns into a local library — so your AI designs in your product's language, not from generic memory.`
+
+**CTAs:** primary `Get the kit on GitHub` · secondary `See how it works` · the copyable one-liner
+(hero and Get-started, identical in both places):
+`git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product && cd my-product && tools/start.sh`
+Copy-button states: `Copy` → `Copied` (or `Press ⌘C` when the clipboard is refused).
+
+**Section headlines — the final set:**
+
+| Section | Eyebrow | Headline |
+|---|---|---|
+| How it works | `HOW IT WORKS` | `Three steps, and only the first one is yours.` |
+| The library | `WHAT YOUR AI ACTUALLY GETS` | `A folder of facts, with an entry point for machines.` |
+| The dashboard | `THE DASHBOARD` | `The part that refuses to guess.` |
+| Figma | `STRAIGHT INTO FIGMA` | `Click ⧉ Copy for Figma. Paste. Editable auto-layout layers — no plugin, no Dev Mode, no paid seat.` |
+| Principles | `THE RULES IT LIVES BY` | `Boring on purpose.` |
+| Get started | `GET STARTED` | `Copy the repo into a folder named after your product.` |
+
+**Three steps** (titles locked by the brief): `Run one script` · `The kit captures` · `Your AI designs grounded`
+
+**Dashboard tour — the three panel lines** (the brief's honesty headlines, as shipped):
+- The Map: `Rings are honest clicks-from-home; the fog is what you haven't captured yet.`
+- Design language: `Measured from your product, or absent.`
+- The working ledger: `It borrows your product's own colour — observed, never guessed.`
+
+**Principles strip** (locked, verbatim — the kit's real invariants):
+- `Local-only — captures never leave your machine.`
+- `Read-only — it follows links, never clicks your product's buttons.`
+- `Never touches credentials — you log in, in your own browser window.`
+- `Measured or absent — nothing on the dashboard is invented.`
+- `Any AI — Claude Code, Cursor, or a chat window; the prompts ship in the box.`
+
+**No-tracking line** (locked): `This page has no analytics. Like the kit: local-only.`
+
+**Requirements pills:** `Node 18 or newer` · `macOS or Linux` · `no account, no key, no signup`
+
+**Footer:** `MIT` badge · `built in public — 20prateeksingh/design-context-for-ai` ·
+`Figma paste powered by @figit/dom-to-figma (MIT)`
+
+### The one wording change this build forced
+
+The brief's Figma line ended `— no plugin, no Dev Mode, no network.` **`no network` is not true** and was
+already corrected everywhere else: a copy makes one external request, a cacheable GET of public font
+files from `cdn.jsdelivr.net/fontsource`, because Figma drops the pasted text when the converter cannot
+embed real font bytes (`prds/figma-exit-copy-paste-BUILD-REPORT.md`, the font-loader revert). README and
+`skills/capture-product/SKILL.md` already say `no paid seat`. The landing page follows that canon:
+
+`Click ⧉ Copy for Figma. Paste. Editable auto-layout layers — no plugin, no Dev Mode, no paid seat.`
+
+and the section body states the font request in the open rather than omitting it.
+
+> **Still stale (not fixed here — out of this brief's scope):** `tools/dashboard-template.html:2873`,
+> the Use-it tab's Figma paragraph, still ends `No plugin, no Dev Mode, no network.` That is the same
+> false claim, shipped in the product. Fix it to `no paid seat` in the next build that touches the
+> template. The Use-it screenshot was deliberately kept OFF the landing page for this reason.
+
+
 ## 2026-07-28 — hygiene-speaks-designer (F4: the ledger card)
 
 **Card title** (`#hygcard`, top of the working ledger):
