@@ -248,9 +248,26 @@ async function discoverNav(page, origin) {
     const grab = (root) => Array.from(root.querySelectorAll('a[href]')).map(a => {
       // aria-label first (clean, singular); otherwise the anchor's OWN heading — not its whole subtree,
       // which concatenates a heading + description run together on nav-dropdown anchors ("Xflow Receiving
-      // AccountsOur version of virtual foreign currency accounts…"); innerText is the last-resort fallback.
+      // AccountsOur version of virtual foreign currency accounts…"). Many nav anchors have neither a
+      // heading element nor an aria-label (plain <p> siblings, e.g. Tailwind-style dropdown cards) — for
+      // those we want the first sibling's text as the heading. innerText can't be trusted for this: mega-menu
+      // items sit inside a CLOSED dropdown (zero-size ancestor, offsetParent null), and unlaid-out elements
+      // never get innerText's block-boundary newlines — the whole subtree serializes as one run-on string.
+      // leafLines() walks the DOM directly (computed `display`/box model, not actual layout) and puts each
+      // leaf text-bearing element on its own line, so it works whether or not the menu is currently open.
+      const leafLines = (el) => {
+        const lines = [];
+        (function walk(node) {
+          const kids = Array.from(node.children);
+          const direct = Array.from(node.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent.trim()).filter(Boolean).join(' ');
+          if (direct) lines.push(direct);
+          kids.forEach(walk);
+        })(el);
+        return lines;
+      };
       const head = a.querySelector('h1,h2,h3,h4,h5,h6,strong,b,[class*="title"],[class*="label"]');
-      let label = (a.getAttribute('aria-label') || (head && head.innerText) || a.innerText || '')
+      const firstLine = leafLines(a)[0] || '';
+      let label = (a.getAttribute('aria-label') || (head && head.innerText) || firstLine)
         .trim().replace(/\s+/g, ' ');
       if (label.length > 60) label = label.slice(0, 60).replace(/\s+\S*$/, '') + '…'; // never cut mid-word
       label = label.split(' ').filter((w, i, ws) => w !== ws[i - 1]).join(' '); // drop consecutive dupes
