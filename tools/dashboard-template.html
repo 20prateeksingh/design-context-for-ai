@@ -222,8 +222,20 @@
   .btn { font-size:12px; font-weight:600; background:var(--panel-2); color:var(--txt); border:1px solid var(--line);
          border-radius:6px; padding:5px 10px; transition:border-color .2s; }
   .btn:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .btn:disabled { cursor:progress; }
   .btn.primary { background:var(--accent); color:var(--accent-text); border:0; }
   .btn.primary:hover { filter:brightness(1.12); }
+  /* (ux-busy-states F2) ONE ring, one rule: the single spinner every busy control uses, ~14px inline.
+     currentColor means it needs no button-specific colour of its own — it reads correctly on an
+     accent-filled primary, a plain ghost, or a --panel-2 chip alike, purely by inheriting the button's
+     own text colour (itself a :root token). Loops ONLY while its action is genuinely in flight — the
+     explicit, recorded exception to the v2.5.1 no-loops rule (§ THE MOTION PASS, below) — and the button
+     that owns it is `disabled` for that exact same span, so the loop's lifetime is bounded by the
+     request/response, never by a timer. */
+  .ring { display:inline-block; width:14px; height:14px; margin:0 6px -2px 0; border-radius:50%;
+          border:2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color:currentColor;
+          animation:spin .75s linear infinite; vertical-align:middle; }
+  @media (prefers-reduced-motion: reduce){ .ring { animation:none; } }
   /* representative-first offer (bug 8): one big primary CTA, a demoted --dim secondary below it */
   .repcta .btn.primary { width:100%; padding:10px; font-size:14px; }
   .dlall-wrap { margin-top:12px; }
@@ -656,9 +668,13 @@
                 border:1.5px dashed color-mix(in srgb, var(--accent-strong) 60%, var(--line)); border-radius:6px; background:color-mix(in srgb, var(--accent) 7%, var(--panel)); color:var(--link);
                 font-weight:600; font-size:11px; line-height:1.35; padding:8px; cursor:pointer; }
   .stt.guided:hover, .stt.guided:focus-visible { background:color-mix(in srgb, var(--accent) 13%, var(--panel)); }
+  .stt.guided:disabled { cursor:progress; opacity:.7; }
+  .stt.guided:disabled:hover { background:color-mix(in srgb, var(--accent) 7%, var(--panel)); }
   .guidedlink { display:inline-block; margin-top:8px; background:none; border:0; padding:0; cursor:pointer;
                 font:inherit; font-size:12px; font-weight:600; color:var(--link); text-align:left; }
   .guidedlink:hover, .guidedlink:focus-visible { text-decoration:underline; }
+  .guidedlink:disabled { color:var(--dim); cursor:progress; }
+  .guidedlink:disabled:hover { text-decoration:none; }
   .lchips { display:flex; gap:6px; flex-wrap:wrap; }
   .lc { border:1px solid var(--line); border-radius:20px; padding:3px 10px; font-size:11px; color:var(--dim); background:none; cursor:pointer; }
   .lc:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); color:var(--txt); }
@@ -788,10 +804,15 @@
          the effect is RELEASED the moment it finishes, handing the element back to its static declaration.
          So `document.getAnimations()` is genuinely EMPTY once the map settles — every measured gate in this
          build runs against the same render it would have without the pass.
-     Durations 120–450ms, ease-out. NOTHING loops: the capture heartbeat (.ent.live/.livedot) and the
-     capture spinner are the only infinite animations in the file and both exist only while a capture runs.
-     Reduced motion needs no new rules — the :root block kills every animation and transition outright, so
-     no transform motion survives it. */
+     Durations 120–450ms, ease-out. NOTHING loops at rest: the capture heartbeat (.ent.live/.livedot), the
+     full-page .spin, and the inline .ring (ux-busy-states F2) are the only infinite animations in the
+     file, and every one of them exists only while its own action is genuinely in flight — the explicit,
+     recorded exception to "nothing loops," never a contradiction of it: `document.getAnimations()` is
+     still empty once the map settles AND once every in-flight request has resolved or rejected.
+     Reduced motion needs no new rules for THIS pass — the :root block kills every animation and
+     transition outright, so no transform motion survives it. .ring/.spin/.livedot carry their own
+     `prefers-reduced-motion` rule each (a static ring in place of a spin) since the settled-render gate
+     is orthogonal to whether a real action is still running. */
   @keyframes mzfade  { from { opacity:0; } }
   @keyframes mzpop   { from { opacity:0; transform:translate(-50%,-50%) scale(.92); } }
   @keyframes mzlift  { from { opacity:0; transform:scale(.92); } }
@@ -900,6 +921,19 @@ function api(p,body){ return fetch(p,{method:'POST',headers:{'content-type':'app
   .then(r=>r.json()).catch(e=>({ok:false,error:String(e)})); }
 function toast(msg, sticky){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); if(!sticky) t._h=setTimeout(()=>t.style.display='none', 6000); }
+
+// (ux-busy-states F2) one ring, one rule — every button that awaits an /api/* call goes busy through
+// this, never a bespoke spinner. Keeps the label (so the button never changes width mid-request),
+// prefixes the shared .ring, disables the button, and hands back a restore closure the caller runs on
+// resolve/reject. Guarded against double-arming (a second click before the first restore lands).
+function setBusy(btn){
+  if(!btn || btn.dataset.busy) return () => {};
+  btn.dataset.busy = '1';
+  const html = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ring" aria-hidden="true"></span>' + html;
+  return () => { if(!btn.isConnected) return; delete btn.dataset.busy; btn.disabled = false; btn.innerHTML = html; };
+}
 
 // ═════════════════════════ PROMPTS (the UI) ══════════════════════════════════
 // Canonical wordings — the single source of truth is prds/use-it-layer.md Appendix A.
@@ -1733,8 +1767,8 @@ function initDashboard(){
   // "Get one example" / "Download all" both funnel through this so there's one capture path, not three.
   async function runCapture(urls, btn){
     if (!urls || !urls.length) return;
-    if (serverMode){ if(btn) btn.disabled=true; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
-      const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { toast('Failed: '+r.error); if(btn) btn.disabled=false; } }
+    if (serverMode){ const done = btn ? setBusy(btn) : ()=>{}; toast(`Capturing ${urls.length} page(s) — watch the browser window…`, true);
+      const r = await api('/api/capture',{urls}); if (r.ok) location.reload(); else { done(); toast('Failed: '+r.error); } }
     else { const cmd = `node tools/capture.js --urls "${urls.join(',')}"`;
       try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
       catch(_){ prompt('Run this in the terminal:', cmd); } }
@@ -1777,9 +1811,9 @@ function initDashboard(){
       if (isShape){
         // "the specific URL the designer clicked" = a single box already checked in the list below;
         // otherwise the server-computed highest-inbound representative (n.repUrl).
-        el.querySelector('#getone').onclick=()=>{ const checkedHere=urls.filter(u=>selected.has(u));
-          runCapture(checkedHere.length===1 ? checkedHere : [n.repUrl || urls[0]]); };
-        el.querySelector('#dlall').onclick=()=>runCapture(urls);
+        el.querySelector('#getone').onclick=(e)=>{ const checkedHere=urls.filter(u=>selected.has(u));
+          runCapture(checkedHere.length===1 ? checkedHere : [n.repUrl || urls[0]], e.currentTarget); };
+        el.querySelector('#dlall').onclick=(e)=>runCapture(urls, e.currentTarget);
       }
     } else {
       const when = n.capturedAt ? new Date(n.capturedAt).toLocaleString() : '—';
@@ -1809,11 +1843,11 @@ function initDashboard(){
         </div></div>`;
       wireThumbs(el);
       el.querySelector('#pnl-expand').onclick=()=>openFullDoc(n.id);
-      { const g=el.querySelector('#st-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url); }
-      el.querySelector('#st-add').onclick=async()=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
+      { const g=el.querySelector('#st-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url, g); }
+      el.querySelector('#st-add').onclick=async(e)=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
         if(!name||!url) return toast('Give the state a name and a URL');
-        if (serverMode){ toast('Capturing state — watch the browser window…', true);
-          const r = await api('/api/state',{slug:n.id,name,url}); r.ok ? location.reload() : toast('Failed: '+r.error); }
+        if (serverMode){ const done=setBusy(e.currentTarget); toast('Capturing state — watch the browser window…', true);
+          const r = await api('/api/state',{slug:n.id,name,url}); if(r.ok) location.reload(); else { done(); toast('Failed: '+r.error); } }
         else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
     }
   }
@@ -1832,16 +1866,38 @@ function initDashboard(){
   function pageUrl(n){ const o=(DATA.origin||'').replace(/\/+$/,''); return o + (n && n.route ? n.route : '/'); }
   // file:// fallback command — prompts-are-the-UI, same shape as v2's cd chip.
   function guidedCmd(startUrl){ return `node tools/capture.js --guided --url "${startUrl || (DATA.origin||'<product URL>')}"`; }
-  // Launch a guided session. Server mode → POST; file:// → copy the command (handled at the call site
-  // via copyGuidedCmd). Returns silently; the live loop is driven by guidedStream().
-  async function launchGuided(startUrl){
+  // (ux-busy-states F1) capture.js's guided end path reports itself as a run of real checkpoints, in
+  // order — this is that sequence's locked copy. 'ended' has none of its own: it falls straight through
+  // to the existing done/reload behaviour in guidedStream()'s finish().
+  const END_STAGE_COPY = { ending:'Closing the browser…', 'browser-closed':'Closing the browser…',
+    indexing:'Rebuilding the library index…', hygiene:'Running the library check…' };
+  function endingStageText(){
+    if(!guidedLive || !guidedLive.ending) return null;
+    if(guidedLive.endStale) return 'Still working — the terminal has details.';
+    const p = guidedLive.endPhase;
+    if(p==='session-saved'){ const n=guidedLive.endCaptures||0; return `Session saved · ${n} capture${n===1?'':'s'}`; }
+    if(p && END_STAGE_COPY[p]) return END_STAGE_COPY[p];
+    return 'Ending the guided session…';   // clicked; no checkpoint line has arrived yet
+  }
+  // (design contract #3) belt: if the end sequence goes 60s with no new checkpoint, say so instead of
+  // spinning forever. Re-armed on every real checkpoint, so genuine progress keeps postponing it.
+  let endWatchdog = null;
+  function armEndWatchdog(){ if(endWatchdog) clearTimeout(endWatchdog);
+    endWatchdog = setTimeout(()=>{ if(guidedLive && guidedLive.ending){ guidedLive.endStale = true; paintGuidedLive(); } }, 60000); }
+  function clearEndWatchdog(){ if(endWatchdog){ clearTimeout(endWatchdog); endWatchdog = null; } }
+  // Launch a guided session. Server mode → POST (btn, if given, rings + disables for that round trip —
+  // F2); file:// → copy the command (handled at the call site via copyGuidedCmd). Returns silently; the
+  // live loop (and, once ended, the staged copy above) is driven by guidedStream().
+  async function launchGuided(startUrl, btn){
     // F1/F3 pass no URL → start at the product's own origin (validation workspaces have no product.json
     // for the server to fall back to). F2 passes the specific page URL.
     const u = startUrl || DATA.origin || '';
     if(!serverMode) return copyGuidedCmd(u);
+    const done = btn ? setBusy(btn) : ()=>{};
     const r = await api('/api/guided/start', u?{startUrl:u}:{});
+    done();
     if(!r.ok){ toast(r.error || 'Another capture is running — finish or stop it first.'); return; }
-    guidedLive = { running:true, count:0, lastCapture:null, capturing:false };
+    guidedLive = { running:true, count:0, lastCapture:null, capturing:false, ending:false, endPhase:null, endCaptures:null, endMs:null, endStale:false };
     paintGuidedLive();
     guidedStream();
   }
@@ -1850,33 +1906,55 @@ function initDashboard(){
       .then(()=>toast('Command copied — paste it in your terminal (or ask your AI to run it)'))
       .catch(()=>{ try{ prompt('Run this in the terminal:', cmd); }catch(_){} }); }
   // End a running guided session from the dashboard (FB1) — the server SIGTERMs capture.js, which
-  // closes its browser cleanly and still writes the session + hygiene artifacts. guided-done reloads us.
+  // closes its browser cleanly and still writes the session + hygiene artifacts. The "Ending the guided
+  // session…" toast that used to sit frozen for the whole teardown now advances through capture.js's
+  // real checkpoints (F1) as they arrive over SSE — see endingStageText() and guidedStream() below.
   async function endGuided(){
     if(guidedLive && guidedLive.capturing){ toast('A page is still saving — one moment…'); return; }  // CTA is disabled here anyway
-    toast('Ending the guided session…', true);
+    if(guidedLive){ guidedLive.ending = true; guidedLive.endStale = false; }
+    armEndWatchdog();
+    paintGuidedLive();
     const r = await api('/api/guided/stop', {});
-    if(!r || !r.ok) toast('Could not end the session: ' + ((r&&r.error)||'unknown') + ' — if it says “unknown endpoint”, restart tools/map.js (the server predates this feature).');
+    if(!r || !r.ok){
+      clearEndWatchdog();
+      if(guidedLive) guidedLive.ending = false;
+      toast('Could not end the session: ' + ((r&&r.error)||'unknown') + ' — if it says “unknown endpoint”, restart tools/map.js (the server predates this feature).');
+      paintGuidedLive();
+    }
     // success path: the guided-done SSE event (or poll) drives the rebuild + reload.
   }
   // Live in-progress entry: sticky toast + (if home is showing) the ledger's next-slot updates.
   function paintGuidedLive(){
     const cnt = guidedLive ? guidedLive.count : 0;
-    toast(guidedLive && guidedLive.capturing ? `Capturing this page… · ${cnt} saved so far` : `Guided capture in progress — ${cnt} captured · the window is yours`, true);
+    const stage = endingStageText();
+    toast(stage || (guidedLive && guidedLive.capturing ? `Capturing this page… · ${cnt} saved so far` : `Guided capture in progress — ${cnt} captured · the window is yours`), true);
     if(document.getElementById('pane-home').classList.contains('active')) renderHome();
     else if(document.getElementById('pane-map').classList.contains('active') && !railSel) renderRail(); // live entry in the map's ledger too (F4)
   }
   // SSE primary (namespaced "guided"/"guided-done"), polling fallback — mirrors attachStream().
   function guidedStream(){
     let done=false;
-    const finish=(d)=>{ if(done) return; done=true; guidedLive=null;
-      if(d && d.error){                                   // launch failed (usually a locked profile) — say why, don't reload into nothing
-        toast('Guided capture couldn’t start: ' + d.error, true);
+    const finish=(d)=>{ if(done) return; done=true;
+      clearEndWatchdog();
+      const wasEnding = !!(guidedLive && guidedLive.ending);
+      guidedLive=null;
+      if(d && d.error){
+        // (design contract #3) errors end the ring — the same toast surface the ring/stages lived in now
+        // holds the real error. Two distinct failures share this branch: the launch never started
+        // (wasEnding false, pre-existing) vs. the end sequence itself died mid-flight (wasEnding true, F1).
+        toast((wasEnding ? '' : 'Guided capture couldn’t start: ') + d.error, true);
         if(document.getElementById('pane-home').classList.contains('active')) renderHome();
+        else if(document.getElementById('pane-map').classList.contains('active') && !railSel) renderRail();
         return;
       }
       toast('Guided session ended — rebuilding your library…', true);
       setTimeout(()=>{ location.hash=''; location.reload(); }, 900); };
-    const update=(p)=>{ if(!p) return; guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture, capturing:!!p.capturing };
+    const update=(p)=>{ if(!p) return;
+      const prevPhase = guidedLive ? guidedLive.endPhase : null;
+      const wasEnding = !!(guidedLive && guidedLive.ending);
+      guidedLive={ running:!!p.running, count:p.captures||0, lastCapture:p.lastCapture, capturing:!!p.capturing,
+        ending: wasEnding || !!p.endPhase, endPhase:p.endPhase||null, endCaptures:p.endCaptures, endMs:p.endMs, endStale:false };
+      if(p.endPhase && p.endPhase!==prevPhase) armEndWatchdog();
       if(!p.running) return finish(p); paintGuidedLive(); };
     const poll=async()=>{ for(;;){ if(done) return;
       const s=await fetch('/api/guided/status').then(x=>x.json()).catch(()=>null);
@@ -2060,9 +2138,9 @@ function initDashboard(){
       menu.style.top=(r.bottom+8)+'px'; menu.style.left=Math.max(8, Math.min(r.right-w, innerWidth-w-8))+'px';
       const first=menu.querySelector('.mi'); if(first) first.focus(); };
     rb.onclick=(e)=>{ e.stopPropagation(); menu.classList.contains('open')?close():open(); };
-    menu.addEventListener('click', e=>{ const b=e.target.closest('[data-mi]'); if(!b) return; const which=b.dataset.mi; close();
-      if(which==='recap'){ if(serverMode){ mountOnboard(); showWizard(STATUS && STATUS.product); } else copyPrompt(PROMPTS.recaptureCheck()); }
-      else if(which==='guided'){ launchGuided(); } });
+    menu.addEventListener('click', e=>{ const b=e.target.closest('[data-mi]'); if(!b) return; const which=b.dataset.mi;
+      if(which==='recap'){ close(); if(serverMode){ mountOnboard(); showWizard(STATUS && STATUS.product); } else copyPrompt(PROMPTS.recaptureCheck()); }
+      else if(which==='guided'){ launchGuided(undefined, b); close(); } });
     document.addEventListener('click', e=>{ if(!menu.contains(e.target) && e.target!==rb) close(); });
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   })();
@@ -2103,7 +2181,7 @@ function initDashboard(){
         <div class="rdet">${esc(c.detail)}</div></div>`).join('')}`;
     chip.onclick=(e)=>{ e.stopPropagation(); pop.classList.toggle('open'); };
     document.addEventListener('click', e=>{ if(!pop.contains(e.target) && e.target!==chip) pop.classList.remove('open'); });
-    const rg=document.getElementById('ready-guided'); if(rg) rg.onclick=(e)=>{ e.stopPropagation(); pop.classList.remove('open'); launchGuided(); };
+    const rg=document.getElementById('ready-guided'); if(rg) rg.onclick=(e)=>{ e.stopPropagation(); launchGuided(undefined, rg); pop.classList.remove('open'); };
   }
 
   // ═════════ HOME (atlas + ledger) + JOURNAL + PAGE DOC ═════════
@@ -2137,15 +2215,21 @@ function initDashboard(){
     const R=DASH.readiness, pend=DASH.pendingDescriptions||0, I=DASH.identity;
     // F5 live loop: while a guided session runs, the next-slot IS the in-progress entry (SSE-updated).
     if(guidedLive && guidedLive.running){
-      const cap = guidedLive.capturing;
-      const title = cap ? `Capturing this page… · ${guidedLive.count} saved` : `Guided capture in progress — ${guidedLive.count} captured · the window is yours`;
-      const detail = cap
+      const cap = guidedLive.capturing, ending = guidedLive.ending;
+      const stage = endingStageText();
+      const title = stage || (cap ? `Capturing this page… · ${guidedLive.count} saved` : `Guided capture in progress — ${guidedLive.count} captured · the window is yours`);
+      const detail = ending
+        ? `Wrapping up — this finishes on its own, no need to do anything.`
+        : cap
         ? `Snapshotting the page you're on — big pages take a few seconds. The pill in the browser says “Capturing…” too.`
         : `Drive to any state in the browser window and click 📸 Capture. When you're done, ${IS_MAC?'press <b>⌘Q</b> to quit the browser':'fully quit the browser'} — just closing the window may leave it running.`;
+      // (ux-busy-states F1/F2) once ending, the button carries the same ring as every other busy control
+      // and can't be clicked twice; its label IS the honest stage, not a generic "ending" placeholder.
+      const endBtnLabel = ending ? `<span class="ring" aria-hidden="true"></span>${esc(stage || 'Ending…')}` : 'End session &amp; save';
       return `<div class="ent hero live" id="guided-live"><div class="emeta"><span class="livedot${cap?' hot':''}"></span>now · you</div>
         <span class="etitle">${title}</span>
         <div class="edetail">${detail}</div>
-        ${serverMode?`<div class="chiprow"><button type="button" class="gobtn ghost" data-guided-end ${cap?'disabled title="Wait for this page to finish saving…"':''}>${cap?'Saving…':'End session &amp; save'}</button></div>`:''}</div>`;
+        ${serverMode?`<div class="chiprow"><button type="button" class="gobtn ghost" data-guided-end ${(cap||ending)?'disabled':''} ${cap?'title="Wait for this page to finish saving…"':''}>${endBtnLabel}</button></div>`:''}</div>`;
     }
     if(R && R.score>=100)
       return `<div class="ent hero quiet"><div class="emeta">next · nothing waiting</div>
@@ -2352,30 +2436,30 @@ function initDashboard(){
       }
       if (act==='ack-confirm'){
         const note = card.querySelector(`input[data-hyg-note="${CSS.escape(key)}"]`).value.trim();
-        b.disabled = true; toast('Noting it…', true);
+        const done = setBusy(b); toast('Noting it…', true);
         const r = await api('/api/hygiene/ack', { key, note: note || null });
-        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        if (r.ok) location.reload(); else { done(); toast('Failed: '+r.error); }
         return;
       }
       if (act==='reached-by-confirm'){
         const note = card.querySelector(`input[data-hyg-note="${CSS.escape(key)}"]`).value.trim();
         if (!note) return toast('Say how you reach it — a word or two is enough');
-        b.disabled = true; toast('Noting it…', true);
+        const done = setBusy(b); toast('Noting it…', true);
         const r = await api('/api/reached-by', { slug: b.getAttribute('data-hyg-slug'), note });
-        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        if (r.ok) location.reload(); else { done(); toast('Failed: '+r.error); }
         return;
       }
       if (act==='fold'){
         const rep = b.getAttribute('data-hyg-rep');
         const members = (b.getAttribute('data-hyg-members')||'').split(',').filter(Boolean);
         const pattern = b.getAttribute('data-hyg-pattern') || null;
-        b.disabled = true; toast('Folding into one example…', true);
+        const done = setBusy(b); toast('Folding into one example…', true);
         const r = await api('/api/hygiene/fold', { rep, members, pattern, key });
-        if (r.ok) location.reload(); else { toast('Failed: '+r.error); b.disabled = false; }
+        if (r.ok) location.reload(); else { done(); toast('Failed: '+r.error); }
         return;
       }
       if (act==='recapture-page'){ runCapture([pageUrl(byId[b.getAttribute('data-hyg-slug')])], b); return; }
-      if (act==='recapture-state'){ toast("You'll drive — the kit records.", true); launchGuided(pageUrl(byId[b.getAttribute('data-hyg-slug')])); return; }
+      if (act==='recapture-state'){ toast("You'll drive — the kit records.", true); launchGuided(pageUrl(byId[b.getAttribute('data-hyg-slug')]), b); return; }
     });
   }
 
@@ -2556,7 +2640,7 @@ function initDashboard(){
     </div>`;
     wireThumbs(el);
     const bk=el.querySelector('#pg-back'); if(bk) bk.onclick=()=>{ location.hash = backTo; };
-    { const g=el.querySelector('#pg-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url); }
+    { const g=el.querySelector('#pg-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url, g); }
     const exp=el.querySelector('#shot-exp'); if(exp) exp.onclick=()=>{ const s=el.querySelector('.dshot'); if(!s) return;
       const capped=s.classList.toggle('capped'); exp.textContent = capped?'expand full length':'collapse'; };
   }

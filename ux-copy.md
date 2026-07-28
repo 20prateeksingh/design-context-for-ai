@@ -1,5 +1,41 @@
 # UX copy canon
 
+## 2026-07-28 — busy states: honest stages, one ring (F1–F2)
+
+`prds/ux-busy-states.md`. F1 replaces the guided-end path's one frozen message with real checkpoints;
+F2 adds a ring + `disabled` to every other POST-backed control but introduces no new copy of its own —
+every button below keeps its existing label verbatim, the ring is a decorative `aria-hidden` prefix.
+
+**Guided-end staged sequence** (dashboard toast + the "End session" button's own label — same string,
+both places; `capture.js`'s `ending`/`browser-closed` GUIDED_JSON phases share the first line):
+```
+Ending the guided session…            (shown for the instant between click and the first checkpoint)
+Closing the browser…                  (phase: ending, browser-closed)
+Session saved · N capture[s]          (phase: session-saved — singular at N=1)
+Rebuilding the library index…         (phase: indexing)
+Running the library check…            (phase: hygiene)
+```
+`phase:'ended'` carries no copy of its own — it falls straight through to the pre-existing "Guided
+session ended — rebuilding your library…" + reload.
+
+**Ledger-card detail line while ending** (replaces the normal "drive to any state…" hint):
+`Wrapping up — this finishes on its own, no need to do anything.`
+
+**60s watchdog fallback** (design contract belt — replaces the current stage text if 60s pass with no
+new checkpoint; re-armed on every real one, so it only ever fires on a genuine stall):
+`Still working — the terminal has details.`
+
+**Abnormal mid-end exit** (child killed/crashed after `ending` started but before `ended` — dashboard
+toast and the terminal-facing `error` string are the same text; `<stage>` is one of *closing the
+browser* / *saving the session* / *rebuilding the index* / *running the library check*, `<sig>` is a
+signal name or `exit <code>`):
+`The session ended abnormally while <stage> (<sig>). Pages already captured are safely on disk — check
+the terminal for details.`
+
+**Terminal timing line** (F1's instrumentation requirement — `capture.js`, printed once per guided
+session on `phase:'ended'`):
+`⏱  guided end — browser <b>ms · save <c>ms · index <d>ms · hygiene <e>ms · total <f>ms`
+
 ## 2026-07-28 — fold loop + guided-public fix (F1–F4)
 
 `prds/v1-fix-fold-loop-guided-public.md`. Guided capture's GUIDED branch (`tools/capture.js`) gained a
