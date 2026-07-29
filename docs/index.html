@@ -281,6 +281,13 @@
 
     </div>
 
+    <!-- The hero map is xflowpay, and v1.2 re-ran the choice rather than inheriting it: with the map-root
+         fix in, wikipedia's 37-page capture finally draws true rings, so both candidates went through the
+         same zoom sweep again. wikipedia wins on structure (two rings, district arcs, a deep-fog chip that
+         xflow's single-ring library cannot produce) and loses on accent presence — measured: 1 of its 37
+         discs wears the product's accent, against 8 of 18 here, because the accent ring marks a page whose
+         description has been written and that workspace has none. Evidence + the head-to-head pair in
+         prds/landing-page-v1.2-populated-BUILD-REPORT.md § F2. -->
     <div class="heroshot">
       <figure class="shot">
         <img src="assets/hero-map.webp" width="2200" height="1696"
@@ -426,11 +433,11 @@
           <div class="body reveal">
             <h3>Design language</h3>
             <p class="quote">Measured from your product, or absent.</p>
-            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages — every value carrying the count and page-spread behind it, as here, where the product's darkest navy is <code>×31,920</code> across all eighteen pages and the accent is <code>×141</code> across four. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out — values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
+            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages — every value carrying the count and page-spread behind it, as here, where the product's darkest navy is <code>×32,939</code> across all eighteen pages and the accent is <code>×141</code> across four. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out — values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
           </div>
           <div class="imgwrap">
             <img src="assets/tour-tokens.webp" width="1900" height="609"
-                 alt="The Design language tab: a provenance strip reading 'Everything below is method: heuristic — values observed on the captured pages, aggregated and clustered by statistics — they are evidence of how the product is styled today, not its authored design tokens', above a Palette / Proportions toggle and twenty-one colour swatches, each labelled with its hex, how many times it was seen and on how many pages — #1F2741 ×31,920 on 18 pages, down to #E4E9FF ×5 on 5 pages.">
+                 alt="The Design language tab: a provenance strip reading 'Everything below is method: heuristic — values observed on the captured pages, aggregated and clustered by statistics — they are evidence of how the product is styled today, not its authored design tokens', then 'Filter: seen on 2+ pages (41 single-page values kept in tokens.json)', above a Palette / Proportions toggle and twenty-one colour swatches, each labelled with its hex, how many times it was seen and on how many pages — #1F2741 ×32,939 on 18 pages, down to #E4E9FF ×5 on 5 pages.">
           </div>
         </article>
 
@@ -442,7 +449,7 @@
           </div>
           <div class="imgwrap">
             <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="990"
-                 alt="The working ledger: 'Library check — all clean — 1 more note, nothing needed from you'; then 'NEXT · NEW PAGES WAITING — Let your AI read your 10 new pages', with a 'Copy the describe prompt' button; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
+                 alt="The working ledger: 'Library check — all clean — 3 more notes, nothing needed from you'; then 'NEXT · NEW PAGES WAITING — Let your AI read your 10 new pages', with a 'Copy the describe prompt' button; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
           </div>
         </article>
 
@@ -453,54 +460,61 @@
   <!-- ═══ 5 · ANY PRODUCT — THE MAP GALLERY ═════════════════════════════════════════════════════
        Seven real workspaces, seven real Map panes, each wearing the accent the kit measured in that
        product's own pages. At tile scale a map is its shape — discs, fog, accent — which is the point:
-       nothing here is a mockup of a product, it is the kit's own output on seven different ones. -->
+       nothing here is a mockup of a product, it is the kit's own output on seven different ones.
+       v1.2: all seven re-shot on POPULATED libraries (18–41 pages each, was 7–39), so a tile now shows
+       a full ring and a real frontier rather than a sparse cluster. Six of the seven come from fresh
+       captures in their own landing-shots-* workspaces; flipkart stays on its read-only fixture. Every
+       number in this section — page counts, hexes, percentages — is re-read from those workspaces at
+       build time; see prds/landing-page-v1.2-populated-BUILD-REPORT.md. -->
   <section id="anyproduct">
     <div class="wrap">
       <p class="eyebrow">Any product</p>
       <h2>Seven products, seven maps.</h2>
-      <p class="lede">Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Same kit, same one script, nothing set per product.</p>
+      <p class="lede">Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Eighteen to forty-one pages in each library, and each map says out loud how little of its site that is: from eleven per cent down to nine-tenths of one. Same kit, same one script, nothing set per product.</p>
 
       <ul class="gal">
         <li>
           <img src="assets/tile-flipkart.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of flipkart.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+               alt="The kit's Map pane on a capture of flipkart.com: thirty-nine page discs in two labelled rings — one click and two clicks from home — around a lit centre, most of them outlined in the measured blue accent, with dashed ghost pages in the fog beyond and a footer reading '3% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#2874F0"></span><b>flipkart.com</b><span class="hex">#2874F0</span></span>
         </li>
         <li>
           <img src="assets/tile-amazon.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of amazon.in: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+               alt="The kit's Map pane on a capture of amazon.in: forty-one page discs packed into a dense ring around a lit centre, each disc its own captured screenshot, a further ring labelled two clicks, dashed ghost pages in the fog, and a footer reading '1% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#2162A1"></span><b>amazon.in</b><span class="hex">#2162A1</span></span>
         </li>
         <li>
           <img src="assets/tile-espncricinfo.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of espncricinfo.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+               alt="The kit's Map pane on a capture of espncricinfo.com: thirty-seven page discs ringing a lit centre with a second ring labelled two clicks, dashed ghost pages spread through a blue-tinted fog, and a footer reading '3% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#0860C4"></span><b>espncricinfo.com</b><span class="hex">#0860C4</span></span>
         </li>
         <li>
           <img src="assets/tile-airbnb.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of airbnb.co.in: a small cluster of seven page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured crimson accent.">
+               alt="The kit's Map pane on a capture of airbnb.co.in: thirty-seven page discs ringing a lit centre, a second ring labelled two clicks, dashed ghost pages in the fog — and the whole fog glowing crimson, because that is the accent the kit measured in this product's own pages.">
           <span class="cap"><span class="sw" style="background:#DA1249"></span><b>airbnb.co.in</b><span class="hex">#DA1249</span></span>
         </li>
         <li>
           <img src="assets/tile-wikipedia.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of en.wikipedia.org: an arc of pale page discs beside a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured blue accent.">
+               alt="The kit's Map pane on a capture of en.wikipedia.org: thirty-seven page discs, pale because the pages themselves are, ringing a blue-ringed centre, a second ring labelled two clicks, dashed ghost pages in the fog, and a footer reading '0.9% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#3366CC"></span><b>en.wikipedia.org</b><span class="hex">#3366CC</span></span>
         </li>
         <li>
           <img src="assets/tile-xflowpay.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of xflowpay.com: rings of small page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured indigo accent.">
+               alt="The kit's Map pane on a capture of xflowpay.com: eighteen page discs in a single ring around a lit centre, several outlined in the measured indigo accent, dashed ghost pages in the fog, and a footer reading '11% of the known world explored' — the most-explored library of the seven, because it is the smallest site.">
           <span class="cap"><span class="sw" style="background:#5E76E3"></span><b>xflowpay.com</b><span class="hex">#5E76E3</span></span>
         </li>
         <li>
           <img src="assets/tile-github.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of github.com: a small ring of page discs around a lit centre, with dashed ghost pages in the fog, the whole panel tinted by a measured green accent.">
-          <span class="cap"><span class="sw" style="background:#5FED83"></span><b>github.com</b><span class="hex">#5FED83</span></span>
+               alt="The kit's Map pane on a capture of github.com: forty page discs in a dense ring around a lit centre, most of them dark because the product's own pages are, dashed ghost pages in the fog, and a footer reading '5% of the known world explored'.">
+          <span class="cap"><span class="sw" style="background:#0969DA"></span><b>github.com</b><span class="hex">#0969DA</span></span>
         </li>
       </ul>
 
-      <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Nothing was configured per product — where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo — absent rather than invented.</p>
+      <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't — a palette someone picked would be prettier than this, and that is rather the point. Nothing was configured per product — where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo — absent rather than invented.</p>
 
       <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape — how many pages, how far from home, how much fog — which is all this section claims. Every full-size dashboard view on this page is of one product, <code>xflowpay.com</code>, captured by the person who built the kit.</p>
+
+      <p class="note" style="margin-top:12px">Nor does every page yield. Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home: amazon.in's run recorded seven of those — six <code>auth-redirect</code>, one <code>soft-404</code> — each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
     </div>
   </section>
 
