@@ -156,6 +156,15 @@
   .mapnode.tpl { border-color:var(--tpl); }
   .mapnode.dorm { border-color:var(--dim); }
   .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--canvas); }
+  /* (covered-shapes) a template's shape count, ON the disc. The retired ghost used to carry this number as
+     a disc of its own, and the label pill cannot take the job over: pills are single-line by F3's ruling
+     below, and the collision pass drops them freely — the count would flicker in and out as the map moved.
+     A badge is always present, needs no placement pass, and reads with the .tpl rim that already says
+     "template". Sits below the disc so it never covers the screenshot the disc is showing. */
+  .mapnode .tplc { position:absolute; bottom:-7px; left:50%; transform:translateX(-50%); z-index:1;
+                   font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--canvas);
+                   background:var(--tpl); border:1.5px solid var(--canvas); border-radius:9px; padding:2.5px 5px;
+                   white-space:nowrap; pointer-events:none; }
   /* (v2.5.1 F3) node pills are SINGLE-LINE. The `from N` sub-line duplicated the size encoding the legend
      already states (`size = how linked-to`) as text, ×29 pills — the map's own busiest ingredient restating
      what the discs were already saying. The exact numbers keep three homes: the hover peek, the rail
@@ -1350,7 +1359,14 @@ function initDashboard(){
   // gets a byId entry — a direct link to its page doc (from the rep's "folded into this" list, or a
   // stale bookmark) still resolves; it's re-shelved, not hidden.
   DATA.nodes.forEach(n=>{ const o = {...n, locked:false}; if (!n.foldedInto) nodes.push(o); byId[o.id]=o; });
-  DATA.frontier.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
+  // (covered-shapes) A frontier group that a captured example now stands for gets NO ghost of its own —
+  // its count lives on that page's node ("stands for N"), and its sibling URLs are pulled from that page's
+  // panel. Two discs for the same N pages was double counting the same fog twice on one map (the
+  // /w/index.php ghost showed 880 while the page it points at claimed 881). Dropped from `nodes`/`byId`,
+  // so its edges fall out of the filter below — but NEVER dropped from DATA.frontier, which is what
+  // lockedTotal and every coverage tally read: those pages are still not downloaded (honesty rule #5).
+  const fogNodes = DATA.frontier.filter(f=>!f.coveredBy);
+  fogNodes.forEach(f=>{ const o = {...f, locked:true}; nodes.push(o); byId[o.id]=o; });
   const edges = DATA.edges.filter(e=>byId[e.a]&&byId[e.b]&&!byId[e.a].foldedInto&&!byId[e.b].foldedInto);
   const adj = {}; nodes.forEach(n=>adj[n.id]=new Set());
   edges.forEach(e=>{ adj[e.a].add(e.b); adj[e.b].add(e.a); });
@@ -1362,7 +1378,7 @@ function initDashboard(){
   const world=document.getElementById('mapworld'), areaEl=document.getElementById('maparea'), linesEl=document.getElementById('maplines'),
         labelsEl=document.getElementById('maplabels'), dcardEl=document.getElementById('mapdcard');
   const capNodes = nodes.filter(n=>!n.locked && n!==root);
-  const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...DATA.frontier.map(f=>f.inboundCount||0));
+  const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...fogNodes.map(f=>f.inboundCount||0));
   const secList0 = (DATA.sections||[]).filter(s=>s!=='Home');
   const secList = secList0.length ? secList0 : ['Other'];
   // ── F2 (v2.5 §3) — SECTOR WIDTH IS PROPORTIONAL TO MEMBERSHIP ──────────────────────────────────
@@ -1420,7 +1436,7 @@ function initDashboard(){
       g.forEach((n,i)=>{ const b=bearingOf(n.section); const off=g.length>1?(-w/2 + i*w/(g.length-1)):0;
         const rad=n.clickDepth==null?nullR:ringRadius(n.clickDepth);
         P[n.id]={x:Math.cos(b+off)*rad, y:Math.sin(b+off)*rad, r:sizeOf(n)/2, node:n}; }); });
-    const ghosts=DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
+    const ghosts=fogNodes.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
     ghostShown=ghosts.slice(0, Math.min(ghosts.length,14));
     const gg={}; ghostShown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
     // ghosts fan out inside their own section's sector too (F2), so a populous section's frontier
@@ -1509,7 +1525,10 @@ function initDashboard(){
       const isHome=n===root; const small=dia<30 && !isHome; const hasStates=(n.states||[]).some(s=>s.captured);
       const bg = (!small && n.screenshot) ? `background-image:url('${esc(n.screenshot)}')` : '';
       const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${small?' mono-disc':''}`;
-      return `<button class="${cls}" data-mapid="${esc(n.id)}" title="${esc(dlabel(n))} — from ${n.inboundCount||0}" style="left:${px}px;top:${py}px;--mzd:${mzd}ms;width:${dia}px;height:${dia}px;${isHome?'border-width:3px;border-color:var(--accent-strong);':''}${bg}">${hasStates?'<span class="st" title="has captured states"></span>':''}</button>`; };
+      // (covered-shapes) the shape count rides on the disc for a template — see .tplc. Compacted past 1k so
+      // a 2891 never grows a badge wider than the disc it hangs off.
+      const sf = n.standsFor>1 ? (n.standsFor>=1000 ? (n.standsFor/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n.standsFor)) : null;
+      return `<button class="${cls}" data-mapid="${esc(n.id)}" title="${esc(dlabel(n))} — from ${n.inboundCount||0}${sf?` · stands for ${n.standsFor}`:''}" style="left:${px}px;top:${py}px;--mzd:${mzd}ms;width:${dia}px;height:${dia}px;${isHome?'border-width:3px;border-color:var(--accent-strong);':''}${bg}">${hasStates?'<span class="st" title="has captured states"></span>':''}${sf?`<span class="tplc">×${sf}</span>`:''}</button>`; };
     html+=disc(root.id);
     capNodes.forEach(n=>html+=disc(n.id));
     ghostShown.forEach(f=>html+=disc(f.id));
@@ -1653,10 +1672,16 @@ function initDashboard(){
     const explored=capNodes.length+1, known=explored+lockedTotal, pct=known?100*explored/known:0;
     document.getElementById('mapstats').innerHTML=`<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home · every unlock pushes the fog back`;
     document.getElementById('mapnote').textContent='rings = how many clicks from home · hover a page for its real links · drag to pan, scroll to zoom';
+    // (covered-shapes) the two conditional rows. Retiring covered ghosts means a small product can now
+    // legitimately have ZERO ghosts on the map (xflow-platform-user: all 3 shapes covered) — a legend that
+    // still explains a dashed ghost nobody can see describes the wrong map. Same in reverse for ×N: no
+    // template, no badge, no row. The fog itself is never hidden by this — `deep fog …N more` and the
+    // explored % still carry every undownloaded page.
     document.getElementById('maplegend').innerHTML=
       `<span class="lg"><i style="width:14px;height:14px;border:2.5px solid var(--accent);border-radius:50%"></i>explored — size = how linked-to</span>
        <span class="lg"><i style="width:11px;height:11px;border:2px solid var(--dim);border-radius:50%"></i>explored, dormant caption</span>
-       <span class="lg"><i style="width:11px;height:11px;border:2px dashed var(--dim);border-radius:50%;opacity:.6"></i>ghost in the fog — locked</span>
+       ${ghostShown.length?`<span class="lg"><i style="width:11px;height:11px;border:2px dashed var(--dim);border-radius:50%;opacity:.6"></i>ghost in the fog — locked</span>`:''}
+       ${capNodes.concat([root]).some(n=>n.standsFor>1)?`<span class="lg"><i style="width:11px;height:11px;border:2px solid var(--tpl);border-radius:50%"></i>×N — one example, stands for N</span>`:''}
        <span class="lg" style="border-top:1px solid var(--line);padding-top:5px">hover a region for its district</span>`;
   }
 
@@ -1800,6 +1825,40 @@ function initDashboard(){
       try { await navigator.clipboard.writeText(cmd); toast('Command copied — paste it in your terminal (or ask your AI to run it)'); }
       catch(_){ prompt('Run this in the terminal:', cmd); } }
   }
+  // ── (covered-shapes) the shape section a REPRESENTATIVE page carries ────────────────────────────────
+  // A frontier group covered by a captured example has no ghost of its own any more, so everything that
+  // ghost's panel offered has to live on the page that stands for it: the count, the pattern, the sibling
+  // URLs, and the pull. Built once and used by BOTH surfaces that can show such a page — the rail panel
+  // (wide) and the page doc (where a stacked layout sends the very same click). The retired ghost was
+  // rail-only, so covering both is a net gain over what it replaced.
+  // Button counts name what will ACTUALLY be pulled: the server caps a selective capture at 15
+  // (map.js /api/capture), so "Download all 2890" would be a promise the pull cannot keep.
+  function coveredGroupOf(id){ return (DATA.frontier||[]).find(f=>f.coveredBy===id) || null; }
+  function coveredShapeHtml(cov, pfx){
+    if(!cov) return '';
+    const urls=cov.urls||[], batch=urls.slice(0,15);
+    return `<h3>Stands for ${cov.count} more page${cov.count===1?'':'s'}</h3>
+      <div class="desc">Same layout — <code>${esc(cov.pattern||'')}</code>. They were discovered, not downloaded: this page is what your AI reads for the shape.</div>
+      <div class="repcta"><button class="btn" id="${pfx}-one">Download another example</button>
+      ${batch.length>1?`<div class="dlall-wrap"><button class="btn dlall" id="${pfx}-all">Download ${batch.length} more</button>
+      <div class="warn">usually near-duplicates — they'll crowd your library and your AI learns nothing new.</div></div>`:''}</div>
+      ${urls.length?`<div class="meta" style="margin-top:6px">${cov.count>urls.length?`showing ${urls.length} of ${cov.count}`:`all ${urls.length}`} — tick any to pull those instead</div>
+      ${urls.map(u=>`<label class="urlrow"><input type="checkbox" data-cu="${esc(u)}" ${selected.has(u)?'checked':''}>
+        <span class="u">${esc(decodeURIComponent(u).replace(/^https?:\/\/[^/]+/,''))}<small>${esc(u.split('/')[2]||'')}</small></span></label>`).join('')}`:''}`;
+  }
+  function wireCoveredShape(el, cov, pfx){
+    if(!cov) return;
+    const urls=cov.urls||[], batch=urls.slice(0,15);
+    el.querySelectorAll('input[data-cu]').forEach(cb=>cb.onchange=()=>{ cb.checked?selected.add(cb.dataset.cu):selected.delete(cb.dataset.cu); syncCapBtn(); });
+    const one=el.querySelector('#'+pfx+'-one');
+    // ticked boxes win; otherwise the group's server-computed representative — highest inbound of what is
+    // LEFT in the pool (the example already downloaded is out of it), so this is genuinely "another".
+    if(one) one.onclick=(e)=>{ const picked=urls.filter(u=>selected.has(u)); const pick=cov.repUrl||urls[0];
+      if(!picked.length && !pick) return toast('No sibling URLs recorded for this shape');
+      runCapture(picked.length?picked.slice(0,15):[pick], e.currentTarget); };
+    const all=el.querySelector('#'+pfx+'-all');
+    if(all) all.onclick=(e)=>runCapture(batch, e.currentTarget);
+  }
   function renderRail(){
     const el = railTarget(); if(!el) return;
     const n = railSel ? byId[railSel] : null;
@@ -1848,6 +1907,8 @@ function initDashboard(){
       // F3 (hygiene-speaks-designer): a folded rep lists its instances as links (they still resolve —
       // "re-shelved", not hidden); a folded member (opened directly, e.g. a stale bookmark) points back.
       const foldedMembers = Object.values(byId).filter(x=>!x.locked && x.foldedInto===n.id);
+      const covered = coveredGroupOf(n.id);
+      const coveredHtml = coveredShapeHtml(covered, 'cov');
       el.innerHTML = `<div class="railpanel">${CLOSE}<h2>${esc(dlabel(n))}</h2>
         <div class="route">${esc(n.route)}</div>
         ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank" aria-label="open full screenshot">${img2(n.screenshot,'pshot')}</a>`:''}
@@ -1858,6 +1919,7 @@ function initDashboard(){
         <div class="links" style="margin-top:8px;font-size:12px"><a href="${esc(n.pageHtml)}" target="_blank">open HTML</a> · <a href="${esc(n.pageMd)}" target="_blank">screen doc</a></div>
         ${n.foldedInto?`<div class="meta" style="margin-top:6px">Folded into <button class="lnk" data-goto="page/${esc(n.foldedInto)}">${esc(dlabel(byId[n.foldedInto]||{id:n.foldedInto}))}</button> — captured here, shown there.</div>`:''}
         ${foldedMembers.length?`<h3>Also stands for</h3><div class="desc">${foldedMembers.map(m=>`<button class="lnk" data-goto="page/${esc(m.id)}">${esc(dlabel(m))}</button>`).join(' · ')}</div>`:''}
+        ${coveredHtml}
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
         ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="stateacts"><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span>${s.captured?figmaBtn(n.id, s.name, true):''}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
@@ -1869,6 +1931,7 @@ function initDashboard(){
           <button class="guidedlink" id="st-guided" data-url="${esc(pageUrl(n))}">Can't reach it by URL? Guided capture</button>
         </div></div>`;
       wireThumbs(el);
+      wireCoveredShape(el, covered, 'cov');
       el.querySelector('#pnl-expand').onclick=()=>openFullDoc(n.id);
       { const g=el.querySelector('#st-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url, g); }
       el.querySelector('#st-add').onclick=async(e)=>{ const name=el.querySelector('#st-name').value.trim(), url=el.querySelector('#st-url').value.trim();
@@ -2512,7 +2575,10 @@ function initDashboard(){
     const described=nodes.filter(n=>!n.descPending), templates=nodes.filter(n=>n.kind==='template');
     const withStates=nodes.filter(n=>(n.states||[]).some(s=>s.captured));
     const subtitle = pend>0 ? `${I.name} — ${I.downloaded} pages, as they really look` : `${I.name} — ${I.downloaded} pages, all described`;
-    const ghostsShown = DATA.frontier.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)).slice(0,2);
+    // (covered-shapes) same rule as the map: a shape a captured page already stands for gets no locked
+    // card — its "stands for N" badge is right there on that page's own card. overflowN still counts it
+    // (lockedTotal is unfiltered), so the atlas never understates how much is undownloaded.
+    const ghostsShown = fogNodes.slice().sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0)).slice(0,2);
     const ghostShownCount = ghostsShown.reduce((s,f)=>s+(f.count||1),0);
     const overflowN = Math.max(0, lockedTotal - ghostShownCount);
     // atlas cards no longer navigate (F1): hover = peek, click = panel; data-card holds the slug
@@ -2624,6 +2690,10 @@ function initDashboard(){
     // F3 (hygiene-speaks-designer): a folded rep's page doc lists its instances as links — nothing is
     // hidden, it's re-shelved (byId still resolves every folded member's own doc, chip included).
     const foldedMembers = Object.values(byId).filter(x=>!x.locked && x.foldedInto===slug);
+    // (covered-shapes) the shape this page stands for. It matters MORE here than in the rail: below the
+    // stacking breakpoint a click on a representative node comes straight to this doc, so without it the
+    // shape would have no controls at all on a narrow window.
+    const pdCovered = coveredGroupOf(slug);
     const hist=[];
     DASH.events.forEach(e=>{ if(e.link&&e.link.page===slug) hist.push({t:e.title,at:e.at,actor:e.actor}); });
     if(!n.descPending) hist.push({t:'Described', at:null, actor:'your AI'});
@@ -2657,6 +2727,7 @@ function initDashboard(){
             ${n.standsFor?`<div class="kv"><span>Layout template</span><span>stands for ${n.standsFor}</span></div>`:''}
             ${foldedMembers.length?`<div class="kv"><span>Also stands for</span><span class="lchips">${foldedMembers.map(m=>chip(m.id)).join('')}</span></div>`:''}
             ${n.foldedInto?`<div class="kv"><span>Folded into</span><span class="lchips">${chip(n.foldedInto)}</span></div>`:''}</div>
+          ${pdCovered?`<div class="card" id="pd-shape">${coveredShapeHtml(pdCovered,'pdcov').replace('<h3>','<h3 style="margin-top:0">')}</div>`:''}
           <div class="card"><h3 style="margin-top:0">Leads to <span class="ai" title="from the DOM">dom</span></h3>
             <div class="lchips">${leadsTo.map(chip).join('')||'<span class="edetail">—</span>'}</div>
             <h3>Reached from</h3>
@@ -2668,6 +2739,7 @@ function initDashboard(){
     </div>`;
     wireThumbs(el);
     const bk=el.querySelector('#pg-back'); if(bk) bk.onclick=()=>{ location.hash = backTo; };
+    wireCoveredShape(el, pdCovered, 'pdcov');
     { const g=el.querySelector('#pg-guided'); if(g) g.onclick=()=>launchGuided(g.dataset.url, g); }
     const exp=el.querySelector('#shot-exp'); if(exp) exp.onclick=()=>{ const s=el.querySelector('.dshot'); if(!s) return;
       const capped=s.classList.toggle('capped'); exp.textContent = capped?'expand full length':'collapse'; };
