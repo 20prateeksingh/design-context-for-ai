@@ -42,8 +42,10 @@ v1.1's report claimed this wrinkle was "disclosed on the page" — it wasn't, on
 
 Evidence: `landing-shots-amazon/design-context/manifest.json` → `counts.skipped: 7`, and a `skipped[]`
 array naming each slug with its reason. The brief asked for this disclosure sourced to espncricinfo's
-`/cricketers/:id` and `/records/*` families; that workspace's manifest records `skipped: 0, failed: 0`,
-so the claim is made on amazon's record, which does hold it. See the build report § F3.
+`/cricketers/:id` and `/records/*` families, which really were blocked during the population run — but
+that run finished with a selective `--urls` frontier pull, and `manifest.json` describes only the most
+recent run, so the blocked-family record was overwritten. The claim is therefore made on amazon's record,
+which survived and which a reader can check. See the build report § F3 and finding 3.
 
 **Unchanged and worth stating:** the hero caption (`eighteen pages downloaded, one hundred and forty-six
 still ghosts in the fog. Rings are measured clicks from home.`) still matches the shipped frame exactly —
