@@ -31,7 +31,13 @@ const PENDING = '_(not yet described — run the describe step)_';
 // only when a workspace running an older copy would actually miss something). Stamped as the last line
 // of each file; a workspace copy running behind this gets a one-line, info-level hygiene warning rather
 // than drifting silently (F6: a 7-day-old workspace had no design-new instruction at all, undetected).
-const KIT_SURFACES_VERSION = 1;
+// v2 (2026-07-30): b2dc1ad rewrote hard rules 1 and 3, added §0 (open Claude on the workspace folder,
+// which .claude/settings.json depends on) and the .claude/ layer itself. A workspace on the v1 copy
+// misses all of it, which is exactly the condition this stamp exists to surface — and it stayed silent,
+// because the nine canonical workspaces were re-copied by hand while the stamp never moved. Measured at
+// bump time: the six frozen landing-shots-* workspaces carried v1 stamps against materially different
+// content and the check was silent on every one.
+const KIT_SURFACES_VERSION = 2;
 
 // journal actor canon — CLOSED set. The dashboard's journal filter chips (All/You/The kit/Your AI)
 // assume every event's actor is exactly one of these three, so each entry matches exactly one filter.
@@ -998,7 +1004,9 @@ function buildIndex(libDir) {
       hygiene.quality.push({
         kind: 'quality', subKind: 'stale-surfaces', severity: 'info', target: 'CLAUDE.md/AGENTS.md',
         issue: 'CLAUDE.md/AGENTS.md are older than tools/ — re-copy them from the template.',
-        action: 're-copy CLAUDE.md, AGENTS.md and skills/ from the template',
+        // .claude/ joined the surface set in b2dc1ad (settings + skill pointers). Remediation that names
+        // an incomplete set is worse than none — someone follows it and still misses a shipped surface.
+        action: 're-copy CLAUDE.md, AGENTS.md, skills/ and .claude/ from the template',
         key: 'quality::stale-surfaces',
       });
     }

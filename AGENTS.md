@@ -10,4 +10,4 @@ This is a designer's workspace for ONE product. Full behavior spec: **[CLAUDE.md
 
 If you were pasted this file as a prompt (host without instruction auto-load): follow the five rules above, then read `design-context/registry.json` and ask the designer what they want to work on. If you were started in a folder *above* this one, resolve every path here against the folder holding `tools/` and `design-context/`, not against where you launched.
 
-<!-- design-context-kit surfaces v1 · if the hygiene check reports a newer upstream, re-copy CLAUDE.md, AGENTS.md and skills/ from the template before trusting this file. -->
+<!-- design-context-kit surfaces v2 · if the hygiene check reports a newer upstream, re-copy CLAUDE.md, AGENTS.md, skills/ and .claude/ from the template before trusting this file. -->
