@@ -1996,8 +1996,9 @@ function initDashboard(){
   // ═════════ COPY FOR FIGMA (figma-exit-copy-paste PRD, F1/F2) ═════════
   // One component everywhere (page-doc header · shared panel · each captured state). Converts the real
   // SNAPSHOT DOM — pages/<slug>/page.html, or a state's page.html — into Figma's paste format entirely
-  // in the browser, then writes it to the clipboard as a user gesture. No plugin, no network, no server
-  // required (the copy works on file:// too; the server, when present, only records the exit).
+  // in the browser, then writes it to the clipboard as a user gesture. No plugin, no server round-trip
+  // required (the copy works on file:// too, plus one font fetch — see below); the server, when present,
+  // only records the exit.
   const FIG_LABEL = '⧉ Copy for Figma';
   // Font handling: the pasted Figma TEXT only survives if the converter can embed real font bytes — a
   // loader that returns no/empty bytes makes Figma drop the text and keep only images + frames. So we
@@ -2981,7 +2982,7 @@ function initDashboard(){
       <div class="mode">
         <span class="badge">new</span>
         <h3>Take any page straight into Figma</h3>
-        <p>On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click <b>⧉ Copy for Figma</b> and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; your library stays untouched. No plugin, no Dev Mode, no network.</p>
+        <p>On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click <b>⧉ Copy for Figma</b> and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; your library stays untouched. No plugin, no Dev Mode, no paid seat.</p>
         <div class="chiprow">${pchip('How to copy for Figma', PROMPTS.figma(), true)}</div>
       </div>
       <div class="mode">

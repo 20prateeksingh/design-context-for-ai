@@ -1,5 +1,18 @@
 # UX copy canon
 
+## 2026-07-29 — map root detection + two riders (`prds/v1-fix-map-root.md`)
+
+**R2 — the Use-it tab's false "no network" claim, fixed.** `tools/dashboard-template.html:2984`, the
+Figma paragraph, ended `No plugin, no Dev Mode, no network.` — flagged in the v1 landing audit
+(originally line 2873) and again in v1.1, never fixed until now. A Figma copy makes exactly one
+external request (public font files from a CDN), so `no network` was never true. Now reads:
+
+`…your library stays untouched. No plugin, no Dev Mode, no paid seat.`
+
+This matches the canon already used on the landing page and in README / `skills/capture-product/SKILL.md`
+(see the `2026-07-28 — landing v1.1` entry below, "The one wording change this build forced"). Both prior
+stale-claim pointers below are struck as resolved.
+
 ## 2026-07-28 — landing v1.1 (Prateek's feedback round: richer hero · no accidental crops · the map gallery)
 
 `prds/landing-page-v1.1-feedback.md`. **Every locked v1 string above is untouched** — checked
@@ -51,10 +64,11 @@ not carried over from v1. Where the product's own render disagreed with a planne
 `prds/landing-page-v1.1-feedback-BUILD-REPORT.md` (§ "The hero the brief asked for, and why it isn't the
 one that shipped").
 
-> **Still stale (unchanged, still out of scope):** the Use-it tab's Figma paragraph in
+> ~~**Still stale (unchanged, still out of scope):** the Use-it tab's Figma paragraph in
 > `tools/dashboard-template.html` still ends `No plugin, no Dev Mode, no network.` — the same false claim
 > v1 flagged (it has drifted from line 2873 to **line 2984**). Fix it to `no paid seat` in the next build
-> that touches the template. The Use-it screenshot is still deliberately kept off the landing page.
+> that touches the template. The Use-it screenshot is still deliberately kept off the landing page.~~
+> **Fixed 2026-07-29** (`prds/v1-fix-map-root.md` R2): line 2984 now reads `no paid seat`, matching canon. See the `2026-07-29` entry at the top of this file.
 
 ## 2026-07-28 — diversity-sweep fix train (D1–D8)
 
@@ -209,10 +223,11 @@ embed real font bytes (`prds/figma-exit-copy-paste-BUILD-REPORT.md`, the font-lo
 
 and the section body states the font request in the open rather than omitting it.
 
-> **Still stale (not fixed here — out of this brief's scope):** `tools/dashboard-template.html:2873`,
+> ~~**Still stale (not fixed here — out of this brief's scope):** `tools/dashboard-template.html:2873`,
 > the Use-it tab's Figma paragraph, still ends `No plugin, no Dev Mode, no network.` That is the same
 > false claim, shipped in the product. Fix it to `no paid seat` in the next build that touches the
-> template. The Use-it screenshot was deliberately kept OFF the landing page for this reason.
+> template. The Use-it screenshot was deliberately kept OFF the landing page for this reason.~~
+> **Fixed 2026-07-29** (`prds/v1-fix-map-root.md` R2) — see the `2026-07-29` entry at the top of this file.
 
 
 ## 2026-07-28 — hygiene-speaks-designer (F4: the ledger card)
