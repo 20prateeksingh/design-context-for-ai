@@ -458,7 +458,7 @@ function buildIndex(libDir) {
   // interchangeable here: a key can be claimed by only one of two independently-eligible
   // partners, and which one it takes changes the final grouping (verified against the old
   // algorithm's output, byte-for-byte, on all 9 workspaces).
-  const sigOf = (segs, pos) => segs.length + '|' + pos + '|' + segs.map((s, k) => k === pos ? ' ' : s).join('/');
+  const sigOf = (segs, pos) => segs.length + '|' + pos + '|' + segs.map((s, k) => k === pos ? '\0' : s).join('/');
   const sigBuckets = new Map(); // sig -> Set(key)
   const partners = new Map();   // key -> Set(key) of currently-known mergeable partners
   const segsOf = new Map();     // key -> its '/'.split() segments, cached
@@ -549,9 +549,42 @@ function buildIndex(libDir) {
 
   // ── 2d. Dashboard-v2 derived data (deterministic; embedded additively) ──────────
   const round1 = (x) => Math.round(x * 10) / 10;
-  const rootSlug = ordered.find(s => pages[s].meta.route === '/')
-    || [...ordered].sort((a, b) => pages[b].linkedFrom.length - pages[a].linkedFrom.length)[0]
-    || ordered[0];
+  // R1 (v1-fix-map-root): root resolution is ground-truth-first. Route '/' is a page-authoring
+  // convention plenty of real products don't use (Wikipedia's home is /wiki/Main_Page) — falling
+  // straight to "most inbound" on those products hands the map's centre to whatever page every other
+  // page happens to link to (Wikipedia: Special:CreateAccount, in the footer nav of every page), an
+  // arbitrary page wearing the "home" label, not a home. manifest.json's startUrl/resolvedOrigin is
+  // what the designer actually pointed the crawl at — that's the recorded fact, not an inference.
+  const hostOf = (u) => { try { return new URL(u).host.toLowerCase().replace(/^www\./, ''); } catch { return null; } };
+  const urlOf = (s) => pages[s].meta.finalUrl || pages[s].meta.url;
+  // Two independent recordings of "where the designer pointed this crawl", tried in order — startUrl
+  // may carry a path resolvedOrigin never does, resolvedOrigin may carry a post-redirect origin startUrl
+  // never does (capture.js resolves TLD/country redirects into resolvedOrigin, e.g. airbnb.com →
+  // www.airbnb.co.in), so a product that redirects needs the latter and one that doesn't needs the
+  // former — trying only one leaves real workspaces falling through to a weaker tier for no reason.
+  const startCandidates = [manifest.startUrl, manifest.resolvedOrigin, sitemap.origin].filter(Boolean);
+  let rootSlug = null;
+  for (const cand of startCandidates) {
+    rootSlug = ordered.find(s => routeKey(urlOf(s)) === routeKey(cand));
+    if (rootSlug) break;
+  }
+  if (!rootSlug) {
+    // Neither candidate routeKey-matched a captured page by path — likely a bare-origin start that
+    // redirected inward (e.g. `--url https://en.wikipedia.org` → /wiki/Main_Page). capture.js always
+    // captures the page that origin actually resolves to FIRST (`landingCand` → ia/sitemap.json's
+    // pages[0]) — still the crawl's own recorded entry, just keyed by discovery order + host instead of
+    // an exact URL match.
+    for (const cand of startCandidates) {
+      const host = hostOf(cand);
+      if (host && navOrder.length && pages[navOrder[0]] && hostOf(urlOf(navOrder[0])) === host) { rootSlug = navOrder[0]; break; }
+    }
+  }
+  let rootBasis = rootSlug ? 'startUrl' : null;
+  if (!rootSlug) { rootSlug = ordered.find(s => pages[s].meta.route === '/'); if (rootSlug) rootBasis = 'route'; }
+  if (!rootSlug) {
+    rootSlug = [...ordered].sort((a, b) => pages[b].linkedFrom.length - pages[a].linkedFrom.length)[0] || ordered[0];
+    rootBasis = 'most-inbound (fallback)';
+  }
   const depths = computeDepths(pages, rootSlug);
   const tokens = aggregateTokens(pagesDir, ordered);
   const brand = deriveBrand(tokens); // F2 (v2.4): whitelabel accent — null when nothing qualifies
@@ -817,6 +850,10 @@ function buildIndex(libDir) {
     offOrigin,
     // additive dashboard-v2 top-level fields
     identity, readiness, events,
+    // R1 (v1-fix-map-root): which page clickDepth's rings are measured from, and how that page was
+    // chosen — 'startUrl' (matched the crawl's own entry, directly or via its recorded landing page),
+    // 'route' (route '/', no startUrl match), or 'most-inbound (fallback)' (neither — an honest guess).
+    rootSlug, rootBasis,
   };
   // guided-capture summary — strictly additive AND only present when a guided session has run, so a
   // workspace with no guided-sessions.json regenerates a byte-identical registry to before (crit #7).
@@ -857,7 +894,7 @@ function buildIndex(libDir) {
   if (fs.existsSync(tplPath)) {
     const mapData = {
       product: sitemap.product, origin: sitemap.origin, generatedAt: manifest.capturedAt,
-      rootSlug, sections: sectionsOrder, districts,
+      rootSlug, rootBasis, sections: sectionsOrder, districts,
       nodes: ordered.map(slug => { const p = pages[slug]; const m = p.meta; return {
         id: slug, kind: m.template ? 'template' : 'page',
         label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), displayLabel: displayLabelOf(slug), route: m.route,
@@ -932,6 +969,9 @@ function buildIndex(libDir) {
     ...frontMatter,
     `Captured ${manifest.capturedAt.slice(0, 10)} from ${sitemap.origin} · ${ordered.length} pages · read-only scrape, provenance-stamped.`,
     '',
+    // R1: honest disclosure only when the map's centre was neither the crawl's own recorded entry nor
+    // route '/' — i.e. an actual guess, not measured. Silent in the normal case on purpose.
+    ...(rootBasis === 'most-inbound (fallback)' ? [`> **Map root is a guess:** no page matched the captured startUrl and none sits at route \`/\`, so the map's centre (**${displayLabelOf(rootSlug)}**) is the most-linked-to page instead — not necessarily this product's real home. Rings measure clicks from there.`, ''] : []),
     `**[Open the dashboard](dashboard.html)** — coverage map (**${frontierTotal}** discovered-but-not-downloaded pages on the frontier), capture overview, and the product's observed design tokens ([tokens.json](tokens.json), method: heuristic). Run \`node tools/map.js\` to make it live (unlock frontier pages, add state URLs).`,
     '',
     '**For AI agents:** read `registry.json` first (same content, machine shape). Every value here is derived from `pages/*/meta.json`; page descriptions are model-written and labeled `method: ai` — everything else is extracted fact.',
