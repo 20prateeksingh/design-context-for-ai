@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { extractPathRefs, expectedAbsentReason } = require('./path-refs.js');
+const { patternize } = require('./route-pattern.js');
 
 const NEAR_EMPTY_CHARS = 200;   // content.md shorter than this = suspiciously thin
 const MIDLOAD_CHARS = 500;      // + loading markers below this = probably captured mid-render
@@ -43,17 +44,6 @@ function blobAssetRefs(html) {
   }
   out.css = (html.match(/url\(\s*['"]?blob:/gi) || []).length;   // background-image: url(blob:…)
   return out;
-}
-
-// crude, dependency-free route → pattern (mirror of capture.js's intent): id-like segments → :id
-const looksLikeId = (seg) =>
-  /^\d+$/.test(seg) || /[0-9a-f]{8,}/i.test(seg) || /_[A-Za-z0-9]{4,}_/.test(seg) ||
-  (seg.length >= 12 && /\d/.test(seg) && /[A-Za-z]/.test(seg));
-function patternize(route) {
-  try {
-    const segs = (route || '/').split('?')[0].split('/').filter(Boolean).map(s => looksLikeId(s) ? ':id' : s.toLowerCase());
-    return '/' + segs.join('/');
-  } catch { return route || '/'; }
 }
 
 // "a and b" / "a, b and c" — the finding names the pages inside its own sentence.

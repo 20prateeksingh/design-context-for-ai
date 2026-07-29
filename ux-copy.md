@@ -1,5 +1,26 @@
 # UX copy canon
 
+## 2026-07-30 — README discloses the one outbound request (`prds/small-open-items-round.md`, S3)
+
+`grep -ci "cdn\|font\|no network"` on `README.md` returned 0 — the kit's honesty thesis is its whole pitch,
+and the Figma-paste font-CDN request had already been through two claims audits on other surfaces (the
+landing page's own line, corrected in the "The one wording change this build forced" entry below, 2026-07-28;
+the Use-it tab's line, corrected in the `2026-07-29 — landing v1.2` entry's R2), but the README — the actual
+front door for anyone cloning the repo — said nothing.
+
+Added to the Figma-paste paragraph in `README.md`'s "After capture — use it" section, immediately after the
+existing `No plugin, no extension, no Dev Mode, no paid seat; your library stays untouched.` sentence, **word-for-word
+identical** to `docs/index.html`'s Figma-section body (canon since v1, `8b0a582`, unchanged since):
+
+`One caveat stated plainly: to keep the pasted text as text, the converter fetches public font files from a
+CDN during a copy — that single request is the only time the kit reaches the network on your behalf, and it
+carries none of your data.`
+
+Whole file re-read for contradicting claims — none found. The rules section's `Read-only capture` (`Nothing
+on your product can be created, deleted, sent, or paid`) is a claim about the user's *product* during
+capture, not about the kit's own egress, so the font-CDN disclosure doesn't contradict it. No other `network`/
+`local-only` claim exists anywhere else in `README.md`.
+
 ## 2026-07-30 — landing v1.3 (the warm reshoot: wikipedia hero + described tiles)
 
 `prds/landing-page-v1.3-warm.md`. **Every locked v1 string is untouched** — re-checked programmatically by
