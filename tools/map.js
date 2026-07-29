@@ -441,24 +441,38 @@ const server = http.createServer((req, res) => {
           if (!fs.existsSync(path.join(LIB, 'pages', m))) return json(res, 404, { ok: false, error: `unknown member slug: ${m}` });
         }
         const pattern = data.pattern == null ? null : String(data.pattern).trim().slice(0, 300) || null;
-        // F2: the ack key is a contract, not a guess — recompute it server-side from the LIVE finding
-        // this fold answers (hygiene.js's own key builder), never from whatever key the browser sends.
-        // A browser-held key can be correct the instant it's read and wrong the instant this very fold
-        // is applied (matchesRep flips false→true, which changes the key's shape) — hygiene.js, asked
-        // right now, is the only source of truth.
-        let key = null;
-        try {
-          const { runHygiene } = require('./hygiene.js');
-          const live = runHygiene(LIB);
-          const memberSet = new Set(members);
-          const match = live.duplicates.find(f => f.repSlug === rep && f.members.length === memberSet.size && f.members.every(m => memberSet.has(m)));
-          if (match) key = match.key;
-        } catch (_) {}
         const annPath = path.join(LIB, 'annotations.json');
         const ann = fs.existsSync(annPath) ? JSON.parse(fs.readFileSync(annPath, 'utf8')) : { pages: {} };
         ann.hygiene = ann.hygiene || {};
         ann.hygiene.folds = ann.hygiene.folds || [];
-        ann.hygiene.folds.push({ rep, members, pattern, at: new Date().toISOString() });
+        // S2: a resubmit, a retry, or a double-click all reach this line — dedupe on write so an incoming
+        // fold identical to one already recorded (same rep + same member set + same pattern) is a no-op
+        // that still returns success: the designer asked for a state, the state already holds, and an
+        // error would be a lie. A genuinely different fold on the same rep (different members/pattern)
+        // still appends normally below. Existing double-entries from before this fix are left exactly as
+        // recorded — annotations.json is designer-owned; this dedupes future writes, it doesn't retro-prune.
+        const memberSet = new Set(members);
+        const existing = ann.hygiene.folds.find(f => f.rep === rep && f.pattern === pattern &&
+          Array.isArray(f.members) && f.members.length === memberSet.size && f.members.every(m => memberSet.has(m)));
+        if (existing) {
+          console.log(`⧉ fold ${members.join(', ')} → ${rep} (already recorded — no-op)`);
+          return json(res, 200, { ok: true, ackKey: existing.key || null, staleAcksRepaired: 0, deduped: true });
+        }
+        // F2: the ack key is a contract, not a guess — recompute it server-side from the LIVE finding
+        // this fold answers (hygiene.js's own key builder), never from whatever key the browser sends.
+        // A browser-held key can be correct the instant it's read and wrong the instant this very fold
+        // is applied (matchesRep flips false→true, which changes the key's shape) — hygiene.js, asked
+        // right now, is the only source of truth. Stored on the fold record (S2) so a later duplicate
+        // request can return the SAME key without recomputing — recomputing after the fact would find a
+        // different (or no) live finding, since this very fold is what flips matchesRep true.
+        let key = null;
+        try {
+          const { runHygiene } = require('./hygiene.js');
+          const live = runHygiene(LIB);
+          const match = live.duplicates.find(f => f.repSlug === rep && f.members.length === memberSet.size && f.members.every(m => memberSet.has(m)));
+          if (match) key = match.key;
+        } catch (_) {}
+        ann.hygiene.folds.push({ rep, members, pattern, at: new Date().toISOString(), key });
         if (key) { ann.hygiene.acks = ann.hygiene.acks || {}; ann.hygiene.acks[key] = { note: null, at: new Date().toISOString() }; }
         // F2: repair — any pre-existing ack stuck under the old "rep included in the key" shape (this
         // exact fold's own signature) is stale as of this write; drop it so it doesn't sit as cruft.
