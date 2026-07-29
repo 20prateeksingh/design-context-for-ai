@@ -31,7 +31,7 @@ This folder is a designer's standalone workspace for ONE product. You are helpin
 └── wireframes/<page>/            ← design work built ON the library (never inside it)
 ```
 
-The two skills are invokable — `/capture-product` and `/wireframe-on-snapshot` — but their content lives at `skills/<name>/SKILL.md`, which is what `CLAUDE.md`, `AGENTS.md`, the dashboard's prompts, `tools/lofi-check.js` and `tools/capture.js` all reference by path. **Edit the file under `skills/`, never the stub under `.claude/skills/`.**
+The two skills are invokable — `/capture-product` and `/wireframe-on-snapshot` — but their content lives at `skills/capture-product/SKILL.md` and `skills/wireframe-on-snapshot/SKILL.md`, which is what `CLAUDE.md`, `AGENTS.md`, the dashboard's prompts, `tools/lofi-check.js` and `tools/capture.js` all reference by path. **Edit the file under `skills/`, never the stub under `.claude/skills/`.**
 
 **First run:** if `design-context/` is empty, the best move is the **dashboard's onboarding** — start it and point the designer at it, then follow the dashboard: it asks URL + sign-in + product-type, triggers login only if relevant, and shows the capture live — no terminal questions. `skills/capture-product/` is the chat-driven equivalent for hosts without a browser or when the designer prefers chatting. Either way, the wizard writes `design-context/product.json` and the skill reads the same file — the two front doors can't drift. Don't discuss a product you haven't captured.
 
