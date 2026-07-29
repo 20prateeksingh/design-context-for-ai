@@ -71,6 +71,11 @@ function routeKey(u) {
 // Returns null for non-template pages so their existing label fallback is untouched.
 function templateLabel(m) {
   if (!m || !m.template || !m.pattern) return null;
+  // (covered-shapes) A DERIVED claim — a real page that now stands for a merge-derived frontier shape —
+  // keeps its OWN name. The tail of such a pattern is a wildcard's neighbour, not a name: `/wiki/:var`
+  // renders as "Wiki Details", which would relabel Wikipedia:General disclaimer into anonymity. The map
+  // leans on that node to carry the shape's count now, so it has to stay recognisable.
+  if (m.templateDerived) return null;
   const segs = m.pattern.split('/').filter(s => s && !/^[:[]/.test(s)); // drop dynamic segments (:id, [id])
   const last = segs[segs.length - 1];
   if (!last) return null;
@@ -271,6 +276,29 @@ function deriveBrand(tokens) {
   // §2.2b button text on an accent fill: whichever of white/near-black reads stronger, stored per brand.
   const buttonText = contrastRatio('#FFFFFF', accent) >= contrastRatio(DARK_BG, accent) ? '#FFFFFF' : DARK_BG;
   return { seed: seed.value.toUpperCase(), applied: { accent, accentStrong, buttonText }, source: 'observed', basis: { count: seed.count, pages: seed.pages } };
+}
+
+// (covered-shapes) The set of URLs the designer explicitly pulled with `capture.js --urls` — i.e.
+// downloaded AS the one example of a frontier shape ("Get one example"), rather than found by the crawl.
+// Read from capture-log.json (cumulative, so it survives a later manifest.json overwrite — same reason
+// deriveSkips reads it). Only such a page may claim a WILDCARD frontier group by route-match (§2b·2);
+// without this gate the earliest-captured page that merely MATCHES a wildcard would claim it, and on
+// wikipedia that is the home page — `/wiki/Main_Page` matches `/wiki/:var`, so the sun of the map would
+// be relabelled "template standing for 2890 pages". Prefers an explicit `urls` array when a run has one
+// (capture.js records it now); falls back to parsing argsSummary so pre-existing logs still work.
+function derivePulledUrls(libDir) {
+  const out = new Set();
+  let runs = null;
+  try {
+    const cl = JSON.parse(fs.readFileSync(path.join(libDir, 'capture-log.json'), 'utf8'));
+    if (cl && Array.isArray(cl.runs)) runs = cl.runs;
+  } catch (_) {}
+  for (const run of runs || []) {
+    if (!run || run.mode !== 'urls') continue;
+    const list = Array.isArray(run.urls) ? run.urls : String(run.argsSummary || '').replace(/^--urls\s+/, '').split(',');
+    for (const u of list) { const t = String(u || '').trim(); if (/^https?:\/\//.test(t)) out.add(t); }
+  }
+  return out;
 }
 
 // M1 (v1-fix-manifest-record): registry.skips — the union of every run's skip/fail reasons, derived
@@ -553,6 +581,65 @@ function buildIndex(libDir) {
     url: f.url, urls: [f.url], label: f.label, via: [...f.via].slice(0, 6), inboundCount: f.via.size, underTemplate: repByWild.get(wildNorm(f.pattern)) || null }));
   if (leftover.length > MAX_SINGLES) pushGroup('(assorted one-off pages)', leftover.slice(MAX_SINGLES));
   const frontierTotal = [...fro.values()].length;
+
+  // 2c·2 (covered-shapes) — REPRESENTATIVE-FIRST for MERGE-DERIVED shapes.
+  // §2b's claim counts raw per-URL patternOf() patterns, so it only ever fires for a group whose pattern
+  // patternOf itself produced (a `:id` group). The big groups on the map are not those: `/wiki/:var` is
+  // manufactured by the merge pass above out of 2890 mutually-distinct literal patterns, so every member's
+  // raw count is 1, and a downloaded example claimed nothing — it landed as an ordinary page while the
+  // ghost kept its full count and nothing tied the two together. (Measured on wikipedia before this fix:
+  // 1 of 76 groups had underTemplate, the one whose pattern is literal rather than merged.)
+  // So the claim is made here against the FINAL grouped pattern, by route-match, gated on the page having
+  // been explicitly pulled with --urls — see derivePulledUrls for why that gate is load-bearing.
+  // `coveredBy` is the field the dashboard reads to decide a group gets NO ghost of its own: the count
+  // then lives on the covering page ("stands for N") instead of being drawn twice, once in each place.
+  // frontier.total and every fog/coverage tally still count these pages — they are not downloaded, they
+  // just stop having a second disc (honesty rule #5: the fog must not shrink because a label moved).
+  // Biggest group first, so a page that could answer two shapes goes to the larger one; `claimed` stops
+  // one page standing for two. Deterministic — no Date.now, every tie broken by name.
+  const pulledUrls = derivePulledUrls(libDir);
+  const segsOfPath = (s) => String(s || '').split('/').filter(Boolean);
+  const routeUnderPattern = (route, pattern) => {
+    const r = segsOfPath(route), g = segsOfPath(pattern);
+    return r.length === g.length && g.every((s, i) => WILD(s) || s === r[i]);
+  };
+  const claimedShape = new Set();
+  const capOrder = Object.entries(pages).slice().sort((a, b) => {
+    const x = a[1].meta.capturedAt || '', y = b[1].meta.capturedAt || '';
+    return x < y ? -1 : (x > y ? 1 : String(a[0]).localeCompare(String(b[0])));
+  });
+  for (const g of frontier.slice().sort((a, b) => (b.count || 1) - (a.count || 1) || String(a.pattern || '').localeCompare(String(b.pattern || '')))) {
+    if (g.underTemplate) { g.coveredBy = g.underTemplate; continue; }   // §2b already covered this shape
+    if ((g.count || 1) < 2 || !g.pattern) continue;
+    const hit = capOrder.find(([slug, p]) => !p.meta.template && !claimedShape.has(slug)
+      && pulledUrls.has(p.meta.url) && routeUnderPattern(p.meta.route, g.pattern));
+    if (!hit) continue;
+    const [slug, p] = hit;
+    // Derived-view mutation only — exactly the fold precedent in §2b·2: meta.json on disk is never
+    // touched, and rebuilding without capture-log.json's --urls record restores the old shape. `pattern`
+    // follows `template` (the fold sets both) so the page names the shape it stands for; `meta.route`
+    // keeps the page's own real route, which is what the panel shows.
+    p.meta.template = g.pattern; p.meta.pattern = g.pattern; p.meta.collapsed = g.count;
+    p.meta.templateDerived = true;   // keeps its own name — see templateLabel
+    claimedShape.add(slug);
+    g.coveredBy = slug; g.underTemplate = slug;
+  }
+
+  // 2c·3 (covered-shapes) — one shape, ONE representative.
+  // §2b claims by RAW pattern, so a claim can survive for a shape the merge pass has since absorbed:
+  // wikipedia had a page standing for `/wiki/:id` (5 pages) while another stood for `/wiki/:var` (2891) —
+  // and the first 5 are inside the second 2891. Two badges, the same pages counted twice, which is the
+  // exact duplication retiring the ghost was meant to end. A claim is dropped when a COVERED group's
+  // pattern subsumes it (same segment count, every segment equal-or-wildcard on the covered side) and it
+  // isn't that group's own representative. Dropping a claim only demotes a page back to an ordinary page
+  // — no page or URL leaves the library, and the covered group still counts every one of its pages.
+  const coveredGroups = frontier.filter(g => g.coveredBy);
+  for (const [slug, p] of Object.entries(pages)) {
+    if (!p.meta.template) continue;
+    const absorbed = coveredGroups.find(g => g.coveredBy !== slug && routeUnderPattern(p.meta.template, g.pattern));
+    if (!absorbed) continue;
+    p.meta.template = null; p.meta.collapsed = 0;
+  }
 
   // 2e. offOrigin (F11): hosts linked from captured pages that the same-origin-only crawl never follows.
   // inbound = number of distinct captured pages referencing that host (mirrors inboundCount's semantics).

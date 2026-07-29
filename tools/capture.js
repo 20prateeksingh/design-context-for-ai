@@ -1081,6 +1081,11 @@ if (require.main === module) (async () => {
     appendCaptureLog(OUT_DIR, {
       at: new Date().toISOString(), mode: STATE ? 'state' : 'urls',
       argsSummary: STATE ? `--state ${STATE} --url ${START_URL}` : `--urls ${ONLY_URLS}`,
+      // (covered-shapes) the pulled URLs as data, not just display text: build-index's derivePulledUrls
+      // reads this to know a page was downloaded AS the one example of a frontier shape, which is what
+      // lets that shape's ghost retire in favour of "stands for N" on the page. It falls back to parsing
+      // argsSummary for logs written before this field existed, so both shapes stay readable.
+      ...(STATE ? {} : { urls: String(ONLY_URLS || '').split(',').map(u => u.trim()).filter(Boolean) }),
       captured: runResults.ok.length, skipped: runResults.skipped, failed: runResults.failed,
     });
     try {
