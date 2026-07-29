@@ -281,18 +281,20 @@
 
     </div>
 
-    <!-- The hero map is xflowpay, and v1.2 re-ran the choice rather than inheriting it: with the map-root
-         fix in, wikipedia's 37-page capture finally draws true rings, so both candidates went through the
-         same zoom sweep again. wikipedia wins on structure (two rings, district arcs, a deep-fog chip that
-         xflow's single-ring library cannot produce) and loses on accent presence — measured: 1 of its 37
-         discs wears the product's accent, against 8 of 18 here, because the accent ring marks a page whose
-         description has been written and that workspace has none. Evidence + the head-to-head pair in
-         prds/landing-page-v1.2-populated-BUILD-REPORT.md § F2. -->
+    <!-- The hero map is en.wikipedia.org as of v1.3, and the swap was decided on the same measurement that
+         kept xflow in v1.2. Back then wikipedia won on structure (two rings, district arcs, a deep-fog chip
+         a single-ring library cannot produce) and lost on accent presence: 1 of its 37 discs wore the
+         product's accent against 8 of 18 on xflow — because the accent ring marks a page whose description
+         has been written, and that workspace had none. The describe run removed that cause: it is 41/41
+         now, and 33 of its 36 discs wear the measured Wikipedia blue. The remaining three are the purple
+         ×N covering discs shipped in 779ffbb, not undescribed pages. Criterion 5 is contested rather than
+         won — xflow still leads on proportion (100% vs 91.7%) and on accent pixels at its own tier — and
+         the call to flip was made on that full table, in prds/landing-page-v1.3-warm-BUILD-REPORT.md § F1. -->
     <div class="heroshot">
       <figure class="shot">
         <img src="assets/hero-map.webp" width="2200" height="1696"
-             alt="The kit's dashboard on the Map tab: a real capture of xflowpay.com, with the landing page lit at the centre and seventeen captured pages ringed one click out, each drawn as a disc of its own screenshot, and dashed ghost pages scattered through the fog beyond them. The footer reads '11% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
-        <figcaption>The Map, on a real capture of xflowpay.com — eighteen pages downloaded, one hundred and forty-six still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '38 in · 19 out', and thirty-two further captured pages ringed across two rings labelled one click and two clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Three discs instead carry a purple ×N badge — one downloaded example standing for a whole template shape, the largest reading ×2.9k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4205 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.8% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <figcaption>The Map, on a real capture of en.wikipedia.org — forty-one pages downloaded, 4,593 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
       </figure>
     </div>
   </section>
@@ -445,11 +447,11 @@
           <div class="body reveal">
             <h3>The working ledger</h3>
             <p class="quote">It borrows your product's own colour — observed, never guessed.</p>
-            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next — here, ten pages have landed that your AI hasn't read yet, so that is what it asks for, with the prompt ready to copy. And the accent the dashboard wears is lifted from the product you captured: the entry names the hex and how many pages it was seen on.</p>
+            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next, and it changes as the work lands — when pages are waiting to be read it asks for that, with the describe prompt ready to copy; here every page has been read, so it has moved on and asks for the first design instead. And the accent the dashboard wears is lifted from the product you captured: the entry names the hex and how many pages it was seen on.</p>
           </div>
           <div class="imgwrap">
-            <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="990"
-                 alt="The working ledger: 'Library check — all clean — 3 more notes, nothing needed from you'; then 'NEXT · NEW PAGES WAITING — Let your AI read your 10 new pages', with a 'Copy the describe prompt' button; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
+            <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="1002"
+                 alt="The working ledger: 'Library check — all clean — 3 more notes, nothing needed from you'; then 'NEXT · YOUR AI KNOWS YOUR PRODUCT NOW — Make your first thing — a wireframe on a real page, or a question answered from the library', with 'Copy a wireframe prompt' and 'Ask a question' buttons; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
           </div>
         </article>
 
@@ -461,58 +463,61 @@
        Seven real workspaces, seven real Map panes, each wearing the accent the kit measured in that
        product's own pages. At tile scale a map is its shape — discs, fog, accent — which is the point:
        nothing here is a mockup of a product, it is the kit's own output on seven different ones.
-       v1.2: all seven re-shot on POPULATED libraries (18–41 pages each, was 7–39), so a tile now shows
-       a full ring and a real frontier rather than a sparse cluster. Six of the seven come from fresh
-       captures in their own landing-shots-* workspaces; flipkart stays on its read-only fixture. Every
-       number in this section — page counts, hexes, percentages — is re-read from those workspaces at
-       build time; see prds/landing-page-v1.2-populated-BUILD-REPORT.md. -->
+       v1.3: all seven re-shot WARM — every one of these libraries is now 100% described (256 pages in
+       total), so the accent rim, which marks a page whose description has been written, is on essentially
+       every disc rather than a handful. The tiles also pick up 779ffbb (covered-shapes): a downloaded page
+       that stands for a template shape now retires that shape's ghost and wears a purple ×N badge instead
+       of the count being drawn twice. espncricinfo shows this hardest — 20 of its 37 discs are badged.
+       Six of the seven come from their own landing-shots-* workspaces; flipkart stays on its read-only
+       fixture. Every number in this section — page counts, badge counts, hexes, percentages — is re-read
+       from those workspaces at build time; see prds/landing-page-v1.3-warm-BUILD-REPORT.md. -->
   <section id="anyproduct">
     <div class="wrap">
       <p class="eyebrow">Any product</p>
       <h2>Seven products, seven maps.</h2>
-      <p class="lede">Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Eighteen to forty-one pages in each library, and each map says out loud how little of its site that is: from eleven per cent down to nine-tenths of one. Same kit, same one script, nothing set per product.</p>
+      <p class="lede">Point it at what you design for. Seven real captures in seven separate workspaces — a marketplace, a retailer, a sports site, a travel platform, an encyclopedia, a payments product, a developer platform — each dashboard wearing that product's own colour, observed rather than configured. Eighteen to forty-one pages in each library, and each map says out loud how little of its site that is: from eleven per cent down to four-fifths of one. Same kit, same one script, nothing set per product.</p>
 
       <ul class="gal">
         <li>
           <img src="assets/tile-flipkart.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of flipkart.com: thirty-nine page discs in two labelled rings — one click and two clicks from home — around a lit centre, most of them outlined in the measured blue accent, with dashed ghost pages in the fog beyond and a footer reading '3% of the known world explored'.">
+               alt="The kit's Map pane on a capture of flipkart.com: thirty-nine page discs in two labelled rings — one click and two clicks from home — around a lit centre, thirty-three of them outlined in the measured blue accent and six badged ×N, where one downloaded page stands for a whole template shape, with dashed ghost pages in the fog beyond and a footer reading '3% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#2874F0"></span><b>flipkart.com</b><span class="hex">#2874F0</span></span>
         </li>
         <li>
           <img src="assets/tile-amazon.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of amazon.in: forty-one page discs packed into a dense ring around a lit centre, each disc its own captured screenshot, a further ring labelled two clicks, dashed ghost pages in the fog, and a footer reading '1% of the known world explored'.">
+               alt="The kit's Map pane on a capture of amazon.in: forty-one page discs packed into a dense ring around a lit centre, each disc its own captured screenshot, thirteen of them badged ×N where one downloaded page stands for a whole template shape, a further ring labelled two clicks, dashed ghost pages in the fog, and a footer reading '1% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#2162A1"></span><b>amazon.in</b><span class="hex">#2162A1</span></span>
         </li>
         <li>
           <img src="assets/tile-espncricinfo.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of espncricinfo.com: thirty-seven page discs ringing a lit centre with a second ring labelled two clicks, dashed ghost pages spread through a blue-tinted fog, and a footer reading '3% of the known world explored'.">
+               alt="The kit's Map pane on a capture of espncricinfo.com: thirty-seven page discs ringing a lit centre with a second ring labelled two clicks — twenty of them badged ×N, where one downloaded page stands for a whole template shape, several of those drawn small because few pages link to them, so this map carries a visible scatter of purple among the blue — dashed ghost pages spread through a blue-tinted fog, and a footer reading '3% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#0860C4"></span><b>espncricinfo.com</b><span class="hex">#0860C4</span></span>
         </li>
         <li>
           <img src="assets/tile-airbnb.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of airbnb.co.in: thirty-seven page discs ringing a lit centre, a second ring labelled two clicks, dashed ghost pages in the fog — and the whole fog glowing crimson, because that is the accent the kit measured in this product's own pages.">
+               alt="The kit's Map pane on a capture of airbnb.co.in: thirty-four page discs across two rings labelled one click and two clicks, with an arc reading 'not linked from home — 2 pages', eight discs badged ×N where one downloaded page stands for a whole template shape, dashed ghost pages in the fog — and the whole fog glowing crimson, because that is the accent the kit measured in this product's own pages.">
           <span class="cap"><span class="sw" style="background:#DA1249"></span><b>airbnb.co.in</b><span class="hex">#DA1249</span></span>
         </li>
         <li>
           <img src="assets/tile-wikipedia.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of en.wikipedia.org: thirty-seven page discs, pale because the pages themselves are, ringing a blue-ringed centre, a second ring labelled two clicks, dashed ghost pages in the fog, and a footer reading '0.9% of the known world explored'.">
+               alt="The kit's Map pane on a capture of en.wikipedia.org — the same library the hero shows, at a wider zoom: thirty-six page discs across two rings labelled one click and two clicks, thirty-three rimmed in the measured Wikipedia blue and three badged ×N, the largest reading ×2.9k, dashed ghost pages in the fog, and a footer reading '0.8% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#3366CC"></span><b>en.wikipedia.org</b><span class="hex">#3366CC</span></span>
         </li>
         <li>
           <img src="assets/tile-xflowpay.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of xflowpay.com: eighteen page discs in a single ring around a lit centre, several outlined in the measured indigo accent, dashed ghost pages in the fog, and a footer reading '11% of the known world explored' — the most-explored library of the seven, because it is the smallest site.">
+               alt="The kit's Map pane on a capture of xflowpay.com: eighteen page discs in a single ring around a lit centre, every one of them outlined in the measured indigo accent and the centre badged ×2, dashed ghost pages in the fog, and a footer reading '11% of the known world explored' — the most-explored library of the seven, because it is the smallest site.">
           <span class="cap"><span class="sw" style="background:#5E76E3"></span><b>xflowpay.com</b><span class="hex">#5E76E3</span></span>
         </li>
         <li>
           <img src="assets/tile-github.webp" width="640" height="493"
-               alt="The kit's Map pane on a capture of github.com: forty page discs in a dense ring around a lit centre, most of them dark because the product's own pages are, dashed ghost pages in the fog, and a footer reading '5% of the known world explored'.">
+               alt="The kit's Map pane on a capture of github.com: forty page discs in a dense ring around a lit centre, most of them dark because the product's own pages are, thirty-three rimmed in the measured link blue and eight badged ×N where one downloaded page stands for a whole template shape, dashed ghost pages in the fog, and a footer reading '5% of the known world explored'.">
           <span class="cap"><span class="sw" style="background:#0969DA"></span><b>github.com</b><span class="hex">#0969DA</span></span>
         </li>
       </ul>
 
       <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't — a palette someone picked would be prettier than this, and that is rather the point. Nothing was configured per product — where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo — absent rather than invented.</p>
 
-      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape — how many pages, how far from home, how much fog — which is all this section claims. Every full-size dashboard view on this page is of one product, <code>xflowpay.com</code>, captured by the person who built the kit.</p>
+      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape — how many pages, how far from home, how much fog — which is all this section claims. Every map here has also been <b>read</b>: all 256 pages across the seven libraries carry a description, written by an AI and labelled <code>method: ai</code> in the library so it is never mistaken for a captured fact. That is what the accent rim marks — a page whose description exists — which is why these maps are warm where earlier versions of this page were pale. A purple <code>×N</code> disc is described too; it simply also stands for a template shape, so it wears that badge instead. The hero at the top of this page is the wikipedia library shown large; every other full-size dashboard view here is one product, <code>xflowpay.com</code>, captured by the person who built the kit.</p>
 
       <p class="note" style="margin-top:12px">Nor does every page yield. Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home: amazon.in's run recorded seven of those — six <code>auth-redirect</code>, one <code>soft-404</code> — each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
     </div>

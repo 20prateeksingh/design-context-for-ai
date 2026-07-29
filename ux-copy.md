@@ -1,5 +1,64 @@
 # UX copy canon
 
+## 2026-07-30 — landing v1.3 (the warm reshoot: wikipedia hero + described tiles)
+
+`prds/landing-page-v1.3-warm.md`. **Every locked v1 string is untouched** — re-checked programmatically by
+`gates.js` (0 locked strings missing, 0 banned words present). The describe run took all six showcase
+workspaces to 100% described, and `779ffbb` (covered-shapes) shipped a new map encoding; between them they
+forced this round's copy. As in v1.2, nothing was reworded for taste.
+
+**The hero changed product.** v1.2 kept xflowpay because wikipedia lost one of five criteria —
+`1 of its 37 discs wears the product's accent` — and the cause was `described: 0`, since the accent rim
+marks a page whose description has been written. That cause is gone: 41/41 described, 33 of 36 discs
+rimmed. Criterion 5 is now *contested* rather than won (xflow still leads on proportion, 100% vs 91.7%,
+and on accent pixels at its own tier); the flip was decided on the full table in the v1.3 build report § F1.
+
+- was: `The Map, on a real capture of xflowpay.com — eighteen pages downloaded, one hundred and forty-six still ghosts in the fog. Rings are measured clicks from home.`
+- now: `The Map, on a real capture of en.wikipedia.org — forty-one pages downloaded, 4,593 still ghosts in the fog. Rings are measured clicks from home.`
+
+Read from `landing-shots-wikipedia/design-context/registry.json`: `identity.downloaded: 41`,
+`identity.found: 4634`, `frontier.total: 4593`. The hero alt text was rewritten to describe that frame —
+two rings labelled one/two clicks, three purple `×N` discs (largest `×2.9k`), 14 ghosts, the
+`DEEP FOG…4205 MORE` chip, and the `0.8% of the known world explored` footer.
+
+**One string was not stale but FALSE, and the describe run is what falsified it.** The ledger's top slot is
+state-dependent: with pages unread it asks for the describe run; with none unread it moves on. `landing-shots`
+went 8/18 → 18/18, so the panel no longer says what the page said it says.
+
+| Where | was | now | Read from |
+|---|---|---|---|
+| Tour · ledger body | `here, ten pages have landed that your AI hasn't read yet, so that is what it asks for, with the prompt ready to copy` | `it changes as the work lands — … here every page has been read, so it has moved on and asks for the first design instead` | the rail's own top card in the reshot render |
+| Tour · ledger alt | `NEXT · NEW PAGES WAITING — Let your AI read your 10 new pages`, `Copy the describe prompt` | `NEXT · YOUR AI KNOWS YOUR PRODUCT NOW — Make your first thing`, `Copy a wireframe prompt` / `Ask a question` | same render |
+| Gallery lede | `down to nine-tenths of one` | `down to four-fifths of one` | wikipedia's stats line, `0.9%` → `0.8%` (frontier grew to 4,593) |
+
+**All seven tile alt texts rewritten** — each now states how many discs wear the accent and how many carry
+a `×N` badge, because that encoding is new and visible at tile scale. Badge counts read from each running
+dashboard by `badge-probe.js`: flipkart 6 · amazon 13 · espncricinfo 20 · airbnb 8 · wikipedia 3 ·
+xflowpay 1 · github 8. espncricinfo's says out loud that its map `carries a visible scatter of purple among
+the blue` — 20 badges on 37 discs, checked against the tile at its shipped display size rather than at
+full resolution, where the badges read much louder than a reader will ever see them.
+
+**One note corrected, one claim added.** The gallery's closing note claimed `Every full-size dashboard view
+on this page is of one product, xflowpay.com` — the hero swap made that false, so it now names the hero
+separately. The brief's optional "AI has read this library" line is added in the same note, phrased so it
+cannot be read as *bright ring = read*:
+
+> `Every map here has also been read: all 256 pages across the seven libraries carry a description, written by an AI and labelled method: ai in the library so it is never mistaken for a captured fact. That is what the accent rim marks — a page whose description exists — which is why these maps are warm where earlier versions of this page were pale. A purple ×N disc is described too; it simply also stands for a template shape, so it wears that badge instead.`
+
+The qualifier is load-bearing, not hedging: espncricinfo is 37/37 described but only 18 of its 37 discs are
+rimmed, because 19 wear the badge instead. Without the last sentence the line would imply those 19 are
+unread. Claims-audit row and evidence in the build report § F3.
+
+**Unchanged and worth stating:** all seven tile caption hexes (`flipkart.com · #2874F0` ·
+`amazon.in · #2162A1` · `espncricinfo.com · #0860C4` · `airbnb.co.in · #DA1249` ·
+`en.wikipedia.org · #3366CC` · `xflowpay.com · #5E76E3` · `github.com · #0969DA`) — all re-verified against
+`tokens.json.brand.seed`, all still `source: "observed"`. The Design-language body (`×32,939` across
+eighteen pages, accent `×141` across four) and its alt (`41 single-page values`, 21 swatches,
+`#E4E9FF ×5 · 5p`) re-read and unchanged. The `tour-map` alt is unchanged — every claim in it
+(`13 pages share this layout`, `linked from 18 pages`, `Get one example`, `Download all 13`) re-verified
+verbatim against the reshot render. Both v1.2 disclosures (the 19.7° blue band; amazon's seven
+non-yielding pages) re-verified and kept. Headline, sub, principles strip and §§1–4, 6–8 as v1.2 left them.
+
 ## 2026-07-29 — cumulative capture record (M1–M2)
 
 `prds/v1-fix-manifest-record.md`. Two new/corrected locked strings, both surfacing counts that vary at
