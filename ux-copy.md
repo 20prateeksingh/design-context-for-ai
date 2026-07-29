@@ -1,5 +1,56 @@
 # UX copy canon
 
+## 2026-07-29 — landing v1.2 (populated showcase + the hero decision)
+
+`prds/landing-page-v1.2-populated.md`. **Every locked v1 string is untouched** — re-checked
+programmatically (25 locked strings, 0 missing; 9 banned words, 0 present). The showcase workspaces were
+re-captured at cap-40 class, so this round's copy changes are the ones the new numbers *forced*, plus two
+honest disclosures the new data made available. Nothing was reworded for taste.
+
+**Numbers that moved, and the strings that carry them.** `landing-shots/` (xflowpay) was itself
+re-captured, so two quoted values went stale and were re-read at build time:
+
+| Where | was | now | Read from |
+|---|---|---|---|
+| Tour · Design language body | `×31,920` | `×32,939` | `tokens.json` `colors.top[0] = {value:"#1F2741", count:32939, pages:18}` |
+| Tour · Design language alt | `42 single-page values` | `41 single-page values` | the provenance strip's own text in the reshot render |
+| Tour · ledger alt | `1 more note` | `3 more notes` | the ledger's own top card in the reshot render |
+
+**One tile caption changed, because the measurement changed.** github.com's accent was the Copilot
+marketing green `#5FED83` off a 10-page capture; the fresh 40-page capture measures GitHub's link blue:
+
+- was: `github.com · #5FED83`
+- now: `github.com · #0969DA` — `tokens.json.brand.seed`, `source: "observed"`, basis 734× across 40 pages
+
+The other six captions are unchanged: `flipkart.com · #2874F0` · `amazon.in · #2162A1` ·
+`espncricinfo.com · #0860C4` · `airbnb.co.in · #DA1249` · `en.wikipedia.org · #3366CC` ·
+`xflowpay.com · #5E76E3`.
+
+**Gallery lede — one clause added**, now that the libraries are genuinely populated and the spread is
+worth stating (18–41 pages; 11% down to 0.9% explored, both endpoints read off the maps' own stats lines):
+
+- added: `Eighteen to forty-one pages in each library, and each map says out loud how little of its site that is: from eleven per cent down to nine-tenths of one.`
+
+**Two disclosures added — both say something *against* the product, which is why they're here.**
+
+> Added to the "measured, not chosen" note: `Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't — a palette someone picked would be prettier than this, and that is rather the point.`
+
+Measured hues: 209.5° · 211.9° · 212.4° · 217.2° · 220° · 229.2° (a 19.7° span) against airbnb at 343.5°.
+v1.1's report claimed this wrinkle was "disclosed on the page" — it wasn't, only in the report. Now it is.
+
+> New third note under the strip: `Nor does every page yield. Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home: amazon.in's run recorded seven of those — six auth-redirect, one soft-404 — each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.`
+
+Evidence: `landing-shots-amazon/design-context/manifest.json` → `counts.skipped: 7`, and a `skipped[]`
+array naming each slug with its reason. The brief asked for this disclosure sourced to espncricinfo's
+`/cricketers/:id` and `/records/*` families; that workspace's manifest records `skipped: 0, failed: 0`,
+so the claim is made on amazon's record, which does hold it. See the build report § F3.
+
+**Unchanged and worth stating:** the hero caption (`eighteen pages downloaded, one hundred and forty-six
+still ghosts in the fog. Rings are measured clicks from home.`) still matches the shipped frame exactly —
+18 downloaded, 164 found, 146 on the frontier, 1 page at depth 0 and 17 at depth 1 with **none null**. The
+three tour panel quotes, the headline `Seven products, seven maps.`, and all of §§1–4 and 6–8 are as v1.1
+left them.
+
 ## 2026-07-29 — map root detection + two riders (`prds/v1-fix-map-root.md`)
 
 **R2 — the Use-it tab's false "no network" claim, fixed.** `tools/dashboard-template.html:2984`, the
