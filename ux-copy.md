@@ -59,6 +59,145 @@ eighteen pages, accent `×141` across four) and its alt (`41 single-page values`
 verbatim against the reshot render. Both v1.2 disclosures (the 19.7° blue band; amazon's seven
 non-yielding pages) re-verified and kept. Headline, sub, principles strip and §§1–4, 6–8 as v1.2 left them.
 
+## 2026-07-30 — prompt readability: all 11 copied prompts reshaped to one human-readable shape
+
+`prds/prompt-readability.md`, off Prateek's field test 2026-07-29: *"When I copy a prompt from the UI
+and paste it in my chat here, the prompts are not very human-readable."* The 11 `PROMPTS.*` strings had
+only ever been graded on whether a **model** could follow them (`prds/ai-readability-experiment-REPORT.md`
+scored them **B**, every invariant held). They were never assessed as **what a human reads in their own
+chat window before hitting send** — the only way they are ever actually used.
+
+**This is a reshaping, not a rewrite.** Every one of the 11 keeps its instruction set exactly: no path,
+filename, flag, prohibition or § number was reworded, dropped, merged or added. Proven by set-equality
+per prompt (`tools/test-prompts.js`, now 182 assertions, holds the pre-reshape token sets frozen off
+commit `779ffbb`), so the strings below supersede their predecessors on **layout only**.
+
+The shared shape, applied to all 11:
+- **Line 1** — the ask, one short sentence, in the designer's voice.
+- **Blank line, then the body** as 2–5 short `-` lines, one instruction each, no nesting.
+- **The `FILL THIS IN: ` line last**, for the four prompts with a `‹placeholder›` (A.2, A.8, A.9, A.11).
+  One fixed marker across every prompt that has one. A.9's placeholder is bound inside a command token,
+  so its marker line points at the command rather than carrying the placeholder alone.
+- **No markdown emphasis** anywhere. A.8's `**…**` is gone — chat inputs rendered it as literal asterisks.
+
+**A.1 `describeLibrary`**
+````
+Describe the pages in this library that are still missing a description.
+
+- Open this folder's design context: read `design-context/registry.json`.
+- Then, for every page whose `page.md` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per `skills/capture-product/SKILL.md` §5.
+- Ground each description only in that page's `content.md`, `screenshot.png`, and `meta.json`.
+- Never invent features; never edit anything outside the markers.
+- Then run `node tools/build-index.js`.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Open this folder's design context. Read \`design-context/registry.json\`, then for every page whose \`page.md\` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per \`skills/capture-product/SKILL.md\` §5 — grounded only in that page's \`content.md\`, \`screenshot.png\`, and \`meta.json\`. Never invent features; never edit anything outside the markers. Then run \`node tools/build-index.js\`.~~
+
+**A.2 `wireframe`**
+````
+I want to explore a change on this page.
+
+- Read `design-context/registry.json` for the shape of this product, then `design-context/pages/<slug>/page.md` and its `screenshot.png` for the page itself.
+- Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/<slug>/round-1/` — never edit `design-context/`.
+- Keep the product's real shell. Make 2–3 genuinely different approaches, new elements visibly lo-fi.
+- Then render previews with `node tools/shot.js`.
+- FILL THIS IN: the change I want to explore — ‹describe your change›
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Read \`design-context/registry.json\` for the shape of this product, then \`design-context/pages/<slug>/page.md\` and its \`screenshot.png\` for the page itself. I want to explore: ‹describe your change›. Per \`skills/wireframe-on-snapshot/SKILL.md\`: work on COPIES in \`wireframes/<slug>/round-1/\` (never edit \`design-context/\`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with \`node tools/shot.js\`.~~
+
+**A.3 `whatsMissing`**
+````
+Tell me what's missing from this library and what's worth unlocking.
+
+- Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`.
+- Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why.
+- Don't capture anything yet — recommend.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Read \`design-context/registry.json\` — especially \`frontier\` (discovered-but-not-downloaded pages) and each page's \`states\`. Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why. Don't capture anything yet — recommend.~~
+
+**A.4 `addState`**
+````
+I want to add a page state to the library — I can reach it via URL.
+
+- Run `node tools/capture.js --state <slug>:<state-name> --url "<the url>"`.
+- Confirm it landed under `design-context/pages/<slug>/states/`.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~I can reach a page state via URL. Run \`node tools/capture.js --state <slug>:<state-name> --url "<the url>"\` and confirm it landed under \`design-context/pages/<slug>/states/\`.~~
+
+**A.5 `auditTokens`**
+````
+Audit this product's visual language for me.
+
+- Read `design-context/tokens.json`.
+- These are OBSERVED values (method: heuristic), not authored tokens.
+- As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Read \`design-context/tokens.json\`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?~~
+
+**A.6 `recaptureCheck`**
+````
+The product may have changed — re-capture it and tell me what moved.
+
+- Re-run the capture with the same settings as last time — use `design-context/product.json` if it exists, otherwise read the parameters recorded in `design-context/manifest.json` and rebuild the command from those.
+- Then compare `contentHash` changes in `design-context/registry.json`.
+- Tell me which pages changed and whether their descriptions need updating.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~The product may have changed. Re-run the capture with the same settings as last time — use \`design-context/product.json\` if it exists, otherwise read the parameters recorded in \`design-context/manifest.json\` and rebuild the command from those. Then compare \`contentHash\` changes in \`design-context/registry.json\` and tell me which pages changed and whether their descriptions need updating.~~
+
+**A.7 `bootstrap`**
+````
+You're in a designer's workspace — get oriented before we start.
+
+- Read `AGENTS.md` first and follow its five rules.
+- Then read `design-context/registry.json` to learn this product.
+- Then ask me what I want to work on.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~You're in a designer's workspace. Read \`AGENTS.md\` first and follow its five rules. Then read \`design-context/registry.json\` to learn this product, and ask me what I want to work on.~~
+
+**A.8 `designNew`**
+````
+I want to design something NEW for this product.
+
+- Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making.
+- Per `skills/wireframe-on-snapshot/SKILL.md` §7: start from the captured page whose shell this new page would share, and work on a COPY in `wireframes/new/<kebab-case name for this concept, your choice>/round-1/` — never in `design-context/`.
+- Keep the product's real shell. Make 2–3 genuinely different approaches, new elements visibly lo-fi. Render previews with `node tools/shot.js`.
+- If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style.
+- FILL THIS IN: what I want to design — ‹describe it›
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Read \`design-context/registry.json\`, \`tokens.json\`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. **Per \`skills/wireframe-on-snapshot/SKILL.md\` §7:** start from the captured page whose shell this new page would share, work on a COPY in \`wireframes/new/<kebab-case name for this concept, your choice>/round-1/\` (never in \`design-context/\`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi. If the library is too thin to know this product's grammar for some part, tag that region \`ASSUMED: …\` and explain it in \`notes.md\` — never invent house style. Render previews with \`node tools/shot.js\`.~~
+
+**A.9 `guided`**
+````
+Run a guided capture of this product with me.
+
+- Run `node tools/capture.js --guided --url ‹where to start›`.
+- A browser window opens on my logged-in profile — I'll drive.
+- Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`.
+- When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found.
+- FILL THIS IN: the URL in the command above — ‹where to start›
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Run \`node tools/capture.js --guided --url ‹where to start›\`. A browser window opens on my logged-in profile — I'll drive. Watch the folder: each capture lands under \`design-context/pages/…\` with \`method: guided\`. When I close the window, run \`node tools/build-index.js\` and tell me what the hygiene check found.~~
+
+**A.10 `figma`**
+````
+How do I get a captured page into Figma?
+
+- Open the dashboard, go to the page you want, and click ⧉ Copy for Figma.
+- Paste into your Figma file (⌘V).
+- It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Open the dashboard, go to the page you want, click ⧉ Copy for Figma, and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.~~
+
+**A.11 `askQuestion`**
+````
+I have a question about this product.
+
+- Read `design-context/registry.json` and `INDEX.md` to learn this product.
+- Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens.
+- If the answer isn't in the library, say so plainly rather than guessing.
+- FILL THIS IN: my question — ‹your question›
+````
+> Superseded (struck 2026-07-30 — the single-paragraph form; reshaped, not reworded): ~~Read \`design-context/registry.json\` and \`INDEX.md\` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.~~
+
 ## 2026-07-29 — cumulative capture record (M1–M2)
 
 `prds/v1-fix-manifest-record.md`. Two new/corrected locked strings, both surfacing counts that vary at

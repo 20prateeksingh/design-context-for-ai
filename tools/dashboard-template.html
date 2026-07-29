@@ -255,6 +255,13 @@
                      border-radius:6px; padding:6px 8px; font-size:13px; }
   #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel-2); color:var(--txt); border:1px solid var(--line);
            border-radius:8px; padding:9px 16px; font-size:13px; display:none; z-index:30; max-width:80vw; box-shadow:var(--elev); }
+  /* (prompt-readability) the blocked-copy fallback. Prompts are multi-line, so the text has to be
+     shown in a textarea — a single-line field silently strips every newline. Sits above the toast. */
+  .copyfallback { position:fixed; bottom:56px; left:50%; transform:translateX(-50%); z-index:31;
+                  width:min(680px,88vw); height:180px; background:var(--panel-2); color:var(--txt);
+                  border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px;
+                  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; line-height:1.5;
+                  white-space:pre-wrap; resize:none; box-shadow:var(--elev); }
 
   /* ── overview + tokens ── */
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
@@ -947,37 +954,140 @@ function setBusy(btn){
 // ═════════════════════════ PROMPTS (the UI) ══════════════════════════════════
 // Canonical wordings — the single source of truth is prds/use-it-layer.md Appendix A.
 // Change one, review both. Copied text is PLAIN markdown; real workspace paths baked in.
+//
+// SHARED SHAPE (prds/prompt-readability.md, 2026-07-30) — these strings are read by a HUMAN in
+// their own chat window before they hit send, so every one of them is built the same way:
+//   line 1  the ask, one short sentence, in the designer's voice
+//   blank line
+//   body    2–5 plain `-` lines, one instruction each, no nesting
+//   last    the `FILL THIS IN: ` line, when the prompt has a ‹placeholder›
+// NO markdown emphasis (`**`/`_`) anywhere — chat inputs render it literally. Paths stay in
+// backticks; skill/§ references stay verbatim. Reshaping only: never add, drop, merge or reword
+// an instruction, path, flag, prohibition or § number while changing the layout.
 const PROMPTS = {
-  // A.1 (ux-copy.md — verbatim)
-  describeLibrary: () => "Open this folder's design context. Read `design-context/registry.json`, then for every page whose `page.md` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per `skills/capture-product/SKILL.md` §5 — grounded only in that page's `content.md`, `screenshot.png`, and `meta.json`. Never invent features; never edit anything outside the markers. Then run `node tools/build-index.js`.",
-  // A.2 (ux-copy.md — revised 2026-07-28 E7: registry-first clause prepended)
-  wireframe: (slug) => "Read `design-context/registry.json` for the shape of this product, then `design-context/pages/" + slug + "/page.md` and its `screenshot.png` for the page itself. I want to explore: ‹describe your change›. Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` (never edit `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi, then render previews with `node tools/shot.js`.",
-  // A.3 (ux-copy.md — verbatim)
-  whatsMissing: () => "Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`. Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why. Don't capture anything yet — recommend.",
-  // A.4 (ux-copy.md — verbatim)
-  addState: () => "I can reach a page state via URL. Run `node tools/capture.js --state <slug>:<state-name> --url \"<the url>\"` and confirm it landed under `design-context/pages/<slug>/states/`.",
-  // A.9 (ux-copy.md — verbatim) — guided capture: human-driven, button-only states/modals
-  guided: () => "Run `node tools/capture.js --guided --url ‹where to start›`. A browser window opens on my logged-in profile — I'll drive. Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`. When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found.",
-  // A.5 (ux-copy.md — verbatim)
-  auditTokens: () => "Read `design-context/tokens.json`. These are OBSERVED values (method: heuristic), not authored tokens. As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
-  // A.6 (ux-copy.md — revised 2026-07-28 E1: product.json-if-it-exists, else rebuild from manifest.json)
-  recaptureCheck: () => "The product may have changed. Re-run the capture with the same settings as last time — use `design-context/product.json` if it exists, otherwise read the parameters recorded in `design-context/manifest.json` and rebuild the command from those. Then compare `contentHash` changes in `design-context/registry.json` and tell me which pages changed and whether their descriptions need updating.",
-  // A.7 (ux-copy.md — revised 2026-07-28 E4: registry.json replaces INDEX.md as the entry file)
-  bootstrap: () => "You're in a designer's workspace. Read `AGENTS.md` first and follow its five rules. Then read `design-context/registry.json` to learn this product, and ask me what I want to work on.",
+  // A.1 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  describeLibrary: () =>
+    "Describe the pages in this library that are still missing a description.\n"
+    + "\n"
+    + "- Open this folder's design context: read `design-context/registry.json`.\n"
+    + "- Then, for every page whose `page.md` still says '(not yet described)', write the screen doc between its ai:begin/ai:end markers per `skills/capture-product/SKILL.md` §5.\n"
+    + "- Ground each description only in that page's `content.md`, `screenshot.png`, and `meta.json`.\n"
+    + "- Never invent features; never edit anything outside the markers.\n"
+    + "- Then run `node tools/build-index.js`.",
+  // A.2 (ux-copy.md — revised 2026-07-28 E7: registry-first clause prepended;
+  //      restructured 2026-07-30, shared shape; instruction set unchanged)
+  wireframe: (slug) =>
+    "I want to explore a change on this page.\n"
+    + "\n"
+    + "- Read `design-context/registry.json` for the shape of this product, then `design-context/pages/" + slug + "/page.md` and its `screenshot.png` for the page itself.\n"
+    + "- Per `skills/wireframe-on-snapshot/SKILL.md`: work on COPIES in `wireframes/" + slug + "/round-1/` — never edit `design-context/`.\n"
+    + "- Keep the product's real shell. Make 2–3 genuinely different approaches, new elements visibly lo-fi.\n"
+    + "- Then render previews with `node tools/shot.js`.\n"
+    + "- FILL THIS IN: the change I want to explore — ‹describe your change›",
+  // A.3 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  whatsMissing: () =>
+    "Tell me what's missing from this library and what's worth unlocking.\n"
+    + "\n"
+    + "- Read `design-context/registry.json` — especially `frontier` (discovered-but-not-downloaded pages) and each page's `states`.\n"
+    + "- Tell me, as my design partner: which locked pages and which missing states matter most for understanding this product, and why.\n"
+    + "- Don't capture anything yet — recommend.",
+  // A.4 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  addState: () =>
+    "I want to add a page state to the library — I can reach it via URL.\n"
+    + "\n"
+    + "- Run `node tools/capture.js --state <slug>:<state-name> --url \"<the url>\"`.\n"
+    + "- Confirm it landed under `design-context/pages/<slug>/states/`.",
+  // A.9 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  //      guided capture: human-driven, button-only states/modals. The ‹placeholder› is bound inside
+  //      the command token, so the FILL THIS IN line points at it rather than carrying it alone.
+  guided: () =>
+    "Run a guided capture of this product with me.\n"
+    + "\n"
+    + "- Run `node tools/capture.js --guided --url ‹where to start›`.\n"
+    + "- A browser window opens on my logged-in profile — I'll drive.\n"
+    + "- Watch the folder: each capture lands under `design-context/pages/…` with `method: guided`.\n"
+    + "- When I close the window, run `node tools/build-index.js` and tell me what the hygiene check found.\n"
+    + "- FILL THIS IN: the URL in the command above — ‹where to start›",
+  // A.5 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  auditTokens: () =>
+    "Audit this product's visual language for me.\n"
+    + "\n"
+    + "- Read `design-context/tokens.json`.\n"
+    + "- These are OBSERVED values (method: heuristic), not authored tokens.\n"
+    + "- As a design-systems reviewer: where is this product consistent, where is it drifting (near-duplicate colors, off-scale spacing), and what would you consolidate first?",
+  // A.6 (ux-copy.md — revised 2026-07-28 E1: product.json-if-it-exists, else rebuild from manifest.json;
+  //      restructured 2026-07-30, shared shape; instruction set unchanged)
+  recaptureCheck: () =>
+    "The product may have changed — re-capture it and tell me what moved.\n"
+    + "\n"
+    + "- Re-run the capture with the same settings as last time — use `design-context/product.json` if it exists, otherwise read the parameters recorded in `design-context/manifest.json` and rebuild the command from those.\n"
+    + "- Then compare `contentHash` changes in `design-context/registry.json`.\n"
+    + "- Tell me which pages changed and whether their descriptions need updating.",
+  // A.7 (ux-copy.md — revised 2026-07-28 E4: registry.json replaces INDEX.md as the entry file;
+  //      restructured 2026-07-30, shared shape; instruction set unchanged)
+  bootstrap: () =>
+    "You're in a designer's workspace — get oriented before we start.\n"
+    + "\n"
+    + "- Read `AGENTS.md` first and follow its five rules.\n"
+    + "- Then read `design-context/registry.json` to learn this product.\n"
+    + "- Then ask me what I want to work on.",
   // A.8 (ux-copy.md — revised 2026-07-27: skill pointer + shell instruction, evidence: create-chain run;
-  // 2026-07-28 E10: ‹concept› placeholder made self-evidently the designer's to fill)
-  designNew: () => "Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making. I want to design something NEW: ‹describe it›. **Per `skills/wireframe-on-snapshot/SKILL.md` §7:** start from the captured page whose shell this new page would share, work on a COPY in `wireframes/new/<kebab-case name for this concept, your choice>/round-1/` (never in `design-context/`), keep the product's real shell, make 2–3 genuinely different approaches, new elements visibly lo-fi. If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style. Render previews with `node tools/shot.js`.",
-  // A.11 (ux-copy.md — verbatim; added after the original use-it-layer.md Appendix A canon, first numbered 2026-07-28)
-  askQuestion: () => "Read `design-context/registry.json` and `INDEX.md` to learn this product. I have a question about it: ‹your question›. Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens. If the answer isn't in the library, say so plainly rather than guessing.",
-  // A.10 (ux-copy.md — verbatim) — the Figma exit: convert a captured page/state to editable Figma layers
-  figma: () => "Open the dashboard, go to the page you want, click ⧉ Copy for Figma, and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
+  // 2026-07-28 E10: ‹concept› placeholder made self-evidently the designer's to fill;
+  // restructured 2026-07-30, shared shape — the `**…**` around the skill pointer is GONE, chat
+  // inputs rendered it as literal asterisks. Instruction set unchanged.)
+  designNew: () =>
+    "I want to design something NEW for this product.\n"
+    + "\n"
+    + "- Read `design-context/registry.json`, `tokens.json`, and the pages most like what I'm making.\n"
+    + "- Per `skills/wireframe-on-snapshot/SKILL.md` §7: start from the captured page whose shell this new page would share, and work on a COPY in `wireframes/new/<kebab-case name for this concept, your choice>/round-1/` — never in `design-context/`.\n"
+    + "- Keep the product's real shell. Make 2–3 genuinely different approaches, new elements visibly lo-fi. Render previews with `node tools/shot.js`.\n"
+    + "- If the library is too thin to know this product's grammar for some part, tag that region `ASSUMED: …` and explain it in `notes.md` — never invent house style.\n"
+    + "- FILL THIS IN: what I want to design — ‹describe it›",
+  // A.11 (ux-copy.md — added after the original use-it-layer.md Appendix A canon, first numbered
+  //       2026-07-28; restructured 2026-07-30, shared shape; instruction set unchanged)
+  askQuestion: () =>
+    "I have a question about this product.\n"
+    + "\n"
+    + "- Read `design-context/registry.json` and `INDEX.md` to learn this product.\n"
+    + "- Answer only from what's in the library — the captured pages, their descriptions, and the observed tokens.\n"
+    + "- If the answer isn't in the library, say so plainly rather than guessing.\n"
+    + "- FILL THIS IN: my question — ‹your question›",
+  // A.10 (ux-copy.md — restructured 2026-07-30, shared shape; instruction set unchanged)
+  //       the Figma exit: convert a captured page/state to editable Figma layers. This one is
+  //       addressed to the designer, not to a model — the shape holds anyway.
+  figma: () =>
+    "How do I get a captured page into Figma?\n"
+    + "\n"
+    + "- Open the dashboard, go to the page you want, and click ⧉ Copy for Figma.\n"
+    + "- Paste into your Figma file (⌘V).\n"
+    + "- It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
 };
 const COPY_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.4 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.4"/></svg>';
 function pchip(label, text, ghost){ return `<button type="button" class="pchip${ghost?' ghost':''}" data-prompt="${esc(text)}">${COPY_SVG}${esc(label)}</button>`; }
+// (prompt-readability) The prompts are MULTI-LINE now, and the old blocked-copy fallback was
+// `prompt('Copy this prompt:', text)`. A prompt() dialog renders a SINGLE-LINE text field, whose value
+// setter runs the HTML value-sanitization algorithm and strips every CR/LF — measured in Chromium:
+// "line one\n\n- bullet a" comes back "line one- bullet a", words fused with no separator at all. So
+// the designer's manual escape hatch would have handed them a mangled prompt. A textarea preserves
+// newlines exactly (measured, same run), so the fallback goes through one: try execCommand('copy')
+// off it, and if even that is refused leave it on screen pre-selected for a manual copy. The rule from
+// the brief holds at every step — never flatten the copy. Toast wording is unchanged canon.
+function copyFallback(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.className = 'copyfallback'; ta.readOnly = true;
+  ta.setAttribute('aria-label', 'Prompt text — select and copy');
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  ta.scrollTop = 0;   // select() scrolls to the END; the designer should see line 1 — the ask — first
+  let copied = false;
+  try { copied = document.execCommand('copy'); } catch(_){}
+  if (copied){ ta.remove(); toast('Copied — paste it into your AI chat.'); }
+  else { toast('Your browser blocked the copy — the prompt is shown below to copy by hand.', true);
+         ta.addEventListener('blur', () => ta.remove(), { once:true }); }
+}
 function copyPrompt(text){ if(!text) return;
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
     .then(()=>toast('Copied — paste it into your AI chat.'))
-    .catch(()=>{ toast('Your browser blocked the copy — the prompt is shown below to copy by hand.'); try{ prompt('Copy this prompt:', text); }catch(_){} }); }
+    .catch(()=>copyFallback(text)); }
 // one delegated handler for every chip, anywhere (works during onboarding completion too)
 document.addEventListener('click', e=>{ const b = e.target.closest && e.target.closest('[data-prompt]'); if (b) copyPrompt(b.getAttribute('data-prompt')); });
 // delegated in-dashboard navigation: any [data-goto] sets the hash → route() (below) reacts
