@@ -1,5 +1,22 @@
 # UX copy canon
 
+## 2026-07-29 — cumulative capture record (M1–M2)
+
+`prds/v1-fix-manifest-record.md`. Two new/corrected locked strings, both surfacing counts that vary at
+runtime — plural forms are part of the canon, not an implementation detail.
+
+**Hygiene — new info-level line (M1)**, sourced from `registry.skips` (the cumulative ledger
+`build-index.js` derives from `design-context/capture-log.json`, restoring disclosure of pages a
+site refused across ALL past runs, not just the latest one):
+`N page(s) was/were blocked or auth-walled during capture` — action: `see design-context/capture-log.json for the full record`.
+Singular: `1 page was blocked or auth-walled during capture`. Plural: `N pages were blocked or auth-walled during capture`.
+
+**Map arc label — pluralization fix (M2)**: was permanently plural regardless of count (`— N pages`,
+visible as `— 1 PAGES` on a 1-null workspace, uppercased by `.maparclbl`'s CSS). Now matches the
+pluralization idiom already used one line above it and elsewhere on the map (`1 click` / `N clicks`):
+- was: `not linked from home — ${unreachCount} pages`
+- now: `not linked from home — ${unreachCount} page${unreachCount===1?'':'s'}`
+
 ## 2026-07-29 — landing v1.2 (populated showcase + the hero decision)
 
 `prds/landing-page-v1.2-populated.md`. **Every locked v1 string is untouched** — re-checked
