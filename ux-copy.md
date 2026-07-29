@@ -1,5 +1,68 @@
 # UX copy canon
 
+## 2026-07-30 — the assisted entry point: `INSTALL.md`, and the desktop app as the recommended client
+
+The paste-into-chat entry point asked the agent to *infer* the install procedure from a human-facing
+README (`Set up the design context kit from <repo URL> in a new folder`), and pointed at a
+`GETTING_STARTED.md` that has never existed in this package. Replaced with a fetchable,
+agent-facing file. Two framing changes ride along: the recommended client becomes the **Claude
+desktop app** (P1 is terminal-averse, and the desktop app is the one surface where capture and
+consumption happen in the same window), and Claude Code **on the web** is named as unsupported
+rather than left to fail.
+
+**The bootstrap prompt** (locked — identical on the landing page and in the README):
+`Read https://raw.githubusercontent.com/20prateeksingh/design-context-for-ai/main/INSTALL.md and follow it.`
+
+**Landing, Get-started section — the assisted lede** (replaces the `Using Claude Code? …` lede and
+its dead `GETTING_STARTED.md` link): names the desktop app first, the CLI second, discloses that
+either needs a Claude subscription while the kit needs no account, and adds a note line pointing at
+`INSTALL.md` (for the assistant) vs the README (for the person), closing with the web-surface
+exclusion.
+
+**README — `Fastest start`**: the prompt above, plus `INSTALL.md` is written for the assistant; you
+don't need to read it.
+
+**README — recommended client** (was `With Claude Code (recommended): cd <your-workspace> && claude`,
+a shell command sitting under a "you don't write code" promise): splits into
+`With the Claude desktop app (recommended, no terminal)` — carrying the **open it on this folder, not
+the folder above** instruction — and `With the Claude Code CLI` beneath it.
+
+**README — Windows note** (factual correction, not a new claim): the old note routed Windows users
+to "the three step-by-step commands", the first of which is `tools/setup.sh` — also a `.sh` script.
+Now names the two `npm`/`npx` substitutes and `node tools/map.js --port 4173`, and states plainly
+that the Windows path has not been through a cold-start test.
+
+**CLAUDE.md / AGENTS.md / `skills/capture-product` — standing instructions** (canon-worthy per the
+E5/E16 precedent):
+- **CLAUDE.md §0 "If you just got here"** — the working directory may be the folder above; tell the
+  designer to reopen on this folder (subfolder instructions load on demand and are not restored
+  after a compaction); re-read this file when unsure late in a session; don't let `/init` regenerate
+  it, and change `AGENTS.md` in the same edit.
+- **`Starting the dashboard`** — `node tools/map.js --port 4173`, **backgrounded**: it is a server, so
+  a foreground call blocks until timeout. `tools/start.sh` is reclassified as the *designer's*
+  double-click path, explicitly not for an agent to run. This closes a real defect: every agent-facing
+  surface previously said "run `tools/start.sh` (or offer to run it)", which hangs the caller.
+- **AGENTS.md closing rider** — resolve paths against the folder holding `tools/` and
+  `design-context/` when started one level up.
+
+**Hard rules 1 and 3 gain an enforcement clause** (same round, same E5/E16 precedent — standing
+instructions, not dashboard copy). `.claude/settings.json` now **denies** every file-editing tool on
+the library's ground truth and derived views, and denies read *and* write inside `profiles/`. The
+rules' wording is unchanged; each gains a sentence saying the rule is enforced rather than asked, so
+a refused edit reads as the rule working instead of a malfunction — with the recovery named
+(`node tools/build-index.js`, a subprocess, is unaffected) and the two deliberate omissions stated
+(`page.md` for rule 1's describe exception, `annotations.json` for the designer's own notes).
+Deliberately **not** mirrored into `AGENTS.md`: that file exists for hosts that don't load Claude
+Code settings, so a note about Claude-specific enforcement would be noise there. The rule itself is
+already identical in both.
+
+**`.claude/skills/` stubs — the drift note is the copy that matters:** both skills are now invokable
+(`/capture-product`, `/wireframe-on-snapshot`), but the stub bodies say outright that
+`skills/<name>/SKILL.md` is canonical and name why (the path is referenced from `CLAUDE.md`,
+`AGENTS.md`, the dashboard prompts, and at runtime by `tools/lofi-check.js`, `tools/lofi-bake.js` and
+`tools/capture.js`). `CLAUDE.md`'s tree carries the same instruction: **edit the file under `skills/`,
+never the stub.**
+
 ## 2026-07-30 — README discloses the one outbound request (`prds/small-open-items-round.md`, S3)
 
 `grep -ci "cdn\|font\|no network"` on `README.md` returned 0 — the kit's honesty thesis is its whole pitch,

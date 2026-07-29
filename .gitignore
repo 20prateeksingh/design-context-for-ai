@@ -1,6 +1,9 @@
 # Browser profiles contain REAL session cookies — never commit or share.
 profiles/
 
+# .claude/settings.json IS shipped (shared allow/deny rules). Per-designer overrides are not.
+.claude/settings.local.json
+
 tools/node_modules/
 .DS_Store
 *.preview.png

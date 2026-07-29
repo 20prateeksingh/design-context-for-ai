@@ -4,12 +4,16 @@ Turn the product you design for into **ready-made context for your AI tools** �
 
 Built for designers. You don't write code — you talk to your AI assistant and it drives the tools in here.
 
-**Fastest start with Claude Code:** open it and paste — *"Set up the design context kit from https://github.com/20prateeksingh/design-context-for-ai in a new folder."*
+**Fastest start — let an AI set it up.** In the [Claude desktop app](https://code.claude.com/docs/en/desktop-quickstart) (no terminal) or the Claude Code CLI, paste:
+
+> *"Read https://raw.githubusercontent.com/20prateeksingh/design-context-for-ai/main/INSTALL.md and follow it."*
+
+It installs the kit, opens the dashboard, and is then the AI that reads your library — same window, no second tool. [`INSTALL.md`](INSTALL.md) is written for the assistant; you don't need to read it. (Claude Code **on the web** can't do this — the kit needs a browser and a local server on your own machine.)
 
 ## Start here
 
 1. **Copy this repo's contents** into a folder named after your product (e.g. `acme-dashboard/`). One workspace = one product.
-2. **Run `tools/start.sh`** (double-click it, or run it in a terminal — or just ask your AI assistant to run it). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand.
+2. **Run `tools/start.sh`** (double-click it, or run it in a terminal). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand. Working with an AI assistant instead? Give it the prompt above and skip this step — it handles 1 and 2 for you.
 3. **Follow the dashboard.** It asks three things — your product's URL, whether you sign in to use it, and what kind of product it is — then captures. If you sign in, it opens a browser window for you to log in (**your password stays in that window, never in the AI or any file**) and continues on its own when you close it. You watch the capture happen live; you never touch the terminal.
 4. When it's done, the dashboard **Home** is your product as a **page atlas** — every captured page as a screenshot card — with a running **ledger** (the journal) down the side and a **context-readiness** score up top. Tabs: **Home · Map · Design language · Use it**, plus the **Journal**. The **Map** plots every page by real clicks-from-home, sized by how linked-to it is, with undownloaded pages as ghosts in the fog; click a ghost to download it, click a captured page for its full doc (screenshot, states, description, link graph, history). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
 5. The ledger's top **"next"** slot tells you the one move that matters — first it's **"Give your AI this toolkit"** (copy one prompt; your AI describes every page and the captions light up), then **"Make your first thing"** (wireframe a real page, or design something new in the product's own language from the **Use it** tab).
@@ -24,7 +28,7 @@ node tools/login.js --url https://app.example.com     # log in once, close the w
 node tools/capture.js --url https://app.example.com   # capture → design-context/
 ```
 
-_Windows: `start.sh` is macOS/Linux; on Windows run the three step-by-step commands above in order._
+_Windows: both `.sh` scripts are macOS/Linux only — `setup.sh` included. Substitute `npm install --prefix tools` and then `cd tools && npx playwright install chromium`, and run the two `node` commands as shown; `node tools/map.js --port 4173` gives you the dashboard. The Windows path hasn't been through a cold-start test yet, so the AI-assisted route above is the better bet there._
 
 ## After capture — use it
 
@@ -32,7 +36,8 @@ _Windows: `start.sh` is macOS/Linux; on Windows run the three step-by-step comma
 
 The dashboard's **Use it** tab turns the library into next moves — every button copies a ready-to-paste prompt with your real file paths already in it. In short:
 
-- **With Claude Code (recommended):** open Claude Code in this folder (`cd <your-workspace> && claude`) — it reads this workspace's instructions and knows every page. Ask it to *describe the pages*, *wireframe on a page*, or *what's missing?*
+- **With the Claude desktop app (recommended, no terminal):** open it on **this folder** — it reads this workspace's instructions and knows every page. Ask it to *describe the pages*, *wireframe on a page*, or *what's missing?* Open it on the folder itself, not the folder above: that's how the kit's instructions load in full.
+- **With the Claude Code CLI:** same thing from a terminal — `cd <your-workspace> && claude`.
 - **With another AI coding tool** (Cursor, Windsurf): point it at `AGENTS.md`, then tell it to read `design-context/INDEX.md`.
 - **With a chat-only AI** (claude.ai, ChatGPT): use the Use-it tab's **Copy context bundle** button — it assembles a self-contained summary you paste in, no file access needed.
 - **By hand:** any `design-context/pages/<slug>/page.html` opens in your browser and is an editable design baseline.
