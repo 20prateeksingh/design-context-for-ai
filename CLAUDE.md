@@ -2,19 +2,50 @@
 
 This folder is a designer's standalone workspace for ONE product. You are helping that **designer** capture their product as a design-context library and design on top of it. They may not be technical. Read this fully before acting.
 
+## 0. If you just got here
+
+**Your working directory may not be this folder.** If an assistant cloned the kit here on the designer's behalf (see `INSTALL.md`), you were probably started one level *above* it. Every path in this file is relative to **this** folder — the one holding `tools/`, `skills/` and `design-context/`. Resolve against it, not against wherever you launched.
+
+**Tell the designer to reopen here next time — once, plainly.** Instructions in a subfolder load only when files in that subfolder are read, and they are not restored after a context compaction. A long session started one level up will quietly lose these rules mid-run:
+
+> Next time, open Claude directly on this folder — that way it reads the kit's instructions from the start and knows every page you've captured.
+
+**If you are deep in a long session and unsure of a rule below, re-read this file.** It is the spec; your recollection of it is not. That goes double after a compaction.
+
+**Don't regenerate this file.** `/init` will offer to rewrite it from the folder contents — it is hand-authored, and `AGENTS.md` is its hand-synced short form for hosts that don't auto-load project instructions. If a rule changes, change it in **both** files.
+
+**First contact, no capture yet?** `design-context/` empty means the designer has nothing yet — go to the first-run guidance below. Don't discuss a product you haven't captured.
+
 ## What lives here
 
 ```
 ./
 ├── skills/capture-product/       ← capture the product → design-context/
 ├── skills/wireframe-on-snapshot/ ← design on a captured page
+├── .claude/skills/               ← discovery stubs so the two above are invokable (/capture-product,
+│                                   /wireframe-on-snapshot). Thin pointers — never the content.
+├── .claude/settings.json         ← shared allow/deny rules (see Hard rules 1 and 3)
 ├── tools/                        ← setup.sh · login.js · capture.js · build-index.js · shot.js
 ├── profiles/                     ← the designer's logged-in browser session (NEVER share/commit)
 ├── design-context/               ← THIS product, captured: facts + consumption layer (see below)
 └── wireframes/<page>/            ← design work built ON the library (never inside it)
 ```
 
-**First run:** if `design-context/` is empty, the best move is the **dashboard's onboarding** — tell the designer to run `tools/start.sh` (or offer to run it), then follow the dashboard: it asks URL + sign-in + product-type, triggers login only if relevant, and shows the capture live — no terminal questions. `skills/capture-product/` is the chat-driven equivalent for hosts without a browser or when the designer prefers chatting. Either way, the wizard writes `design-context/product.json` and the skill reads the same file — the two front doors can't drift. Don't discuss a product you haven't captured.
+The two skills are invokable — `/capture-product` and `/wireframe-on-snapshot` — but their content lives at `skills/<name>/SKILL.md`, which is what `CLAUDE.md`, `AGENTS.md`, the dashboard's prompts, `tools/lofi-check.js` and `tools/capture.js` all reference by path. **Edit the file under `skills/`, never the stub under `.claude/skills/`.**
+
+**First run:** if `design-context/` is empty, the best move is the **dashboard's onboarding** — start it and point the designer at it, then follow the dashboard: it asks URL + sign-in + product-type, triggers login only if relevant, and shows the capture live — no terminal questions. `skills/capture-product/` is the chat-driven equivalent for hosts without a browser or when the designer prefers chatting. Either way, the wizard writes `design-context/product.json` and the skill reads the same file — the two front doors can't drift. Don't discuss a product you haven't captured.
+
+## Starting the dashboard
+
+```bash
+node tools/map.js --port 4173     # run this in the BACKGROUND — it never exits on its own
+```
+
+It is a server, not a command: a foreground call blocks until it times out. Start it detached, then put the URL (`http://localhost:4173`) in your message to the designer — an empty library opens the onboarding wizard, a populated one opens the dashboard. If 4173 is taken, try 4174–4182 and use whichever takes; a second product workspace on this machine needs its own port.
+
+`tools/start.sh` does the same plus a first-run dependency install, and is the path for a designer working *without* an assistant (double-click it, or run it in a terminal). **Don't run it yourself** — it stays in the foreground by design and will hang you.
+
+Fresh clone, dependencies not installed yet: `npm install --prefix tools --no-fund --no-audit`, then `cd tools && npx playwright install chromium` (slow — tell the designer before you start it). `map.js` has no dependencies of its own, so the dashboard can open before the capture browser finishes downloading; capture can't run until it does.
 
 ## How to consume the library (you and any other AI agent)
 
@@ -28,15 +59,15 @@ A page's `label` is a scraped nav string, not an authored title — it can be tr
 
 ## Hard rules
 
-1. **The library is facts.** Everything under `design-context/` was captured deterministically from the real product, with provenance. Never edit library files, never add model-guessed values to them. **The one exception is the describe step:** you write each page's screen doc *between* its `ai:begin`/`ai:end` markers in `page.md` (see `skills/capture-product/SKILL.md` §5). Everything outside those markers, in every file, stays untouched. Design work goes in `wireframes/`, on a **copy** of the snapshot.
+1. **The library is facts.** Everything under `design-context/` was captured deterministically from the real product, with provenance. Never edit library files, never add model-guessed values to them. **The one exception is the describe step:** you write each page's screen doc *between* its `ai:begin`/`ai:end` markers in `page.md` (see `skills/capture-product/SKILL.md` §5). Everything outside those markers, in every file, stays untouched. Design work goes in `wireframes/`, on a **copy** of the snapshot. **This one is enforced, not just asked:** `.claude/settings.json` denies every file-editing tool on the library's ground truth and derived views, so if an edit there is refused, that is the rule working — regenerate with `node tools/build-index.js` (a subprocess, unaffected) or re-capture, and never route around it. `page.md` and `annotations.json` are deliberately left editable, because rule 1's exception and the designer-owned notes both need them.
 2. **Capture is read-only.** `capture.js` follows links only — it never clicks buttons or submits forms. Never work around this by driving the product yourself; if a page needs interaction to reach, tell the designer it's beyond one-click capture for now.
-3. **Never handle credentials.** Login happens in the browser window `login.js` opens — the designer types their password there, never into you or any file. Never ask for, read, or store a password, cookie, or token. `profiles/` never leaves this machine.
+3. **Never handle credentials.** Login happens in the browser window `login.js` opens — the designer types their password there, never into you or any file. Never ask for, read, or store a password, cookie, or token. `profiles/` never leaves this machine — and `.claude/settings.json` denies your file tools any read or write inside it, so you cannot open it even by accident. `login.js` and `capture.js` reach it as subprocesses; you don't.
 4. **Plain language.** Talk like a design collaborator, not a terminal. "I'll open a browser window — log in like you normally do, then close it," not "run the persistent-context authentication flow." One question at a time; no walls of text.
 5. **Report honestly.** If a page was skipped, capped, or failed, say so with the reason from `manifest.json`. Never present a partial capture as complete.
 
 ## Typical session
 
-- Empty `design-context/`, or "capture my product" / "set this up" → prefer `tools/start.sh` → the dashboard runs onboarding; else `skills/capture-product/SKILL.md` (includes the describe step that fills each page's "What this page is"). The dashboard hands off to the describe step on its completion screen.
+- Empty `design-context/`, or "capture my product" / "set this up" → start the dashboard (see **Starting the dashboard** below) → it runs onboarding; else `skills/capture-product/SKILL.md` (includes the describe step that fills each page's "What this page is"). The dashboard hands off to the describe step on its completion screen.
 - "wireframe on ‹page›" / "redesign ‹page›" → `skills/wireframe-on-snapshot/SKILL.md`
 - "re-capture" / "the product changed" → run capture again (safe: refreshes in place, `contentHash` shows what changed; descriptions survive), then re-check descriptions whose page hash changed.
 - "show me the map" / "what haven't we captured?" → `node tools/map.js` → http://localhost:4173 — the coverage map: captured pages + the frontier (discovered, not downloaded). The designer selects frontier pages there (or you run `node tools/capture.js --urls "<u1>,<u2>"`); states are added on a page's panel (or `--state <slug>:<name> --url <stateUrl>`). `design-context/annotations.json` is designer-owned (notes + state URLs, plus a `hygiene` block of acks/folds) — you may append to it, never prune it, and never write its `hygiene` block unasked; `registry.json` may carry derived `foldedInto`/`template` fields from a fold — that re-shelves a page under a representative, it never deletes it.

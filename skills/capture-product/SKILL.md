@@ -9,7 +9,7 @@ Produce a design-context library for the designer's product: `ia/sitemap.json` (
 
 ## 0. Prefer the dashboard — it runs onboarding for you
 
-The best first-run path is **not** this conversation: tell the designer to run **`tools/start.sh`** (or offer to run it) and follow the dashboard. It asks the URL + sign-in + product-type once, opens the login window only if relevant, and shows the capture live — no terminal, no questions here. Point them there first. Use the steps below when the host has no browser, the designer prefers chatting, or you're iterating on an already-captured library.
+The best first-run path is **not** this conversation: start the dashboard yourself — `node tools/map.js --port 4173`, **in the background** (it's a server that never exits; a foreground call hangs you) — and point the designer at http://localhost:4173. If they're working without an assistant, `tools/start.sh` is their double-click path; don't run that one yourself. Either way they follow the dashboard. It asks the URL + sign-in + product-type once, opens the login window only if relevant, and shows the capture live — no terminal, no questions here. Point them there first. Use the steps below when the host has no browser, the designer prefers chatting, or you're iterating on an already-captured library.
 
 **If `design-context/product.json` exists, the questions in §1 are already answered** — read it (`url`, `loggedIn`, `productType`, `presets`) and do **not** re-ask. Pass it straight through: `node tools/capture.js --config design-context/product.json`. Only ask what's missing.
 
@@ -81,7 +81,7 @@ Read `design-context/manifest.json` and `ia/sitemap.json`. Report in designer la
 - Anything skipped/failed/capped, with reasons, per manifest. Never hide gaps.
 - Show 1–2 `screenshot.png`s so they see it worked.
 - Point them at `INDEX.md` as the browsable map of everything captured — and tell them their AI tools should start at `registry.json`.
-- Point them at the dashboard's **Home** (`tools/start.sh` → http://localhost:4173) — their product as a page atlas with a running ledger. The single next move to name is the ledger's **"Give your AI this toolkit"** threshold: one copied prompt makes the AI describe every page and the dormant captions light up. (The **Use it** tab holds the rest — wireframe, design-something-new, what's-missing, context bundle.)
+- Point them at the dashboard's **Home** (`node tools/map.js --port 4173`, backgrounded → http://localhost:4173) — their product as a page atlas with a running ledger. The single next move to name is the ledger's **"Give your AI this toolkit"** threshold: one copied prompt makes the AI describe every page and the dormant captions light up. (The **Use it** tab holds the rest — wireframe, design-something-new, what's-missing, context bundle.)
 - The headline capability worth naming: **⧉ Copy for Figma** — on any page (Home atlas panel, Map panel, page doc, or a captured state) one click copies that snapshot to the clipboard and it pastes into Figma (⌘V) as **editable auto-layout layers**. No plugin, no Dev Mode, no paid seat (prompt canon **A.10**).
 
 Then offer the map: "run `node tools/map.js` and open http://localhost:4173, then the Map tab — your product plotted by clicks-from-home; the ghosts in the fog are pages I found but didn't download, click to pull them in." And the next move: "want to wireframe on one of these?" (→ `wireframe-on-snapshot`).
