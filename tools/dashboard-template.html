@@ -244,7 +244,14 @@
   .ring { display:inline-block; width:14px; height:14px; margin:0 6px -2px 0; border-radius:50%;
           border:2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color:currentColor;
           animation:spin .75s linear infinite; vertical-align:middle; }
-  @media (prefers-reduced-motion: reduce){ .ring { animation:none; } }
+  /* (busy-states-everywhere B1/H1) rotation is exactly what reduced-motion strips (the blanket rule at
+     the top of this stylesheet: `*{animation:none!important}`) — that used to leave .ring frozen: a
+     bright static arc over a ~1.5:1-contrast track, with the one thing that read as "in progress" (the
+     spin) gone. Opacity has none of the vestibular effect transform/rotate motion does, so it stays
+     allowed under the same policy: a pulse instead of silence. Needs its own !important to outrank the
+     blanket rule — importance ties, so specificity decides, and .ring beats the universal selector. */
+  @media (prefers-reduced-motion: reduce){ .ring { animation:ringpulse 1s ease-in-out infinite !important; } }
+  @keyframes ringpulse { 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
   /* representative-first offer (bug 8): one big primary CTA, a demoted --dim secondary below it */
   .repcta .btn.primary { width:100%; padding:10px; font-size:14px; }
   .dlall-wrap { margin-top:12px; }
@@ -2128,7 +2135,10 @@ function initDashboard(){
     const cnt = guidedLive ? guidedLive.count : 0;
     const stage = endingStageText();
     toast(stage || (guidedLive && guidedLive.capturing ? `Capturing this page… · ${cnt} saved so far` : `Guided capture in progress — ${cnt} captured · the window is yours`), true);
-    if(document.getElementById('pane-home').classList.contains('active')) renderHome();
+    // (busy-states-everywhere B1/H3) railSel guards BOTH panes now — home used to rebuild unconditionally,
+    // which silently destroyed any open rail detail panel (and whatever busy button/ring it held, e.g.
+    // #st-add or a covered-shape pull) the instant a guided session ticked while Home was on screen.
+    if(document.getElementById('pane-home').classList.contains('active') && !railSel) renderHome();
     else if(document.getElementById('pane-map').classList.contains('active') && !railSel) renderRail(); // live entry in the map's ledger too (F4)
   }
   // SSE primary (namespaced "guided"/"guided-done"), polling fallback — mirrors attachStream().
@@ -2143,7 +2153,7 @@ function initDashboard(){
         // holds the real error. Two distinct failures share this branch: the launch never started
         // (wasEnding false, pre-existing) vs. the end sequence itself died mid-flight (wasEnding true, F1).
         toast((wasEnding ? '' : 'Guided capture couldn’t start: ') + d.error, true);
-        if(document.getElementById('pane-home').classList.contains('active')) renderHome();
+        if(document.getElementById('pane-home').classList.contains('active') && !railSel) renderHome();
         else if(document.getElementById('pane-map').classList.contains('active') && !railSel) renderRail();
         return;
       }

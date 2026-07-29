@@ -728,6 +728,51 @@ function guidedOverlayInjector() {
   else build();
 }
 
+// ── Non-guided capture-window progress pill (busy-states-everywhere B2) ───────
+// crawl/--urls/--state opened a headed Chromium and left the window silent — no sign the kit was
+// driving it, no sign whether the designer could touch it. This is the read-only counterpart to
+// guidedOverlayInjector above: same injection mechanism (an init script, so it survives every
+// navigation), same visual family, but output only — no button, no input, nothing for a click to
+// land on (`pointer-events:none` on the wrapper is belt-and-suspenders on top of that). Node holds
+// the one thing that changes, `progressState` (set right before each capturePage call, in the loop
+// that drives this mode); the pill asks for it once on mount via the exposed `__dckProgress` binding
+// and polls lightly afterward, rather than Node pushing into a page it's about to navigate away from.
+// Copy is locked in ux-copy.md (2026-07-30, "busy states everywhere").
+function progressPillInjector() {
+  if (window.top !== window) return; // top frame only
+  let pending = null;
+  function render(state) {
+    const el = document.getElementById('__dck_progress_text');
+    if (!el) { pending = state; return; }
+    let fragment = 'starting capture…';
+    if (state && state.label) {
+      fragment = state.total ? `capturing ${state.index} of ${state.total} — ${state.label}` : `capturing ${state.label}`;
+    }
+    el.textContent = `Design Context Kit — driving this window, please don't click · ${fragment}`;
+  }
+  function build() {
+    if (document.getElementById('__dck_progress') || !document.body) return;
+    if (!document.getElementById('__dck_progress_kf')) {
+      const kf = document.createElement('style'); kf.id = '__dck_progress_kf';
+      kf.textContent = '@keyframes __dckprogspin{to{transform:rotate(360deg)}}';
+      document.head && document.head.appendChild(kf);
+    }
+    const wrap = document.createElement('div');
+    wrap.id = '__dck_progress';
+    wrap.setAttribute('style', 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:center;gap:10px;background:#111;color:#fff;padding:9px 14px;border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.42);font:13px/1.3 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:92vw;pointer-events:none');
+    wrap.innerHTML =
+      '<span id="__dck_progress_ring" aria-hidden="true" style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;flex:none;animation:__dckprogspin .8s linear infinite"></span>' +
+      '<span id="__dck_progress_text" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Design Context Kit — driving this window, please don\'t click · starting capture…</span>';
+    document.body.appendChild(wrap);
+    render(pending);
+  }
+  async function poll() { try { render(await window.__dckProgress()); } catch (_) {} }
+  function start() { build(); poll(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+  setInterval(poll, 1000);
+}
+
 // ── Cumulative capture record (M1, v1-fix-manifest-record) ────────────────────────────────────
 // manifest.json describes only the latest run and OVERWRITES — a run after a prior one destroys that
 // prior run's skipped[]/failed[] record (real damage already done: espncricinfo's two genuinely-blocked
@@ -759,7 +804,7 @@ function flattenHygiene(f) {
 }
 
 // Exported for tests/reuse. Requiring this file no longer auto-runs the CLI (guarded below).
-module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, routeKey, cleanSearch, flattenHygiene, appendCaptureLog, pickDismissText, DISMISS_TEXTS };
+module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, progressPillInjector, routePattern, slugFor, routeKey, cleanSearch, flattenHygiene, appendCaptureLog, pickDismissText, DISMISS_TEXTS };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 if (require.main === module) (async () => {
@@ -1015,6 +1060,16 @@ if (require.main === module) (async () => {
       throw e;
     }
   }
+  // (busy-states-everywhere B2) the progress pill — crawl/--urls/--state were silent windows before
+  // this; guided already had one. `progressState` is the one thing Node updates as it works through
+  // each mode's loop below; the pill (injected fresh into every new document, same mechanism as
+  // guided's overlay) asks for it on mount and polls lightly while the document stays open. A missing
+  // pill can never fail a capture, so both calls are best-effort.
+  let progressState = null;
+  try {
+    await context.exposeBinding('__dckProgress', async () => progressState);
+    await context.addInitScript(progressPillInjector);
+  } catch (_) {}
   const page = context.pages()[0] || await context.newPage();
   const actionLog = [];
 
@@ -1027,6 +1082,7 @@ if (require.main === module) (async () => {
       const [pslug, sname] = STATE.split(':').map(s => (s || '').trim());
       if (!pslug || !sname || !START_URL) { console.error('Usage: node capture.js --state <pageSlug>:<stateName> --url <stateUrl>'); process.exit(1); }
       process.stdout.write(`⤷ state ${pslug} › ${sname} … `);
+      progressState = { index: 1, total: 1, label: `${pslug} › ${sname}` };
       try {
         const r = await capturePage(page, context, START_URL,
           { slug: pslug, subdir: path.join(pslug, 'states', sname.replace(/[^A-Za-z0-9-]+/g, '-')), label: sname }, OUT_DIR, actionLog);
@@ -1056,7 +1112,8 @@ if (require.main === module) (async () => {
           try { const m = JSON.parse(fs.readFileSync(mp, 'utf8')); if (m[field]) routeIndex.set(routeKey(m[field]), { slug: s, meta: m }); } catch (_) {}
         }
       }
-      for (const u of urls) {
+      for (let ui = 0; ui < urls.length; ui++) {
+        const u = urls[ui];
         const rk = routeKey(u);
         const existing = routeIndex.get(rk);
         let slug;
@@ -1065,6 +1122,7 @@ if (require.main === module) (async () => {
         takenSlugs.add(slug);
         const prev = existing ? existing.meta : {};
         process.stdout.write(`  ${slug}${existing ? ' (refresh)' : ''} … `);
+        progressState = { index: ui + 1, total: urls.length, label: slug };
         try {
           const r = await capturePage(page, context, u, {
             slug, label: prev.navLabel || null,                 // preserve the facts a URL alone can't carry
@@ -1168,6 +1226,7 @@ if (require.main === module) (async () => {
     while (seenSlugs.has(slug)) slug += '-2';
     seenSlugs.add(slug);
     process.stdout.write(`[${String(i + 1).padStart(2, '0')}/${queue.length}] ${slug} … `);
+    progressState = { index: i + 1, total: queue.length, label: slug };
     try {
       const r = await capturePage(page, context, cand.url, { ...cand, slug }, OUT_DIR, actionLog);
       if (r.status === 'ok') {
@@ -1221,6 +1280,9 @@ if (require.main === module) (async () => {
       while (seenSlugs.has(slug)) slug += '-2';
       seenSlugs.add(slug);
       process.stdout.write(`   ⧉ ${pattern} (${g.urls.size} instances, via ${g.from}) → ${slug} … `);
+      // No total here (unlike the phase-1 loop above): depth-2 groups are discovered as it goes, so any
+      // denominator shown before the pass finishes would be a guess — the pill just names the page.
+      progressState = { index: null, total: null, label: slug };
       try {
         const r = await capturePage(page, context, rep, { url: rep, label: null, pattern, slug, template: pattern, collapsed: g.urls.size - 1 }, OUT_DIR, actionLog);
         if (r.status === 'ok') {

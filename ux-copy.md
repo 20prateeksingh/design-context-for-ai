@@ -1,5 +1,39 @@
 # UX copy canon
 
+## 2026-07-30 — busy states everywhere: a reduced-motion-safe ring, and a progress pill inside the capture window (B1–B2)
+
+`prds/busy-states-everywhere.md`. B1 is a CSS/JS fix, not new copy (the ring's existing labels are
+untouched). B2 is new: a read-only status pill injected into the capture browser window itself for
+the three modes that were silent before (`crawl`, `--urls`, `--state`) — guided capture already had
+one. Same visual family as the guided pill (dark rounded pill, bottom-center, a dot + one status
+line) but output-only: no button, no input, nothing to click. `capture.js` builds the line from three
+parts, always in this order — the "don't touch this" notice never scrolls out of the line, and the
+progress fragment is the only part that changes as the run proceeds:
+
+```
+Design Context Kit — driving this window, please don't click · <status fragment>
+```
+
+**Status fragment, one of** (`<label>` is the page's slug or `pslug › stateName`; never the raw URL —
+matches the guided pill's own choice not to show URLs):
+```
+starting capture…                          (before the first page's target is known)
+capturing <n> of <total> — <label>         (crawl's queue, or a --urls pull — both know their total up front)
+capturing <label>                          (depth-2 template follow-ups — the total isn't known until
+                                             each group is discovered, so no "n of total" is shown; see
+                                             the brief's honesty gate — a count here would be a guess)
+```
+
+`--state` (always exactly one target) reads as `capturing 1 of 1 — <pslug› ‹stateName>`.
+
+**Why not the guided pill's copy verbatim:** guided is interactive (a person is driving, the pill asks
+them things) — the sentence "please don't click" would be actively wrong there. The two pills share a
+look, not a script, because they make opposite promises about who's in control.
+
+**Dashboard-side agreement:** `runCapture`'s existing toast — `Capturing ${urls.length} page(s) — watch
+the browser window…` — already promises something will be visible in the window and names no specific
+mechanism, so B2 fulfills that promise without any wording change on the dashboard side.
+
 ## 2026-07-30 — the assisted entry point: `INSTALL.md`, and the desktop app as the recommended client
 
 The paste-into-chat entry point asked the agent to *infer* the install procedure from a human-facing
