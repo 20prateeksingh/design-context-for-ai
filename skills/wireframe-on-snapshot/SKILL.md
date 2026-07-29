@@ -96,13 +96,24 @@ For each approach, edit the lofi-mode copy:
 
 ### Pre-render checklist (every approach, before screenshotting)
 
-- [ ] `lofi-mode` + `lofi-kit` style blocks present — no brand color anywhere in the render
+**Machine-verified — run this instead of re-reading the rules it covers:**
+
+```
+node tools/lofi-check.js <file>
+```
+
+Covers: the `lofi-mode` + `lofi-kit` blocks (byte-verbatim against this file) and brand color in the
+render · the `.lofi-region` ↔ `.lofi-tag` pairing and any prose annotation in the canvas · the
+swap-test lines in `notes.md` · and, for §7 work, the `ASSUMED:` chips and the `<title>`. It also
+warns on clipping inside your drawn regions. Structural failures exit 1; heuristics exit 0 and can
+have false positives — read them, don't obey them. It reports and recommends; it never edits anything.
+
+**Yours to judge — the checker is blind to these four, so you still have to look:**
+
 - [ ] Shell carried as captured: structure + labels intact, nothing redrawn or dropped
-- [ ] Invented parts: `.lofi-region` + one short `.lofi-tag` chip — no prose annotations anywhere in the canvas
 - [ ] Everything the approach introduces is drawn; secondary views are frames, not descriptions
 - [ ] New regions cloned from captured elements or built on `tokens.json` values
 - [ ] Real page data reused; density ≥ the captured page
-- [ ] Swap-test lines written in notes.md
 
 ### Post-render check (look at your own PNG before presenting)
 
@@ -200,10 +211,17 @@ content is invented. If the state is reachable by URL, offer the capture instead
 
 #### Pre-render checklist — additions for a new page
 
+**Machine-verified** by the same `node tools/lofi-check.js <file>` run: every ungrounded region carries
+an `ASSUMED: …` chip *and* `notes.md` carries the matching log — both directions, because a log with an
+untagged canvas is the exact failure this check was built for. Plus the `<title>` against every captured
+page's title.
+
+**Yours to judge — the checker cannot decide these:**
+
 - [ ] Built on a copy of a real donor page; shell, nav, breadcrumb, footer intact
-- [ ] Breadcrumb extended and `<title>` set to this page's name
+- [ ] Breadcrumb extended and `<title>` set to this page's name — *the `<title>` half is machine-verified; the crumb is not*
 - [ ] `notes.md` carries the vocabulary table (what · which captured page · measured values)
-- [ ] Every ungrounded region tagged `ASSUMED: …`; invented content listed line by line in `notes.md`
+- [ ] Every ungrounded region tagged `ASSUMED: …`; invented content listed line by line in `notes.md` — *the chip is machine-verified; the line-by-line list is not*
 - [ ] No invented identifiers (order IDs, tracking numbers, courier names) — placeholders instead
 - [ ] The state the page exists for is drawn as its own frame, not described
 
