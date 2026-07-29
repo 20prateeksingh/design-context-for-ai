@@ -273,6 +273,34 @@ function deriveBrand(tokens) {
   return { seed: seed.value.toUpperCase(), applied: { accent, accentStrong, buttonText }, source: 'observed', basis: { count: seed.count, pages: seed.pages } };
 }
 
+// M1 (v1-fix-manifest-record): registry.skips — the union of every run's skip/fail reasons, derived
+// from the cumulative design-context/capture-log.json (see capture.js's appendCaptureLog), so a page
+// blocked or auth-walled during ANY past run stays evidencable even after a later run's manifest.json
+// overwrites the single latest-run record. Deduped by url (falling back to slug when a run never
+// recorded a literal url, e.g. crawl-discovered candidates) — a later run's entry for the same key wins,
+// so this reads as "current known state", not an ever-growing list of resolved history.
+function deriveSkips(libDir, manifest) {
+  let runs = null;
+  try {
+    const cl = JSON.parse(fs.readFileSync(path.join(libDir, 'capture-log.json'), 'utf8'));
+    if (cl && Array.isArray(cl.runs)) runs = cl.runs;
+  } catch (_) {}
+  const byKey = new Map();
+  const record = (key, reason, at) => { if (key) byKey.set(key, { url: key, reason, at }); };
+  if (runs) {
+    for (const run of runs) {
+      for (const s of run.skipped || []) record(s.url || s.slug, s.reason, run.at);
+      for (const f of run.failed || []) record(f.url || f.slug, f.error || 'failed', run.at);
+    }
+  } else {
+    // No capture-log.json yet (a workspace mid-upgrade, before its next real capture run) — seed from
+    // the latest manifest so registry.skips isn't empty until then. Additive-only: no data invented.
+    for (const s of (manifest && manifest.skipped) || []) record(s.url || s.slug, s.reason, manifest.capturedAt);
+    for (const f of (manifest && manifest.failed) || []) record(f.url || f.slug, f.error || 'failed', manifest.capturedAt);
+  }
+  return [...byKey.values()].sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0)));
+}
+
 // D3: the zero-page branch — same public shape (registry.json + INDEX.md), honest content. Never
 // throws even if manifest fields are missing/unexpected (a hand-built or edge-case manifest.json).
 function buildEmptyIndex(libDir, manifest) {
@@ -848,6 +876,8 @@ function buildIndex(libDir) {
     // F11: hosts linked from captured pages that same-origin capture never follows (e.g. a marketing
     // site's "Sign in" pointing at a separate app subdomain) — not in frontier, not in readiness.
     offOrigin,
+    // M1 (v1-fix-manifest-record): cumulative skip/fail ledger across every run — see deriveSkips().
+    skips: deriveSkips(libDir, manifest),
     // additive dashboard-v2 top-level fields
     identity, readiness, events,
     // R1 (v1-fix-map-root): which page clickDepth's rings are measured from, and how that page was
@@ -999,7 +1029,7 @@ function buildIndex(libDir) {
   return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene };
 }
 
-module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl }; // routeKey for the mirror test; deriveBrand & helpers for test-brand.js
+module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl, deriveSkips }; // routeKey for the mirror test; deriveBrand & helpers for test-brand.js; deriveSkips for test-capture-log.js
 
 if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');

@@ -278,6 +278,22 @@ function runHygiene(outDir) {
     }
   }
 
+  // M1 (v1-fix-manifest-record): the site refused us — surfaced from registry.skips (the cumulative
+  // ledger build-index.js derives from capture-log.json), so it survives past whatever the latest
+  // manifest.json alone shows. Info-level: a blocked/auth-walled page isn't a defect in THIS library,
+  // it's an honest disclosure of what the source site wouldn't hand over. soft-404 is excluded on
+  // purpose — moved-or-deleted isn't "refused us", it's "never there to get".
+  const blockedFamily = ((registry && registry.skips) || []).filter(s => s.reason === 'blocked' || s.reason === 'auth-redirect');
+  if (blockedFamily.length) {
+    findings.quality.push({
+      kind: 'quality', subKind: 'blocked-family', severity: 'info',
+      target: 'blocked/auth-walled URLs',
+      issue: `${blockedFamily.length} page${blockedFamily.length === 1 ? '' : 's'} ${blockedFamily.length === 1 ? 'was' : 'were'} blocked or auth-walled during capture`,
+      action: 'see design-context/capture-log.json for the full record',
+      key: makeKey('blocked-family'),
+    });
+  }
+
   // F1: acknowledgments — designer-owned, live in annotations.json (`hygiene.acks`), survive every
   // rebuild. Hygiene still FINDS acked findings (never silently un-finds — an ack is a note, not a
   // suppression of fact); it only marks them so the ledger card and terminal tail can set them aside.

@@ -1605,7 +1605,7 @@ function initDashboard(){
     { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(short(dlabel(root),28))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d)*z; const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY;
       specs.push({pri:1, ring:true, cx, cy, rr, cls:'maprlbl', html:`${d} click${d===1?'':'s'}`}); }
-    if(unreachCount>0){ const [ax,ay]=toScreen({x:Math.cos(2.0)*nullR, y:Math.sin(2.0)*nullR}); specs.push({pri:1, ax, ay, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} pages`}); }
+    if(unreachCount>0){ const [ax,ay]=toScreen({x:Math.cos(2.0)*nullR, y:Math.sin(2.0)*nullR}); specs.push({pri:1, ax, ay, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} page${unreachCount===1?'':'s'}`}); }
     if(deepCount>0){ const [dx,dy]=toScreen({x:Math.cos(-0.55)*ghostR*1.16, y:Math.sin(-0.55)*ghostR*1.16}); specs.push({pri:1, ax:dx, ay:dy, center:true, cls:'maparclbl', html:`deep fog<small>…${deepCount} more — templates stand for most</small>`}); }
     let set=[];
     if(level==='near') set=capNodes.slice();

@@ -218,12 +218,24 @@ async function settle(page) {
 }
 
 // ── Cookie-banner dismissal — the one sanctioned click, allowlisted + logged ──
-// Privacy-preserving options first; exact-ish short-text match only.
+// Preference order (M3, v1-fix-manifest-record): reject/decline/necessary-only first (most
+// privacy-preserving), then a neutral dismiss/close/got-it, and accept-all only as a last resort.
+// Was one flat list with accept-all interleaved before dismiss/close — on espncricinfo that meant
+// "accept all" matched before "got it" even though both were present. Order now IS the priority.
 const DISMISS_TEXTS = [
-  'reject all', 'decline all', 'only essential', 'essential only', 'reject non-essential',
-  'necessary only', 'decline', 'reject',
-  'accept all', 'allow all', 'accept cookies', 'i agree', 'agree', 'accept', 'ok', 'got it', 'ok, got it', 'dismiss', 'understood', 'close',
+  'reject all', 'decline all', 'only essential', 'essential only', 'reject non-essential', 'necessary only', 'decline', 'reject',
+  'dismiss', 'close', 'got it', 'ok, got it', 'understood', 'ok',
+  'accept all', 'allow all', 'accept cookies', 'i agree', 'agree', 'accept',
 ];
+// Pure + exported so the preference order is unit-testable without a browser (test-dismiss-order.js).
+// Mirrors the in-page evaluate() logic below exactly — that closure can't require() this module
+// (page.evaluate serializes its own scope only), so the algorithm is intentionally duplicated, not the data.
+function pickDismissText(availableTexts) {
+  const norm = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const set = new Set((availableTexts || []).map(norm));
+  for (const t of DISMISS_TEXTS) if (set.has(t)) return t;
+  return null;
+}
 async function dismissBanner(page, log) {
   if (NO_DISMISS) return;
   try {
@@ -716,6 +728,21 @@ function guidedOverlayInjector() {
   else build();
 }
 
+// ── Cumulative capture record (M1, v1-fix-manifest-record) ────────────────────────────────────
+// manifest.json describes only the latest run and OVERWRITES — a run after a prior one destroys that
+// prior run's skipped[]/failed[] record (real damage already done: espncricinfo's two genuinely-blocked
+// URL families were observed once, then unevidencable once a later run replaced manifest.json). This is
+// additive: one entry appended per run, across all five modes (crawl/urls/state/guided/login-page).
+// Mirrors the guided-sessions.json read-modify-write pattern used a few hundred lines below.
+function appendCaptureLog(outDir, entry) {
+  const p = path.join(outDir, 'capture-log.json');
+  let store = { runs: [] };
+  if (fs.existsSync(p)) { try { const prev = JSON.parse(fs.readFileSync(p, 'utf8')); if (prev && Array.isArray(prev.runs)) store = prev; } catch (_) {} }
+  store.runs.push(entry);
+  fs.writeFileSync(p, JSON.stringify(store, null, 2), 'utf8');
+  return store.runs.length;
+}
+
 // Flatten hygiene.js's grouped findings into a plain list for persistence (F4·1). Mirrors the section
 // renders in hygiene.formatHygiene so the ledger's detail lines read the same, action included.
 function flattenHygiene(f) {
@@ -732,7 +759,7 @@ function flattenHygiene(f) {
 }
 
 // Exported for tests/reuse. Requiring this file no longer auto-runs the CLI (guarded below).
-module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, routeKey, cleanSearch, flattenHygiene };
+module.exports = { writeSnapshot, capturePage, guidedOverlayInjector, routePattern, slugFor, routeKey, cleanSearch, flattenHygiene, appendCaptureLog, pickDismissText, DISMISS_TEXTS };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 if (require.main === module) (async () => {
@@ -748,12 +775,15 @@ if (require.main === module) (async () => {
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
     const actionLog = [];
+    let loginCaptured = 0, loginSkipped = [], loginFailed = [];
     process.stdout.write(`⤷ login page … `);
     try {
       const r = await capturePage(page, context, START_URL, { slug: 'login', label: 'Login', loginPage: true }, OUT_DIR, actionLog);
       console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)} — captured logged-out` : `skipped (${r.status})`);
-    } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
+      if (r.status === 'ok') loginCaptured = 1; else loginSkipped.push({ slug: 'login', url: START_URL, reason: r.status });
+    } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); loginFailed.push({ slug: 'login', url: START_URL, error: e.message.split('\n')[0] }); }
     await context.close(); await browser.close();
+    appendCaptureLog(OUT_DIR, { at: new Date().toISOString(), mode: 'login-page', argsSummary: `--login-page --url ${START_URL}`, captured: loginCaptured, skipped: loginSkipped, failed: loginFailed });
     // Refresh the consumption layer only if a prior full capture exists (fresh workspace has none yet;
     // the login page gets folded in when the main capture rebuilds the index).
     if (fs.existsSync(path.join(OUT_DIR, 'ia', 'sitemap.json'))) {
@@ -822,6 +852,7 @@ if (require.main === module) (async () => {
       } }
     const startedAt = new Date().toISOString();  // session start — persisted at session end (F4)
     const captures = [];
+    const guidedIssues = []; // non-ok attempts this session (M1 capture-log), each {slug, url, reason} or {slug, url, error}
     const sessionNames = new Set(); // `${slug}/${name}` captured THIS session — repeats get suffixed, never overwritten
     // URL-awareness: the overlay asks this on every navigation → red (new) vs green (seen, + when).
     await gctx.exposeBinding('__dckStatus', async (source, url) => {
@@ -870,11 +901,12 @@ if (require.main === module) (async () => {
           console.log('GUIDED_JSON:' + JSON.stringify(rec));
         }
         await pageObj.evaluate(() => { if (window.__dckMount) window.__dckMount(); }).catch(() => {});
-        if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); return { ok: false, error: r.status }; }
+        if (r.status !== 'ok') { console.log(`  ✗ ${label}: ${r.status}`); guidedIssues.push({ slug, url, reason: r.status }); return { ok: false, error: r.status }; }
         console.log(`  ✓ ${label}  (${r.sizeKb} KB)${blobNote(r)}`);
         return { ok: true, label, sizeKb: r.sizeKb };
       } catch (e) {
         console.log(`  ✗ ${label}: ${e.message.split('\n')[0]}`);
+        guidedIssues.push({ slug, url, error: e.message.split('\n')[0] });
         return { ok: false, error: e.message.split('\n')[0] };
       }
     });
@@ -911,6 +943,14 @@ if (require.main === module) (async () => {
         fs.writeFileSync(gsPath, JSON.stringify(store, null, 2), 'utf8');
         console.log(`🗒  guided-sessions.json updated (${store.sessions.length} session${store.sessions.length === 1 ? '' : 's'})`);
       } catch (e) { console.log(`⚠  could not write guided-sessions.json: ${e.message.split('\n')[0]}`); }
+    }
+    if (captures.length || guidedIssues.length) {
+      appendCaptureLog(OUT_DIR, {
+        at: endedAt, mode: 'guided', argsSummary: `--guided --url ${START_URL}`,
+        captured: captures.length,
+        skipped: guidedIssues.filter(i => i.reason).map(i => ({ slug: i.slug, url: i.url, reason: i.reason })),
+        failed: guidedIssues.filter(i => i.error).map(i => ({ slug: i.slug, url: i.url, error: i.error })),
+      });
     }
     const tSessionSaved = Date.now();
     emitPhase('session-saved', { captures: captures.length });
@@ -982,6 +1022,7 @@ if (require.main === module) (async () => {
   if (STATE || ONLY_URLS) {
     const OUT_DIR = path.join(KIT_DIR, 'design-context');
     fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
+    const runResults = { ok: [], skipped: [], failed: [] }; // M1 capture-log — this branch has no existing tracker
     if (STATE) {
       const [pslug, sname] = STATE.split(':').map(s => (s || '').trim());
       if (!pslug || !sname || !START_URL) { console.error('Usage: node capture.js --state <pageSlug>:<stateName> --url <stateUrl>'); process.exit(1); }
@@ -990,7 +1031,8 @@ if (require.main === module) (async () => {
         const r = await capturePage(page, context, START_URL,
           { slug: pslug, subdir: path.join(pslug, 'states', sname.replace(/[^A-Za-z0-9-]+/g, '-')), label: sname }, OUT_DIR, actionLog);
         console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)}` : `skipped (${r.status})`);
-      } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
+        if (r.status === 'ok') runResults.ok.push(pslug); else runResults.skipped.push({ slug: pslug, url: START_URL, reason: r.status });
+      } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); runResults.failed.push({ slug: pslug, url: START_URL, error: e.message.split('\n')[0] }); }
     } else {
       const urls = ONLY_URLS.split(',').map(s => s.trim()).filter(Boolean);
       console.log(`🎯 Selective capture — ${urls.length} url(s) from the frontier`);
@@ -1030,11 +1072,17 @@ if (require.main === module) (async () => {
             template: prev.template || null, collapsed: prev.collapsed || 0,
           }, OUT_DIR, actionLog);
           console.log(r.status === 'ok' ? `✓ (${r.sizeKb} KB)${blobNote(r)}` : `skipped (${r.status})`);
-          if (r.status === 'ok') routeIndex.set(routeKey(r.finalUrl || u), { slug, meta: r.meta });
-        } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); }
+          if (r.status === 'ok') { routeIndex.set(routeKey(r.finalUrl || u), { slug, meta: r.meta }); runResults.ok.push(slug); }
+          else runResults.skipped.push({ slug, url: u, reason: r.status });
+        } catch (e) { console.log(`✗ ${e.message.split('\n')[0]}`); runResults.failed.push({ slug, url: u, error: e.message.split('\n')[0] }); }
       }
     }
     await context.close(); if (browser) await browser.close();
+    appendCaptureLog(OUT_DIR, {
+      at: new Date().toISOString(), mode: STATE ? 'state' : 'urls',
+      argsSummary: STATE ? `--state ${STATE} --url ${START_URL}` : `--urls ${ONLY_URLS}`,
+      captured: runResults.ok.length, skipped: runResults.skipped, failed: runResults.failed,
+    });
     try {
       const { buildIndex } = require('./build-index.js');
       const r = buildIndex(OUT_DIR);
@@ -1200,6 +1248,12 @@ if (require.main === module) (async () => {
     provenance: { source: 'scrape', method: 'dom', determinism: 'no OCR, no vision, no model-derived values' },
   };
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  appendCaptureLog(OUT_DIR, {
+    at: manifest.capturedAt, mode: 'crawl',
+    argsSummary: `--url ${START_URL} --depth ${DEPTH} --cap ${CAP}${HEADLESS ? ' --headless' : ''}`,
+    captured: results.ok.length, skipped: results.skipped, failed: results.failed,
+    capHit: capped > 0,
+  });
 
   // 6. Consumption layer: registry.json + INDEX.md + per-page page.md (preserves AI descriptions on re-runs)
   try {
