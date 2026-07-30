@@ -118,9 +118,26 @@
              overflow-y:auto; padding:24px 20px 40px; z-index:8; }
   @media (max-width:1080px){ /* = --stack-bp */ #maparea { inset:0 300px 0 0; } #maprail { width:300px; } }
   #mapworld { position:absolute; inset:0; }
-  #maplines { position:absolute; inset:0; z-index:1; pointer-events:none; }
-  #maplines .eout { stroke:color-mix(in srgb, var(--accent-strong) 60%, transparent); stroke-width:1.4; }
-  #maplines .ein { stroke:color-mix(in srgb, var(--dim) 45%, transparent); stroke-width:1.4; }
+  /* (M4) width/height are NOT redundant with inset:0. <svg> is a REPLACED element, so an absolutely
+     positioned one with `left:0;right:0` and `width:auto` does not stretch — it resolves to SVG's
+     intrinsic 300×150 and the `right` offset is simply over-constrained away (CSS 2.1 §10.3.8). This box
+     has been 300×150 in the top-left corner of the pane since the v2 map shipped, and everything
+     drawLinks() drew outside it was CLIPPED: on xflowpay, 56 edges were in the DOM, correctly positioned,
+     styled, and invisible. That is the whole reason the hover links "needed" to be made visible — the
+     defect was the geometry, not the paint. */
+  #maplines { position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
+  /* ── (M4) HOVER LINKS ARE FAINT AND DOTTED ─────────────────────────────────────────────────────────
+     The mechanism was already right — drawLinks() draws every real linksTo/linkedFrom edge on hover — so
+     this is styling only. Two solid 1.4px lines read as structure the map is asserting; Prateek asked for
+     a whisper. Both drop to 1.1px and lose a chunk of alpha, and both go dashed.
+     OUT and IN stay distinguishable by TWO channels, not one: colour as before (--accent-strong leaving,
+     --dim arriving) AND a different dash rhythm — a long 5/4 stride for out-links, a fine 2/4 stipple for
+     in-links. That is deliberate: fading both toward the canvas compresses the colour difference exactly
+     where the map is darkest, so the pattern has to carry the distinction where the hue can no longer.
+     Alpha is set against the WORST ground, not the best: the frontier band sits near --bg-deep, and a
+     line tuned on the lit centre disappears there. Measured on both — see the build report. */
+  #maplines .eout { stroke:color-mix(in srgb, var(--accent-strong) 46%, transparent); stroke-width:1.1; stroke-dasharray:5 4; }
+  #maplines .ein  { stroke:color-mix(in srgb, var(--dim) 40%, transparent); stroke-width:1.1; stroke-dasharray:2 4; }
   .mapring { position:absolute; border:1.5px dashed color-mix(in srgb, var(--txt) 11%, transparent); border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; }
   /* ── labels are PILLS (v2.5 §2.4, the reference's signature) ──
      Every label carries its own surface + hairline, so it is readable on the lit centre, on the mid
@@ -155,6 +172,17 @@
   .mapnode:hover { box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent), 0 8px 22px color-mix(in srgb, var(--bg-deep) 80%, transparent); }
   .mapnode.tpl { border-color:var(--tpl); }
   .mapnode.dorm { border-color:var(--dim); }
+  /* (M3.3) HOVERING A NAMED DISTRICT ANSWERS ON ITS MEMBER DISCS. Strictly ADDITIVE, for two reasons the
+     disc itself imposes:
+       · the rim COLOUR is already load-bearing — --accent = a described page, --tpl = a template,
+         --dim = a dormant caption, --accent-strong = home. A treatment that swapped border-color would
+         erase that encoding for exactly as long as the pointer sits there, i.e. while the reader is
+         looking hardest. So this adds an `outline`, and touches nothing the rim says.
+       · `outline` (like box-shadow, unlike border-width) is outside the box model, so it changes no
+         geometry. placeLabels() is a screen-space collision pass over real disc rects, and a mid-hover
+         box change re-triggers exactly the class of bug that had v2.5.1 measuring discs at scale(.92).
+     Ghosts can never wear it: members come from capNodes, so the frontier is never a district member. */
+  .mapnode.rgnmate { outline:2px solid color-mix(in srgb, var(--accent-strong) 62%, transparent); outline-offset:3px; }
   .mapnode .st { position:absolute; top:-2px; right:-2px; width:10px; height:10px; border-radius:50%; background:var(--ok); border:2px solid var(--canvas); }
   /* (covered-shapes) a template's shape count, ON the disc. The retired ghost used to carry this number as
      a disc of its own, and the label pill cannot take the job over: pills are single-line by F3's ruling
@@ -809,8 +837,39 @@
      #maparea's overflow:hidden is what stops the spread painting outside the pane. */
   #mapregions { position:absolute; left:0; top:0; z-index:0; opacity:.035; pointer-events:none; filter:blur(14px); }
   .mapregion { position:absolute; border-radius:44% 56% 52% 48% / 50%; background:var(--accent); pointer-events:auto; }
+  /* (M3.1) THE CATCH-ALL IS POINTER-INERT. `Everything else` is not a district — computeRegions() builds
+     it from every section with exactly ONE member, so it is a bag of unrelated singletons whose bbox
+     sprawls across the whole map and swallows the pointer before any real district can have it. It keeps
+     its fill (it is still where those pages are) and loses hover, the wash and the card. Targeted by the
+     region's `merged` flag, never by matching its name. */
+  .mapregion.inert { pointer-events:none; }
+  /* ── (M3.2) THE RESTING EDGE — a SECOND opacity group, and why it cannot be the first one ───────────
+     A named district now carries a barely-there boundary at rest that firms up under the pointer. The
+     stacking invariant that governs this layer is NOT "one element in the file" — it is "one alpha per
+     layer, over fully-opaque children", which is what makes v2.4's stacked-translucent-bbox fog bug
+     geometrically impossible. #mapedges reproduces that mechanism exactly, for strokes: every child is a
+     fully OPAQUE 1px --accent-strong outline, the group carries the single alpha, and two opaque strokes
+     of the same colour that cross composite to that colour — they read as crossing, they cannot brighten.
+     It cannot live INSIDE #mapregions, and the reason is arithmetic rather than taste: that group carries
+     `opacity:.035` AND `filter:blur(14px)`. A 1px stroke smeared over ~28px of blur keeps a small
+     fraction of its peak, and 3.5% of that lands at the very bottom of the 8-bit range: measured on the
+     real render, the identical stroke moved inside #mapregions peaks at Δ1 per channel over a few
+     thousand pixels — not faint, indistinguishable. Outside it, in this group, the same stroke measures
+     Δ24–27 peak / ~12 mean (see the build report).
+     The fill wants the blur (a district is a neighbourhood, not a shape — v2.5.1 F2); a boundary is a
+     boundary. So: two layers, each independently non-stacking, proven by the same pixel-compare gate.
+     The catch-all gets no child here in either state. */
+  #mapedges { position:absolute; left:0; top:0; z-index:0; opacity:.13; pointer-events:none; }
+  .mapedge { position:absolute; border-radius:44% 56% 52% 48% / 50%; border:1px solid var(--accent-strong); }
+  /* the hovered district's resting edge steps aside for #maphot's dashed one — a continuous faint line
+     under a dashed brighter one just fills the gaps back in and the dashes stop reading as dashes. */
+  .mapedge.hot { visibility:hidden; }
+  /* (M3.2) the hover wash is still ONE element, and its border is now DASHED: solid read "too pronounced"
+     (Prateek's original ask) — a dashed edge says territory rather than object. Stronger than the resting
+     edge so the hovered district is unambiguous, still well under the discs. */
   #maphot { position:absolute; z-index:0; border-radius:44% 56% 52% 48% / 50%; pointer-events:none;
-            background:color-mix(in srgb, var(--accent) 7%, transparent); border:1px solid color-mix(in srgb, var(--accent) 26%, transparent); }
+            background:color-mix(in srgb, var(--accent) 7%, transparent);
+            border:1px dashed color-mix(in srgb, var(--accent-strong) 42%, transparent); }
   #maplabels { position:absolute; inset:0; z-index:5; pointer-events:none; }
   #maplabels .mapnlbl, #maplabels .maprlbl, #maplabels .maphomelbl, #maplabels .mapghostlbl, #maplabels .maparclbl { position:absolute; transform:none; }
   .mapghostlbl { transform:translate(-50%,0); text-align:center; font-size:9px; color:var(--dim); white-space:nowrap;
@@ -832,7 +891,10 @@
   /* (v2.5 §2.3) a disc with no thumbnail is a plain --panel-2 well inside its ring. The v2.4 accent-tinted
      fill existed to stop small discs vanishing into near-black; on the lit canvas --panel-2 already reads,
      and the tint now competes with the accent RING that carries the meaning. The ring keeps its encoding
-     (accent = explored · --dim = dormant caption · --tpl = template) — only the fill changed. */
+     (accent = explored · --dim = dormant caption · --tpl = template · --accent-strong = home) — only the
+     fill changed. (M1, map-legibility) This class no longer means "too small for a picture": the disc
+     floor guarantees every captured page is big enough to hold one. It now means exactly one thing, the
+     honest one — this page has NO screenshot. */
   .mapnode.mono-disc { background-color:var(--panel-2); }
 
   /* ══ (v2.5.1 F5) THE MOTION PASS ════════════════════════════════════════════════════════════════
@@ -1522,7 +1584,16 @@ function initDashboard(){
   const world=document.getElementById('mapworld'), areaEl=document.getElementById('maparea'), linesEl=document.getElementById('maplines'),
         labelsEl=document.getElementById('maplabels'), dcardEl=document.getElementById('mapdcard');
   const capNodes = nodes.filter(n=>!n.locked && n!==root);
-  const maxIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0), ...fogNodes.map(f=>f.inboundCount||0));
+  // ── (M1, map-legibility) TWO SCALES, NOT ONE ──────────────────────────────────────────────────────
+  // A single shared maximum over captured pages AND uncovered frontier nodes let one heavily-linked
+  // GHOST — a page that was never downloaded — compress every real page toward the floor. On amazon the
+  // busiest ghost carried 28 inbound links against the busiest captured page's 22, so every captured
+  // disc was normalised against something that isn't in the library. Captured discs now normalise over
+  // captured pages only; ghosts keep their own independent maximum and their own (smaller) size range.
+  // The shared `maxIn` is gone rather than left lying around — every read of it is now one or the other,
+  // including the label solver's priority ranking (a ranking OF captured pages, so it takes maxCapIn).
+  const maxCapIn = Math.max(1, root.inboundCount||0, ...capNodes.map(n=>n.inboundCount||0));
+  const maxFogIn = Math.max(1, ...fogNodes.map(f=>f.inboundCount||0));
   const secList0 = (DATA.sections||[]).filter(s=>s!=='Home');
   const secList = secList0.length ? secList0 : ['Other'];
   // ── F2 (v2.5 §3) — SECTOR WIDTH IS PROPORTIONAL TO MEMBERSHIP ──────────────────────────────────
@@ -1547,6 +1618,18 @@ function initDashboard(){
       sectorW[s] = w; bearing[s] = cur + w/2; cur += w; }); }
   const bearingOf = (s)=> bearing[s]!=null ? bearing[s] : 0;
   const sectorOf  = (s)=> sectorW[s]!=null ? sectorW[s] : 2*Math.PI/secList.length;
+  // (M2·2) the gutter between adjacent sectors: reserved arc that NOTHING is placed in, taken out of
+  // each wedge before its members are laid down. Wedge widths themselves are untouched (v2.5 F2) — this
+  // narrows the usable span inside one, it never redistributes one sector's width to another. Clamped to
+  // 35% of the sector so an 18°-floor sector keeps a usable span rather than collapsing to a point.
+  const SECTOR_GUTTER = 14 * Math.PI/180;
+  const usableSpan = (s)=>{ const w=sectorOf(s); return Math.max(w*0.35, w - SECTOR_GUTTER); };
+  // (M2·3) A CLUSTER IS A SECTION WITH MORE THAN ONE MEMBER. A section of one page is a singleton, and
+  // every singleton shares one pseudo-cluster — the same partition computeRegions() makes when it merges
+  // every 1-member section into the catch-all district. Used by the ring sizing and the relaxation alike,
+  // so the two can never disagree about what counts as "another cluster".
+  const capSecSize={}; capNodes.forEach(n=>{ const s=n.section||'Other'; capSecSize[s]=(capSecSize[s]||0)+1; });
+  const capCluster = (n)=>{ const s=n.section||'Other'; return capSecSize[s]>1 ? s : '§singletons'; };
 
   // ---- layout state (world coords, home at 0,0) ----
   let VW=0, VH=0, minD=0, maxDepth=1, ringR1=0, ringRmax=0, nullR=0, ghostR=0;
@@ -1557,8 +1640,30 @@ function initDashboard(){
   // through where the ghost orbit actually ends, or the band lands on the wrong things — the relaxation
   // moves discs off their nominal rings, and a sparse product's rings sit nowhere near a dense one's.
   let exploredR=0, ghostOuterR=0;
-  const ringRadius = (d)=> maxDepth<=1 ? ringR1 : ringR1 + (d-1)*(ringRmax-ringR1)/(maxDepth-1);
-  const sizeOf = (n)=> Math.round(16 + 46*Math.min(1,(n.inboundCount||0)/maxIn));
+  // (M2·3) ring radii are RESOLVED per build (see computeLayout) rather than computed from a formula:
+  // a ring whose members cannot physically fit on its nominal circumference is moved outward until they
+  // can. ringRs[0] is depth 1. Empty until the first computeLayout(), so the fallback matters.
+  let ringRs=[];
+  const ringRadius = (d)=>{ const i=Math.max(1,d|0)-1; return ringRs[i]!=null ? ringRs[i]
+    : (maxDepth<=1 ? ringR1 : ringR1 + (d-1)*(ringRmax-ringR1)/(maxDepth-1)); };
+  // ── (M1) THE FLOOR IS THE THUMBNAIL'S FLOOR ───────────────────────────────────────────────────────
+  // Size still encodes inbound links — observed truth, and the legend says so — but the range now starts
+  // where a screenshot is still READABLE, because a disc that cannot hold its page's face has stopped
+  // being that page. The old 16→62 scale bottomed out at a 16px dot, which is why a `dia<30` branch used
+  // to suppress the screenshot outright and paint a flat well instead: the suppression was a symptom of
+  // the scale, not a design. That branch is gone (see `disc()`), so the floor has to earn its keep.
+  // 32 was picked by MEASUREMENT, not taste — real thumbnails from four products rendered at 16/20/24/
+  // 26/28/30/32/34/36/40/44 on the lit centre, the flat canvas and the frontier ground (the three values
+  // a disc can sit on). Rejected: 16 and 20 (a white dot, zero structure at any ground), 24 and 26 (a
+  // band or two resolves, but all four pages look alike — structure without identity), 28 and 30 (read
+  // on the lit centre, collapse on the frontier ground where the local contrast is lowest). 32 is the
+  // smallest at which all four are mutually distinguishable on ALL THREE grounds — the 2.5px rim leaves
+  // a 27px aperture there, enough for a nav column, a footer band or a table's rows to read as itself.
+  // The range NARROWS rather than shifting: the ceiling stays at 62, so the biggest disc — and therefore
+  // the layout's outer envelope, the fog's measured zone boundaries and the label solver's free space —
+  // is exactly where it was. Only the bottom moved.
+  const DISC_MIN = 32, DISC_MAX = 62;
+  const sizeOf = (n)=> Math.round(DISC_MIN + (DISC_MAX-DISC_MIN)*Math.min(1,(n.inboundCount||0)/maxCapIn));
 
   function computeLayout(){
     // v2.4 F4: the map lives in #maparea (the rail owns the right edge) — all geometry keys off it.
@@ -1568,15 +1673,46 @@ function initDashboard(){
     const homeD=Math.max(58, minD*0.10); P[root.id]={x:0,y:0,r:homeD/2, node:root};
     maxDepth=Math.max(1, ...capNodes.map(n=> n.clickDepth==null?1:n.clickDepth));
     ringR1=minD*0.22; ringRmax=minD*0.40; nullR=minD*0.45; ghostR=minD*0.56;
+    // ── (M2·3) A RING IS ONLY AS SMALL AS ITS MEMBERS ALLOW ─────────────────────────────────────────
+    // The nominal radii (0.22·minD → 0.40·minD) assumed discs small enough to always fit. With M1's 32px
+    // floor that assumption breaks on the densest libraries: amazon puts 24 pages and xflowpay 25 on ring
+    // 1, and laid end to end with no gap at all those discs need MORE arc than a 195px circle has. The
+    // old code hid this by letting the relaxation drag discs off their ring (61px of drift on amazon,
+    // 86px on xflowpay — enough to read back to the wrong ring); the ring band forbids that, so the ring
+    // itself has to give. Each ring is moved out to whatever radius holds its own members at the design
+    // gaps, and never inward — so a product that already fits is untouched, bit for bit.
+    // The encoding is intact and strengthened: same depth still ⇒ one shared radius, and deeper still ⇒
+    // strictly further out. The map never claimed depth was LINEAR in radius; it claims the rings are
+    // honest, and they are more honest after this than before.
+    { const nom = (d)=> maxDepth<=1 ? ringR1 : ringR1 + (d-1)*(ringRmax-ringR1)/(maxDepth-1);
+      // never force growth from spacing alone — a deep product keeps its nominal, tighter ring pitch
+      const minPitch = Math.min(DISC_MAX+GAP_SAME, maxDepth>1 ? (ringRmax-ringR1)/(maxDepth-1) : (nullR-ringR1));
+      ringRs=[]; let prev=P[root.id].r + 10;
+      for(let d=1; d<=maxDepth; d++){
+        const mem=capNodes.filter(n=>n.clickDepth===d);
+        const k=Math.min(new Set(mem.map(capCluster)).size, mem.length);
+        // the arc the ring's own members need, laid end to end with their design gaps between them
+        const arc=mem.reduce((s,n)=>s+sizeOf(n),0) + Math.max(0,mem.length-k)*GAP_SAME + k*GAP_CROSS;
+        const r=Math.max(nom(d), arc/(2*Math.PI), prev+minPitch);
+        ringRs.push(r); prev=r; }
+      ringRmax=ringRs[ringRs.length-1];
+      nullR=Math.max(nullR, prev+minPitch); ghostR=Math.max(ghostR, nullR+minPitch); }
     const groups={}; capNodes.forEach(n=>{ const k=(n.section||'Other')+'|'+(n.clickDepth==null?'x':n.clickDepth); (groups[k]=groups[k]||[]).push(n); });
-    // each (section, ring) group spreads inside ITS OWN sector's arc (F2) — a populous sector is wide, so
-    // its members fan out across the world instead of stacking into one bearing. How MUCH of the wedge a
-    // group uses scales with its size: a lone page sits dead centre, a pair stays compact around the
-    // centre, and only a genuinely crowded group opens out to (almost) the full wedge. That is what keeps
-    // "same section ⇒ same neighbourhood" legible while still filling the circle — spreading every group
-    // to its wedge ends would fling a 2-page section as far apart as the layout allows.
+    // ── (M2·1 + M2·2, map-legibility) A SECTION IS A TIGHT ARC WITH EMPTY CANVAS EITHER SIDE ──────────
+    // Each (section, ring) group still spreads inside ITS OWN sector's arc (F2) and the wedge WIDTHS are
+    // untouched (v2.5 F2's membership proportionality is settled). Two things changed inside the wedge:
+    //   · a fixed GUTTER is subtracted before members are placed, so what separates two sections is
+    //     actual empty canvas rather than merely lower density. It is clamped so it can never eat more
+    //     than 65% of a sector — a floor-width (18°) sector must stay usable.
+    //   · the group's own spread was `min(0.94, 0.30+0.16*(len-1))` — a crowded group opened to 94% of
+    //     its wedge, i.e. it FILLED the space rather than clustering in it. The new curve tops out at
+    //     72% of the (already narrower) usable span, so a section reads as a tight arc.
+    // These two set the SEEDING. What finally fixes the spacing is relaxDiscs()' section-aware gaps
+    // below — a group seeded tighter than its members physically fit is opened back up to exactly
+    // GAP_SAME, which is the point: the minimum gap becomes the design, not an accident of the seed.
     Object.values(groups).forEach(g=>{ g.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
-      const w=sectorOf(g[0].section)*Math.min(0.94, 0.30+0.16*(g.length-1));
+      const span=usableSpan(g[0].section);
+      const w=span*Math.min(0.72, 0.14+0.10*(g.length-1));
       g.forEach((n,i)=>{ const b=bearingOf(n.section); const off=g.length>1?(-w/2 + i*w/(g.length-1)):0;
         const rad=n.clickDepth==null?nullR:ringRadius(n.clickDepth);
         P[n.id]={x:Math.cos(b+off)*rad, y:Math.sin(b+off)*rad, r:sizeOf(n)/2, node:n}; }); });
@@ -1585,9 +1721,14 @@ function initDashboard(){
     const gg={}; ghostShown.forEach(f=>{ const k=f.section||'Other'; (gg[k]=gg[k]||[]).push(f); });
     // ghosts fan out inside their own section's sector too (F2), so a populous section's frontier
     // follows its wedge instead of bunching at one bearing; the alternating radius stays.
-    Object.values(gg).forEach(g=>g.forEach((f,i)=>{ const gw=Math.min(sectorOf(f.section)*0.7, 0.20*Math.max(1,g.length-1));
+    // (M2·2) ghosts respect the same gutter — the frontier of one section stays over that section.
+    Object.values(gg).forEach(g=>g.forEach((f,i)=>{ const gw=Math.min(usableSpan(f.section)*0.7, 0.20*Math.max(1,g.length-1));
       const b=bearingOf(f.section)+(g.length>1?(-gw/2 + i*gw/(g.length-1)):0); const rad=ghostR+(i%2)*minD*0.05;
-      P[f.id]={x:Math.cos(b)*rad, y:Math.sin(b)*rad, r:(Math.round(12+18*Math.min(1,(f.inboundCount||1)/maxIn)))/2, node:f, ghost:true}; }));
+      // (M1) ghosts keep their own range, 12→30, and now their OWN maximum: they were sharing the
+      // captured pages' denominator, which is the same coupling in reverse. A ghost has no thumbnail to
+      // protect, so nothing here needs a floor — and 30 stays strictly below the captured floor of 32, so
+      // "big dashed circle" can never be mistaken for "small real page".
+      P[f.id]={x:Math.cos(b)*rad, y:Math.sin(b)*rad, r:(Math.round(12+18*Math.min(1,(f.inboundCount||1)/maxFogIn)))/2, node:f, ghost:true}; }));
     deepCount=Math.max(0, lockedTotal - ghostShown.reduce((s,f)=>s+(f.count||1),0));
     unreachCount=capNodes.filter(n=>n.clickDepth==null).length;
     relaxDiscs();
@@ -1600,25 +1741,85 @@ function initDashboard(){
     if(!ghostOuterR) ghostOuterR = exploredR*1.18;
     computeRegions();
   }
-  // deterministic relaxation — seeded from the radial layout, home fixed; guarantees disc gaps
+  // ══ (M2·3) SECTION-AWARE RELAXATION, INSIDE A RING BAND ══════════════════════════════════════════
+  // Deterministic, seeded from the radial layout, home fixed. Two changes, and they are the same idea
+  // twice — the magnet Prateek asked for, expressed as a CONSTRAINT rather than a force so it stays a
+  // pure function of the data and cannot drift, iterate differently, or fail to be build-twice identical:
+  //
+  //   · ONE GAP BECOMES TWO. Same-cluster pairs get a small minimum (they should touch shoulders);
+  //     cross-cluster pairs get a much larger one (they should visibly repel). A "cluster" is a nav
+  //     section that has more than one member — a section of ONE page is not a cluster, it is a
+  //     singleton, and every singleton shares one pseudo-cluster. That is not a shortcut: it is exactly
+  //     the partition computeRegions() already makes when it merges every 1-member section into the
+  //     catch-all district. Charging a full repulsion gutter between two unrelated singletons would
+  //     spend the ring's whole circumference on boundaries (amazon's ring 1 carries 24 pages across 18
+  //     nav sections — 18 gutters is 612px of a 1228px ring) while separating nothing a reader groups.
+  //
+  //   · EVERY DISC IS CLAMPED TO ITS OWN RING BAND. The radius the seeding gave it is its orbit; it may
+  //     drift at most ±band from it, where band is 35% of the distance to the NEAREST OTHER orbit,
+  //     capped at 26px. Being strictly under half that distance, a disc's nearest orbit is always its
+  //     own — which is what makes `rings are honest clicks-from-home` (printed on the map at #mapstats)
+  //     literally true rather than nearly true. Free 2-D relaxation used to drag discs wherever the
+  //     packing wanted: 61px of radial drift on amazon, 86px on xflowpay, and at 86px ONE xflowpay disc
+  //     read back to the wrong ring outright. The band also kills the 16,000px overshoot class outright
+  //     — v2.5.1's bug (d=0.001 scaling a unit vector 1000×, flinging eight of flipkart's ghosts ~20×
+  //     off-canvas, deterministic enough to pass nine build-twice gates and be caught only by eye) was a
+  //     RADIAL excursion, and a radius that cannot leave [orbit−band, orbit+band] cannot leave the
+  //     canvas. The gate asserts the bound directly, per workspace.
+  //
+  // Why a band and not a frozen radius: a ring is a finite amount of circumference. M1's 32px floor
+  // means amazon's 24 depth-1 discs need 1244px of arc laid end to end against 1228px of ring — they do
+  // not fit on a circle at ALL, at any gap. Freezing the radius would have shipped real disc overlaps
+  // (measured: 8 pairs on amazon, 24 on xflowpay) in exchange for an exactness the band already buys.
+  // The band lets a crowded ring stagger, which is what a ring layout does when it runs out of room.
+  const GAP_SAME = 7;     // same cluster: shoulders touching
+  const GAP_CROSS = 34;   // different clusters: visibly apart
+  const BAND_MAX = 26;    // hard cap on radial drift, px
+  let relaxIters = 0, relaxResidual = 0;
   function relaxDiscs(){
     const ids=Object.keys(P).filter(id=>id!==root.id);
-    const GAP=10, hr=P[root.id].r;
-    for(let iter=0; iter<1500; iter++){ let worst=0;
+    const hr=P[root.id].r;
+    // clusters: capCluster's partition for captured pages, the same rule applied to the shown ghosts for
+    // the fog. Captured and fog are kept in separate namespaces — they never share an orbit, so pooling
+    // them would only blur the key.
+    const fogSecSize={}; ghostShown.forEach(f=>{ const s=f.section||'Other'; fogSecSize[s]=(fogSecSize[s]||0)+1; });
+    const clusterOf=(p)=>{ const s=(p.node.section||'Other');
+      return p.ghost ? ('g:' + ((fogSecSize[s]||0)>1 ? s : '§singletons')) : ('c:' + capCluster(p.node)); };
+    // orbits are the distinct seeded radii; the band is a fraction of the nearest neighbouring orbit
+    const orbits=[...new Set(ids.map(id=>Math.round(Math.hypot(P[id].x,P[id].y))))].sort((a,b)=>a-b);
+    const bandOf=(rad)=>{ let near=Infinity;
+      orbits.forEach(o=>{ const d=Math.abs(o-rad); if(d>0.5) near=Math.min(near,d); });
+      return near===Infinity ? BAND_MAX : Math.min(BAND_MAX, near*0.35); };
+    const O={}, K={};
+    ids.forEach(id=>{ const p=P[id], rad=Math.hypot(p.x,p.y), band=bandOf(rad);
+      O[id]={ lo: Math.max(p.r+hr+10, rad-band), hi: Math.max(p.r+hr+10, rad+band) };
+      K[id]=clusterOf(p); });
+    // the ONE place a radius is written: a projection back into the disc's own band. Home stays at 0,0.
+    const clamp=(id)=>{ const p=P[id], o=O[id]; const d=Math.hypot(p.x,p.y);
+      if(d<0.001){ p.x=o.lo; p.y=0; return; }
+      const t = d<o.lo ? o.lo/d : (d>o.hi ? o.hi/d : 1);
+      if(t!==1){ p.x*=t; p.y*=t; } };
+    let worst=0;
+    for(let iter=0; iter<1500; iter++){ relaxIters=iter+1; worst=0;
       for(let i=0;i<ids.length;i++){ for(let j=i+1;j<ids.length;j++){
         const a=P[ids[i]], b=P[ids[j]]; let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
         // break exact coincidence deterministically. (v2.5.1) d is set to 1, NOT to 0.001: dx,dy are
         // already a UNIT vector here, and the push below divides them by d — with d=0.001 that scaled the
         // separation by 1000×, flinging the pair ±20,000px in a single iteration. Eight of flipkart's
         // fourteen ghosts were sitting at r≈16,000 world px (invisible, ~20× off-canvas) because of it,
-        // which is also why the frontier read as empty. Deterministic either way; now also correct.
+        // which is also why the frontier read as empty. Deterministic either way; now also correct —
+        // and now also unable to escape, because clamp() is applied to both discs on the same line.
         if(d<0.001){ dx=Math.cos(i*1.7); dy=Math.sin(i*1.7); d=1; }
-        const need=a.r+b.r+GAP; if(d<need){ const push=(need-d)/2, ux=dx/d, uy=dy/d;
-          a.x-=ux*push; a.y-=uy*push; b.x+=ux*push; b.y+=uy*push; worst=Math.max(worst,need-d); } } }
-      for(const id of ids){ const p=P[id]; const d=Math.hypot(p.x,p.y)||0.001; const need=p.r+hr+10;
-        if(d<need){ p.x+=p.x/d*(need-d); p.y+=p.y/d*(need-d); } }
+        const need=a.r+b.r+(K[ids[i]]===K[ids[j]] ? GAP_SAME : GAP_CROSS);
+        if(d<need){ const push=(need-d)/2, ux=dx/d, uy=dy/d;
+          a.x-=ux*push; a.y-=uy*push; b.x+=ux*push; b.y+=uy*push;
+          clamp(ids[i]); clamp(ids[j]); worst=Math.max(worst,need-d); } } }
       if(worst<0.25) break;
     }
+    // report what the constraint system could NOT satisfy rather than iterating until the symptom goes
+    // away: `worst` is the largest unmet gap left in the field, measured, and surfaced in the build report.
+    relaxResidual = worst;
+    ids.forEach(clamp);
   }
   // districts → regions (rounded bbox behind member nodes); 1-page sections merge into "Everything else"
   function computeRegions(){
@@ -1635,7 +1836,11 @@ function initDashboard(){
     const explored = smallCount!=null ? smallCount : (dist?dist.explored:arr.length);
     const fog = smallCount!=null ? 0 : (dist?dist.fog:0);
     const states = arr.filter(n=>(n.states||[]).some(s=>s.captured)).length;
-    return { name, x:minx-pad, y:miny-pad, w:(maxx-minx)+pad*2, h:(maxy-miny)+pad*2, cx:(minx+maxx)/2, cy:(miny+maxy)/2, explored, fog, states, merged:smallCount!=null };
+    // (M3.3) the member ids, retained ADDITIVELY — every existing field keeps its name and meaning; this
+    // is the one thing the shape was missing, and hover needs it to address the discs it covers. `arr` is
+    // always drawn from capNodes, so a ghost can never appear here.
+    return { name, x:minx-pad, y:miny-pad, w:(maxx-minx)+pad*2, h:(maxy-miny)+pad*2, cx:(minx+maxx)/2, cy:(miny+maxy)/2, explored, fog, states, merged:smallCount!=null,
+             ids: arr.map(n=>n.id) };
   }
 
   // ---- camera ----
@@ -1652,7 +1857,13 @@ function initDashboard(){
     // repaint order. One opacity group (#mapregions, unchanged): reordering children cannot change the
     // composite — same pixels, same blur, same alpha — only which one wins the hover.
     const regionOrder = regions.map((_,i)=>i).sort((a,b)=>(regions[b].w*regions[b].h - regions[a].w*regions[a].h) || (a-b));
-    regionOrder.forEach(i=>{ const rg=regions[i]; html+=`<div class="mapregion" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
+    // (M3.1) the catch-all keeps its fill and goes pointer-inert — by its `merged` flag, never by name.
+    regionOrder.forEach(i=>{ const rg=regions[i]; html+=`<div class="mapregion${rg.merged?' inert':''}" data-region="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
+    html+='</div>';
+    // (M3.2) the resting edges — their own single-alpha group, named districts only, same paint order.
+    html+='<div id="mapedges">';
+    regionOrder.forEach(i=>{ const rg=regions[i]; if(rg.merged) return;
+      html+=`<div class="mapedge" data-edge="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
     html+='</div><div id="maphot" style="display:none"></div>';
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
     // discs
@@ -1666,9 +1877,15 @@ function initDashboard(){
       const tier = p.ghost ? maxDepth+2 : (n===root ? 0 : (n.clickDepth==null ? maxDepth+1 : n.clickDepth));
       const mzd = tier===0 ? 0 : Math.min(90 + 40*(tier-1), 240);
       if(p.ghost){ return `<button class="mapghost" data-mapid="${esc(n.id)}" title="${esc(n.pattern||n.label||'')}" style="left:${px}px;top:${py}px;--mzd:${mzd}ms"><span class="gc" style="width:${dia}px;height:${dia}px"></span></button>`; }
-      const isHome=n===root; const small=dia<30 && !isHome; const hasStates=(n.states||[]).some(s=>s.captured);
-      const bg = (!small && n.screenshot) ? `background-image:url('${esc(n.screenshot)}')` : '';
-      const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${small?' mono-disc':''}`;
+      // (M1) NO SIZE THRESHOLD SUPPRESSES A THUMBNAIL. `small = dia<30 && !isHome` used to strip the
+      // screenshot off any disc the old scale had squeezed under 30px and swap in a flat .mono-disc well
+      // — on flipkart that was 22 of 39 captured pages, i.e. most of the library rendered faceless
+      // because of how the SCALE bottomed out. The floor above guarantees every captured disc is ≥32px,
+      // so the branch has nothing left to protect against and is gone. .mono-disc keeps its one honest
+      // case: a page with no screenshot at all.
+      const isHome=n===root; const hasStates=(n.states||[]).some(s=>s.captured);
+      const bg = n.screenshot ? `background-image:url('${esc(n.screenshot)}')` : '';
+      const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${n.screenshot?'':' mono-disc'}`;
       // (covered-shapes) the shape count rides on the disc for a template — see .tplc. Compacted past 1k so
       // a 2891 never grows a badge wider than the disc it hangs off.
       const sf = n.standsFor>1 ? (n.standsFor>=1000 ? (n.standsFor/1000).toFixed(1).replace(/\.0$/,'')+'k' : String(n.standsFor)) : null;
@@ -1677,7 +1894,9 @@ function initDashboard(){
     capNodes.forEach(n=>html+=disc(n.id));
     ghostShown.forEach(f=>html+=disc(f.id));
     world.innerHTML=html;
-    world.querySelectorAll('.mapregion').forEach(el=>{ const rg=regions[+el.dataset.region];
+    // (M3.1) no listeners on the catch-all at all — `inert` already denies it the pointer, and not
+    // wiring it means there is no second path by which it could ever raise the card.
+    world.querySelectorAll('.mapregion:not(.inert)').forEach(el=>{ const rg=regions[+el.dataset.region];
       el.addEventListener('mouseenter', ()=>showRegion(rg, el)); el.addEventListener('mouseleave', hideRegion); });
   }
   function applyMapView(){
@@ -1782,7 +2001,7 @@ function initDashboard(){
       .slice(0, FAR_ANCHORS);
     set.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
     // (v2.5.1 F3) one line, the label alone — the `from N` sub-line is gone from node pills (design ruling)
-    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}`}); });
+    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxCapIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}`}); });
     if(level==='near') ghostShown.forEach(f=>{ const [sx,sy]=toScreen(P[f.id]); specs.push({pri:3, ax:sx, ay:sy, dr:P[f.id].r*z, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}); });
     specs.sort((a,b)=>a.pri-b.pri);
     const els=specs.map(s=>{ const e=document.createElement('div'); e.className=s.cls; e.style.visibility='hidden'; e.innerHTML=s.html; labelsEl.appendChild(e); return e; });
@@ -1839,6 +2058,9 @@ function initDashboard(){
   function showRegion(rg, el){ hotRegion={rg,el};
     const hot=world.querySelector('#maphot');
     if(hot){ hot.style.left=rg.x+'px'; hot.style.top=rg.y+'px'; hot.style.width=rg.w+'px'; hot.style.height=rg.h+'px'; hot.style.display='block'; }
+    // (M3.2/M3.3) this district's faint resting edge steps aside for #maphot's dashed one, and its member
+    // discs answer with an additive outline — no colour swap, no box change (see .mapnode.rgnmate).
+    paintRegionHover(rg);
     // (v2.5.1 F4) the fill is the explored share, floored to a 2px sliver whenever explored ≥ 1 — a 3%
     // share is the truth and a 0px bar is not a way of telling it. Nothing explored ⇒ genuinely no fill.
     const share = rg.explored+rg.fog ? Math.round(100*rg.explored/(rg.explored+rg.fog)) : 100;
@@ -1846,7 +2068,20 @@ function initDashboard(){
       <div class="dbar" title="explored share of this district"><i style="width:${rg.explored?`max(2px, ${share}%)`:'0'}"></i></div>`;
     dcardEl.style.display='block'; positionCard(rg, el); }
   function hideRegion(){ const hot=world.querySelector('#maphot'); if(hot) hot.style.display='none';
-    hotRegion=null; dcardEl.style.display='none'; }
+    hotRegion=null; dcardEl.style.display='none'; paintRegionHover(null); }
+  // (M3.2/M3.3) the whole hover paint in one place, and it is a full REPAINT rather than a diff: every
+  // mate/hot mark is cleared first, so two regions can never both be lit even if a mouseleave is missed
+  // (a re-render mid-hover, a pointer leaving the pane, a region rebuilt under the cursor by a zoom).
+  function paintRegionHover(rg){
+    world.querySelectorAll('.mapnode.rgnmate').forEach(e=>e.classList.remove('rgnmate'));
+    world.querySelectorAll('.mapedge.hot').forEach(e=>e.classList.remove('hot'));
+    if(!rg || rg.merged) return;
+    const i=regions.indexOf(rg); if(i>=0){ const ed=world.querySelector(`.mapedge[data-edge="${i}"]`); if(ed) ed.classList.add('hot'); }
+    // matched by dataset rather than by an attribute selector — a slug is page-derived, and there is no
+    // reason to hand it to the selector parser.
+    const want=new Set(rg.ids||[]);
+    world.querySelectorAll('.mapnode').forEach(e=>{ if(want.has(e.dataset.mapid)) e.classList.add('rgnmate'); });
+  }
 
   // ---- hover links + peek + click ----
   let hoverId=null;
