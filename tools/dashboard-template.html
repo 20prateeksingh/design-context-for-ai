@@ -118,14 +118,29 @@
              overflow-y:auto; padding:24px 20px 40px; z-index:8; }
   @media (max-width:1080px){ /* = --stack-bp */ #maparea { inset:0 300px 0 0; } #maprail { width:300px; } }
   #mapworld { position:absolute; inset:0; }
-  /* (M4) width/height are NOT redundant with inset:0. <svg> is a REPLACED element, so an absolutely
-     positioned one with `left:0;right:0` and `width:auto` does not stretch — it resolves to SVG's
-     intrinsic 300×150 and the `right` offset is simply over-constrained away (CSS 2.1 §10.3.8). This box
-     has been 300×150 in the top-left corner of the pane since the v2 map shipped, and everything
-     drawLinks() drew outside it was CLIPPED: on xflowpay, 56 edges were in the DOM, correctly positioned,
-     styled, and invisible. That is the whole reason the hover links "needed" to be made visible — the
-     defect was the geometry, not the paint. */
-  #maplines { position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
+  /* ── (P3) THE LINK LAYER LIVES IN THE WORLD ────────────────────────────────────────────────────────
+     Prateek: "the dotted connectors should not be on top of nodes, should be under."
+     CAUSE, precisely. applyMapView() sets a `transform` on #mapworld, and a transform CREATES A STACKING
+     CONTEXT — so the discs' `z-index:3` is sealed inside it, while #maplines sat at `z-index:1` in
+     #maparea and therefore painted above the entire world. (Pre-M4 nobody could see it, because the SVG
+     was clipped to 300×150 — see below.) A z-index change alone cannot fix this: the regions (z-0) and
+     the discs (z-3) are BOTH inside #mapworld, so any screen-space layer outside it is either entirely
+     under everything in the world or entirely over it. You cannot interleave from outside a stacking
+     context. So the layer moved in, and now interleaves by ordinary z-index: above the region fill and
+     the rings, below the discs.
+     Drawing in world coordinates pays for itself twice — the parent transform handles pan and zoom for
+     free, so drawLinks() left the per-frame path entirely (it now runs on hover, and only on hover).
+     `vector-effect:non-scaling-stroke` on every line is what keeps 1.1px at 1.1px and the M4 dash
+     rhythms at their authored pitch while the world scales under them.
+     GEOMETRY, and the M4 lesson it is built on. renderWorld() gives this element an explicit box AND a
+     matching viewBox spanning the whole world (world units = user units, negatives included), plus
+     `overflow:visible` so nothing can be clipped even if that box were ever computed short. M4's finding
+     is why: <svg> is a REPLACED element, so an absolutely positioned one with `left:0;right:0` and
+     `width:auto` does not stretch — it resolves to SVG's intrinsic 300×150 and the `right` offset is
+     over-constrained away (CSS 2.1 §10.3.8). This box was 300×150 in the pane's top-left corner from the
+     v2 map until M4, and everything drawn outside it was silently CLIPPED: on xflowpay 56 edges sat in
+     the DOM, correctly positioned, styled, and invisible. */
+  #maplines { position:absolute; overflow:visible; z-index:2; pointer-events:none; }
   /* ── (M4) HOVER LINKS ARE FAINT AND DOTTED ─────────────────────────────────────────────────────────
      The mechanism was already right — drawLinks() draws every real linksTo/linkedFrom edge on hover — so
      this is styling only. Two solid 1.4px lines read as structure the map is asserting; Prateek asked for
@@ -136,8 +151,48 @@
      where the map is darkest, so the pattern has to carry the distinction where the hue can no longer.
      Alpha is set against the WORST ground, not the best: the frontier band sits near --bg-deep, and a
      line tuned on the lit centre disappears there. Measured on both — see the build report. */
-  #maplines .eout { stroke:color-mix(in srgb, var(--accent-strong) 46%, transparent); stroke-width:1.1; stroke-dasharray:5 4; }
-  #maplines .ein  { stroke:color-mix(in srgb, var(--dim) 40%, transparent); stroke-width:1.1; stroke-dasharray:2 4; }
+  /* ── (P4) DIRECTION, AT THE FAINT END OF THE PALETTE ───────────────────────────────────────────────
+     The data was never wrong; the render was ambiguous. Measured across the fleet, 100% of ring-2+ pages
+     link TO home (the header logo) — and drawLinks() drew inbound and outbound together, separated only
+     by hue and dash rhythm, both of which M4 had just faded. So an arriving edge and a leaving edge read
+     as the same object, and a ring-2 disc joined to home by a line read as proof it was one click away.
+     It is not, and the map prints "rings are honest clicks-from-home" a few pixels away.
+     THE TREATMENT: each stroke starts at its M4 alpha at the SOURCE and brightens toward the TARGET.
+     Hue and dash are already spent, so the third channel is the ramp ALONG the line.
+       · Why not an arrowhead. These strokes are 1.1px. A `marker-end` at that weight is a ~4px triangle
+         in the same faint paint, on a canvas whose darkest ground is where the frontier lines run — it
+         does not resolve. It also has no defined size under `vector-effect:non-scaling-stroke`, which P3
+         needs on every line, so its scale would be a per-browser accident.
+       · Why not one-semantic-per-hover (hover home ⇒ outbound only, hover a page ⇒ inbound only). It
+         removes real edges from the render to make the rest unambiguous, and it asks the reader to hold a
+         mode in their head. Both sets stay; the strokes just say which way they go.
+       · Why a ramp survives being faint. Direction is carried by the WHOLE stroke, so the eye compares
+         the two ends of one line rather than resolving a glyph. And the floor is unmoved — the source end
+         is exactly the alpha M4 measured against the frontier ground, so nothing got dimmer; only the
+         arriving end firms up. No motion is involved, so `prefers-reduced-motion` has nothing to strip.
+     Paint lives here rather than inline so a stop is one number in one place: `stop-color` carries the
+     hue, `stop-opacity` the alpha (the SVG-native split; identical to M4's color-mix-to-transparent). */
+  /* ── (P3) WHY THESE ARE DIVIDED BY THE ZOOM, and why `vector-effect` is not what holds them ────────
+     The brief's mechanism for keeping 1.1px at 1.1px was `vector-effect:non-scaling-stroke`. MEASURED off
+     the render, it does not do it: that property compensates for transforms between the element's user
+     space and its nearest SVG VIEWPORT — a viewBox, a `transform` attribute. #mapworld's zoom is a CSS
+     transform on an HTML ANCESTOR of the <svg>, which is outside that chain entirely, so the property
+     cannot see it and the whole rasterised layer scales. First measurement, before this fix: the stroke's
+     ink was 3.5 device px wide at 100% and 7.5 at 300%, and the dash period went 14 → 107 device px.
+     So the counter-scale is explicit. `--lz` is the live zoom, written by applyMapView(); every length
+     here is authored at its intended CSS size and divided by it, so `1.1px / 3` user units × a 3× ancestor
+     transform is 1.1 CSS px again — at any zoom, for the width and for both M4 dash rhythms alike.
+     `vector-effect` stays on the lines: it is a no-op today (the viewBox maps 1:1 to the box) and it is
+     NOT the mechanism, but it is what would keep this correct if that ever stopped being true. */
+  #maplines .eout { stroke-width:calc(1.1px / var(--lz, 1)); stroke-dasharray:calc(5px / var(--lz, 1)) calc(4px / var(--lz, 1)); }
+  #maplines .ein  { stroke-width:calc(1.1px / var(--lz, 1)); stroke-dasharray:calc(2px / var(--lz, 1)) calc(4px / var(--lz, 1)); }
+  #maplines .g-out .s0 { stop-color:var(--accent-strong); stop-opacity:.46; }   /* M4's alpha, unchanged */
+  #maplines .g-out .s1 { stop-color:var(--accent-strong); stop-opacity:.82; }
+  #maplines .g-in  .s0 { stop-color:var(--dim); stop-opacity:.40; }             /* M4's alpha, unchanged */
+  #maplines .g-in  .s1 { stop-color:var(--dim); stop-opacity:.76; }
+  /* the legend's own swatch for the rule above — the same two alphas, as a 2px bar */
+  .lgdir { width:24px; height:2px; border-radius:1px;
+           background:linear-gradient(90deg, color-mix(in srgb, var(--accent-strong) 46%, transparent), color-mix(in srgb, var(--accent-strong) 82%, transparent)); }
   .mapring { position:absolute; border:1.5px dashed color-mix(in srgb, var(--txt) 11%, transparent); border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:1; }
   /* ── labels are PILLS (v2.5 §2.4, the reference's signature) ──
      Every label carries its own surface + hairline, so it is readable on the lit centre, on the mid
@@ -164,8 +219,13 @@
   /* discs SIT ON the canvas instead of glaring against it (v2.5 §2.3): a soft --canvas-tinted rim
      feathers the jump from a bright thumbnail to the ground, and a real drop shadow finally works now
      that the ground is lighter than the shadow. Hover swaps the rim to accent, keeps the shadow. */
+  /* (P1) the framing is `center top`, not `center`. A disc showing the vertical MIDDLE of a full-page
+     capture was the odd one out: the atlas card, the peek, the rail panel and the state strip are all
+     `object-fit:cover; object-position:top`, so the same page looked like two different pages depending
+     on where you met it. Now the thumbnail IS the top square, and a disc that has to fall back to the
+     full screenshot frames it the same way — so the two paths are indistinguishable. */
   .mapnode { position:absolute; transform:translate(-50%,-50%); border-radius:50%; border:2.5px solid var(--accent);
-             background:var(--panel-2) center/cover no-repeat; z-index:3; padding:0; cursor:pointer;
+             background:var(--panel-2) center top/cover no-repeat; z-index:3; padding:0; cursor:pointer;
              box-shadow:0 0 0 3px color-mix(in srgb, var(--canvas) 82%, transparent), 0 5px 16px color-mix(in srgb, var(--bg-deep) 62%, transparent); }
   /* (v2.5.1 F5·2) the rim swaps to accent AND the drop shadow deepens — the disc lifts off the canvas
      rather than just changing colour. The 1.04 scale that goes with it lives in the motion block. */
@@ -989,8 +1049,10 @@
 
 <section class="pane" id="pane-map">
   <div id="maparea">
+    <!-- (P3) #maplines is NOT here any more. The link layer is generated inside #mapworld by
+         renderWorld(), because a layer outside a transformed element cannot interleave with the things
+         inside it — see the comment on #maplines in the stylesheet. -->
     <div id="mapworld"></div>
-    <svg id="maplines"></svg>
     <div id="maplabels"></div>
     <div class="mapdistrict" id="mapdcard" style="display:none"></div>
     <div id="mapnote"></div>
@@ -1455,6 +1517,12 @@ function mountFileBanner(){
     el.remove();
     document.documentElement.style.setProperty('--fb-h', '0px');
     window.removeEventListener('resize', setH);
+    // (P2) --fb-h is the shell's top offset, so dismissing this banner resizes #maparea — and nothing
+    // told the map. Its VW/VH, ring radii and label placements have therefore been stale after a
+    // dismissal since F7 shipped, until the next window resize happened to fix them. Announcing it as a
+    // resize is also what keeps P2's cached pane origin honest: the map reads the pane's geometry on
+    // resize and on pane entry, and now those really are the only two ways it can change.
+    window.dispatchEvent(new Event('resize'));
   };
 }
 
@@ -1481,6 +1549,12 @@ function mountAttemptBanner(a){
     el.remove();
     document.documentElement.style.setProperty('--fb-h', '0px');
     window.removeEventListener('resize', setH);
+    // (P2) --fb-h is the shell's top offset, so dismissing this banner resizes #maparea — and nothing
+    // told the map. Its VW/VH, ring radii and label placements have therefore been stale after a
+    // dismissal since F7 shipped, until the next window resize happened to fix them. Announcing it as a
+    // resize is also what keeps P2's cached pane origin honest: the map reads the pane's geometry on
+    // resize and on pane entry, and now those really are the only two ways it can change.
+    window.dispatchEvent(new Event('resize'));
   };
 }
 
@@ -1519,9 +1593,20 @@ function initDashboard(){
   let mapReopen = null;                        // node id whose panel to reopen on return to map
   let guidedLive = null;                       // guided-capture live state (F5): {running,count,lastCapture}
 
+  // ── (P1) THE SMALL RASTER, AND ITS FALLBACK ────────────────────────────────────────────────────────
+  // Every on-screen consumer of a page's face renders `thumb` (a 762px top-square derived from the
+  // screenshot — see tools/thumb.js) and falls back to `screenshot` when there is none. That fallback is
+  // what lets a part-migrated library render: build-index.js sets `thumb` only when the file is really on
+  // disk, so a page whose thumbnail could not be derived simply keeps the behaviour it had before.
+  // The full PNG stays the artifact — the page doc's hero and every "open full screenshot" link still
+  // point at `screenshot`, never at this.
+  const shotSrc = n => (n && (n.thumb || n.screenshot)) || '';
   // thumbnail: skeleton wrapper + fade-in on decode; monogram on error for logos (F5)
-  function img2(src, cls, alt){ return src
-    ? `<span class="${cls} skel imgwrap"><img class="fadeimg fade" data-src="${esc(src)}" alt="${esc(alt||'')}"></span>`
+  // `fb` is a second source tried once if the first 404s — the same thumb→screenshot ladder, held at
+  // runtime as well as at build time, so a hand-deleted thumbnail degrades to the artifact rather than
+  // to a monogram.
+  function img2(src, cls, alt, fb){ return src
+    ? `<span class="${cls} skel imgwrap"><img class="fadeimg fade" data-src="${esc(src)}"${fb&&fb!==src?` data-fallback="${esc(fb)}"`:''} alt="${esc(alt||'')}"></span>`
     : `<span class="${cls} skel"></span>`; }
   function wireThumbs(root){ (root||document).querySelectorAll('img.fade[data-src]:not([data-wired])').forEach(img=>{
     img.setAttribute('data-wired','1');
@@ -1535,7 +1620,10 @@ function initDashboard(){
     const fail=()=>{ if(wrap){ wrap.classList.remove('skel'); wrap.classList.add('imgfail','mono-logo');
                        wrap.textContent = ((DATA.product||'?').trim()[0]||'?'); }
                      else img.remove(); };
-    img.onload=done; img.onerror=fail;
+    // (P1) one retry down the thumb→screenshot ladder before giving up on the tile entirely. The
+    // attribute is consumed, so a broken fallback cannot loop.
+    img.onload=done; img.onerror=()=>{ const fb=img.getAttribute('data-fallback');
+      if(fb){ img.removeAttribute('data-fallback'); img.src=fb; return; } fail(); };
     img.src=img.getAttribute('data-src'); if(img.complete && img.naturalWidth) done(); }); }
   function monogram(cls, name){ return `<span class="${cls} mono-logo">${esc(((name||DATA.product||'?').trim()[0]||'?'))}</span>`; }
 
@@ -1546,10 +1634,10 @@ function initDashboard(){
       ? `<div class="pk-b"><div class="pk-nm">${esc(short(n.pattern||n.label||'locked',40))}</div>
           <div class="pk-rt">${esc(n.pattern||'')}</div><div class="pk-desc dorm">not downloaded yet</div>
           <div class="pk-foot"><span>linked from ${n.inboundCount||n.count||1} pages</span><span class="pk-hint">click to unlock</span></div></div>`
-      : `${img2(n.screenshot,'pk-shot')}
+      : `${img2(shotSrc(n),'pk-shot','',n.screenshot)}
           <div class="pk-b"><div class="pk-nm">${esc(dlabel(n))}</div><div class="pk-rt">${esc(n.route||'')}</div>
           <div class="pk-desc${n.descPending?' dorm':''}">${n.descPending?'caption dormant, waiting for your AI':esc(short(n.desc||'',120))}</div>
-          <div class="pk-foot"><span>linked from ${n.inboundCount||0} pages</span><span class="pk-hint">click to inspect</span></div></div>`;
+          <div class="pk-foot"><span>${n.inboundCount||0} in · ${(n.linksTo||[]).length} out</span><span class="pk-hint">click to inspect</span></div></div>`;
     peekEl.classList.add('open'); peekEl.setAttribute('aria-hidden','false'); wireThumbs(peekEl); positionPeek(cx,cy); }
   function positionPeek(cx, cy){ const w=peekEl.offsetWidth||252, h=peekEl.offsetHeight||170;
     let x=cx+16, y=cy+16; if(x+w>innerWidth-8) x=cx-w-16; if(x<8) x=8;
@@ -1581,8 +1669,9 @@ function initDashboard(){
   const root = nodes.find(n=>!n.locked && (n.id===DATA.rootSlug || n.route==='/')) || nodes.find(n=>!n.locked) || nodes[0];
 
   const selected = new Set(); let activeNode = null;
-  const world=document.getElementById('mapworld'), areaEl=document.getElementById('maparea'), linesEl=document.getElementById('maplines'),
+  const world=document.getElementById('mapworld'), areaEl=document.getElementById('maparea'),
         labelsEl=document.getElementById('maplabels'), dcardEl=document.getElementById('mapdcard');
+  let linesEl=null;   // (P3) generated inside #mapworld by renderWorld(), so it is re-taken on every build
   const capNodes = nodes.filter(n=>!n.locked && n!==root);
   // ── (M1, map-legibility) TWO SCALES, NOT ONE ──────────────────────────────────────────────────────
   // A single shared maximum over captured pages AND uncovered frontier nodes let one heavily-linked
@@ -1633,6 +1722,9 @@ function initDashboard(){
 
   // ---- layout state (world coords, home at 0,0) ----
   let VW=0, VH=0, minD=0, maxDepth=1, ringR1=0, ringRmax=0, nullR=0, ghostR=0;
+  // (P2) the pane's viewport origin, cached. The wheel handler needs it to turn a pointer position into a
+  // pane coordinate, and reading it per event was the last forced layout on the zoom path.
+  let panePos={left:0,top:0};
   const P = {};                 // id -> {x,y,r,node,ghost}
   let ghostShown=[], deepCount=0, unreachCount=0, regions=[], hotRegion=null;
   // (v2.5.1 F1) the fog's zone boundaries are MEASURED off the finished layout rather than read off the
@@ -1669,6 +1761,10 @@ function initDashboard(){
     // v2.4 F4: the map lives in #maparea (the rail owns the right edge) — all geometry keys off it.
     const pane=document.getElementById('maparea'); const r=pane.getBoundingClientRect();
     VW=r.width; VH=r.height; if(!VW||!VH) return; minD=Math.min(VW,VH);
+    // (P2) the same read serves the wheel handler's pointer→pane conversion, so it never has to take one
+    // of its own mid-gesture. Assigned by name rather than via refreshPanePos() because that helper is
+    // declared with the zoom listeners further down.
+    panePos={left:r.left, top:r.top};
     for(const k in P) delete P[k];
     const homeD=Math.max(58, minD*0.10); P[root.id]={x:0,y:0,r:homeD/2, node:root};
     maxDepth=Math.max(1, ...capNodes.map(n=> n.clickDepth==null?1:n.clickDepth));
@@ -1866,6 +1962,15 @@ function initDashboard(){
       html+=`<div class="mapedge" data-edge="${i}" style="left:${rg.x}px;top:${rg.y}px;width:${rg.w}px;height:${rg.h}px"></div>`; });
     html+='</div><div id="maphot" style="display:none"></div>';
     for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d); html+=`<div class="mapring" style="left:0;top:0;width:${rr*2}px;height:${rr*2}px"></div>`; }
+    // (P3) the link layer, in the world and in world coordinates. The box is measured off the finished
+    // layout — the furthest disc EDGE, the ghost orbit, and a margin — rather than read off a ring
+    // constant, because the relaxation moves discs off their nominal rings and a link runs disc centre to
+    // disc centre. `overflow:visible` means a short box could not clip anything anyway; this just keeps
+    // the viewBox honest. Inside #mapworld, left:0/top:0 IS the world origin (the transform's own origin),
+    // which is exactly the coordinate space the discs are already positioned in.
+    let linesR=0; for(const k in P){ const p=P[k]; linesR=Math.max(linesR, Math.hypot(p.x,p.y)+p.r); }
+    linesR=Math.ceil(Math.max(linesR, ghostOuterR||0, exploredR||0)+40);
+    html+=`<svg id="maplines" style="left:${-linesR}px;top:${-linesR}px;width:${linesR*2}px;height:${linesR*2}px" viewBox="${-linesR} ${-linesR} ${linesR*2} ${linesR*2}"></svg>`;
     // discs
     // (v2.5.1 F5·1/F5·2) two changes to the disc's own style attribute:
     //   · --mzd is its materialize delay, so the reveal staggers inner-ring→outer (home 0 · ring1 90ms ·
@@ -1883,8 +1988,16 @@ function initDashboard(){
       // because of how the SCALE bottomed out. The floor above guarantees every captured disc is ≥32px,
       // so the branch has nothing left to protect against and is gone. .mono-disc keeps its one honest
       // case: a page with no screenshot at all.
+      // (P1) THE DISC RENDERS THE SMALL RASTER. M1 removed the `!small &&` guard from this line for a good
+      // reason (a size threshold must not cost a page its face) and, unrecorded, that guard had also been
+      // halving the decode load: every captured disc then pointed at the raw full-page PNG — on flipkart
+      // 39 images, 57 MB, largest 2934×18816, to fill a ~40px circle, re-sampled on every pan/zoom frame.
+      // The fix is a raster the right size, not a threshold: `.mono-disc` keeps its one honest case (a page
+      // with no screenshot at all) and a page whose thumbnail could not be derived still shows its
+      // screenshot. `shotSrc` is the same ladder every other consumer uses.
       const isHome=n===root; const hasStates=(n.states||[]).some(s=>s.captured);
-      const bg = n.screenshot ? `background-image:url('${esc(n.screenshot)}')` : '';
+      const src = shotSrc(n);
+      const bg = src ? `background-image:url('${esc(src)}')` : '';
       const cls = `mapnode${n.kind==='template'?' tpl':''}${n.descPending?' dorm':''}${n.screenshot?'':' mono-disc'}`;
       // (covered-shapes) the shape count rides on the disc for a template — see .tplc. Compacted past 1k so
       // a 2891 never grows a badge wider than the disc it hangs off.
@@ -1894,13 +2007,19 @@ function initDashboard(){
     capNodes.forEach(n=>html+=disc(n.id));
     ghostShown.forEach(f=>html+=disc(f.id));
     world.innerHTML=html;
+    // (P3) the link layer is regenerated with the world, so the handle has to be re-taken with it
+    linesEl=world.querySelector('#maplines');
     // (M3.1) no listeners on the catch-all at all — `inert` already denies it the pointer, and not
     // wiring it means there is no second path by which it could ever raise the card.
     world.querySelectorAll('.mapregion:not(.inert)').forEach(el=>{ const rg=regions[+el.dataset.region];
       el.addEventListener('mouseenter', ()=>showRegion(rg, el)); el.addEventListener('mouseleave', hideRegion); });
   }
+  let lastLz=null;
   function applyMapView(){
     world.style.transform=`translate(${(VW/2+mapView.panX)}px, ${(VH/2+mapView.panY)}px) scale(${mapView.zoom})`;
+    // (P3) the link layer's counter-scale — one custom property, written only when the zoom actually
+    // changes, so a pan touches nothing here. See the #maplines stroke rules for what it undoes.
+    if(mapView.zoom!==lastLz){ lastLz=mapView.zoom; world.style.setProperty('--lz', String(mapView.zoom)); }
     // ── THE LUMINOUS CANVAS, one gradient system (v2.5 §2.1) ──────────────────────────────────────
     // v2.4.1 stacked three layers to tell the fog story — a world-space lit pool, a haze donut, a grain
     // texture — and the reading Prateek rejected came from the last of them: an overlay ABOVE the discs
@@ -1959,14 +2078,70 @@ function initDashboard(){
       const rr=Math.max(prev, r); prev=rr; return s.slice(0,i)+' '+rr+'px'; });
     areaEl.style.backgroundImage=`radial-gradient(circle at ${cx}px ${cy}px, ${ordered.join(', ')})`;
     const zl=document.getElementById('zlbl'); if(zl) zl.textContent=Math.round(mapView.zoom*100)+'%';
-    placeLabels();
-    if(hoverId) drawLinks(hoverId);
+    // (P2/P3) WHAT IS LEFT ON THE FRAME PATH, and what each thing costs. The camera transform and the
+    // gradient above are camera work by definition. Everything else that used to run here is gone:
+    //   · placeLabels() → reanchorLabels(), arithmetic + style writes, no geometry read (P2)
+    //   · drawLinks() → nothing. The link layer lives inside #mapworld now and the transform moves it (P3)
+    //   · the three overlay strings → renderMapOverlays(), which is not camera work at all (P2)
+    reanchorLabels();
     if(hotRegion) positionCard(hotRegion.rg, hotRegion.el);
   }
+  // (P2) one commit for the discrete paths — a settled camera gets the full collision pass. Gesture
+  // frames call applyMapView() alone; every gesture ends on one of these.
+  function commitMapView(){ applyMapView(); placeLabels(); }
   const ovl=(a,b)=>{ const ox=Math.min(a.right,b.right)-Math.max(a.left,b.left), oy=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top); return ox>4 && oy>4; };
   const FAR_ANCHORS = 8;   // how many pills survive the far tier (§4) — one constant, tune here
+  // ══ (P2) THE COLLISION PASS COMES OFF THE FRAME PATH ═══════════════════════════════════════════════
+  // placeLabels() used to run inside applyMapView(), i.e. on every frame of every pan and every wheel
+  // tick. It is a `querySelectorAll` over every disc, a `getBoundingClientRect()` PER DISC (a forced
+  // synchronous layout, linear in node count), an `innerHTML=''` and a full rebuild of the label layer.
+  // That is a settle-time pass wired to a gesture, and it has been there since the v2 map.
+  //
+  // The split: the expensive pass still runs, but only when the camera SETTLES. Between settles the pills
+  // are RE-ANCHORED — recomputed from the world coordinates the layout already knows, at the current
+  // camera, in the same candidate slot the collision pass chose. Not an approximation: candidatesFor() is
+  // the one candidate ladder, used by both, so a re-anchor writes exactly the position the full pass
+  // would have written for that slot. Pure arithmetic and style WRITES; it reads no geometry, so nothing
+  // on the frame path can force a layout. And because the pills keep following their discs, no label
+  // needs hiding for the ride (#maplabels' `zhide` stays for the eased button zoom, where the transform
+  // is animating and there are no intermediate camera values to re-anchor to).
+  //
+  // What a re-anchor deliberately does NOT redo: the collision test itself, and the far/mid/near tier
+  // that decides WHICH pills exist. So during a gesture a pill may pass under the legend, and a zoom that
+  // crosses a tier boundary shows the previous tier's set — both for as long as the gesture lasts, both
+  // corrected by the settle pass. The alternative is the pass that made the gesture lag.
+  const RING_ANGLES=[0,-0.35,0.35,-0.7,0.7,Math.PI], CENTER_STEPS=[0,0.08,-0.08,0.17,-0.17,0.27];
+  // Every spec anchors in WORLD coordinates (wx,wy · a ring depth · a world radius dr), never in the
+  // screen coordinates the camera invalidates. offR/offPx are the anchor's own radial and fixed nudges,
+  // kept apart precisely because one scales with zoom and the other must not.
+  function candidatesFor(s, w, h){
+    const z=mapView.zoom, ox=VW/2+mapView.panX, oy=VH/2+mapView.panY;
+    if(s.ring){ const rr=ringRadius(s.ringD)*z;
+      return RING_ANGLES.map(a=>[ox+Math.cos(a)*rr - w/2, oy+Math.sin(a)*rr - h/2]); }
+    const ax=ox+s.wx*z, ay=oy+s.wy*z + (s.offR||0)*z + (s.offPx||0);
+    // the two arc labels (`not linked from home`, `deep fog …`) used to get exactly ONE candidate, so a
+    // single disc in the way dropped them outright — the map then lost a whole caption with no fallback.
+    // They now walk outward along their own bearing, which keeps them on their arc.
+    if(s.center){ const ux=s.wx*z, uy=s.wy*z;
+      return CENTER_STEPS.map(k=>[ax+ux*k-w/2, ay+uy*k-h/2]); }
+    // (v2.5) pills are bigger than the bare labels these six candidates were tuned for, so the ladder
+    // gains four diagonals — placement odds matter most at the far tier, where §4's anchors have to
+    // survive a crowded little world.
+    const dr=(s.dr||0)*z, d=0.72;
+    return [[ax-w/2, ay+dr+3],[ax-w/2, ay-dr-3-h],[ax+dr+4, ay-h/2],[ax-dr-4-w, ay-h/2],
+      [ax+dr*d+4, ay+dr*d+3],[ax-dr*d-4-w, ay+dr*d+3],[ax+dr*d+4, ay-dr*d-3-h],[ax-dr*d-4-w, ay-dr*d-3-h],
+      [ax-w/2, ay+dr+18],[ax-w/2, ay+dr+34]];
+  }
+  // what the last settle committed: the element, its measured size, its spec, and the slot it won
+  let anchored=[];
+  // THE FRAME-PATH FUNCTION. No querySelectorAll, no getBoundingClientRect, no innerHTML — writes only.
+  function reanchorLabels(){
+    for(let i=0;i<anchored.length;i++){ const a=anchored[i];
+      const p=candidatesFor(a.s, a.w, a.h)[a.slot]; if(!p) continue;
+      a.el.style.left=p[0]+'px'; a.el.style.top=p[1]+'px'; }
+  }
   function placeLabels(){
-    labelsEl.innerHTML='';
+    labelsEl.innerHTML=''; anchored=[];
     const z=mapView.zoom, level = z<0.9?'far': z<1.7?'mid':'near';
     const paneRect=document.getElementById('maparea').getBoundingClientRect();
     const committed=[];
@@ -1984,11 +2159,12 @@ function initDashboard(){
     // is a 649px pill — wider than half the pane, so every candidate collided and the collision pass DROPPED
     // the map's most important label entirely (silently, since v2.5). It now gets a budget like everything
     // else — longer than a node pill's 18, because it is the sun. Its stats line stays, per the F3 ruling.
-    { const [sx,sy]=toScreen(P[root.id]); specs.push({pri:0, ax:sx, ay:sy+P[root.id].r*z+3, cls:'maphomelbl', below:true, html:`${esc(short(dlabel(root),28))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`}); }
-    for(let d=1; d<=maxDepth; d++){ const rr=ringRadius(d)*z; const cx=VW/2+mapView.panX, cy=VH/2+mapView.panY;
-      specs.push({pri:1, ring:true, cx, cy, rr, cls:'maprlbl', html:`${d} click${d===1?'':'s'}`}); }
-    if(unreachCount>0){ const [ax,ay]=toScreen({x:Math.cos(2.0)*nullR, y:Math.sin(2.0)*nullR}); specs.push({pri:1, ax, ay, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} page${unreachCount===1?'':'s'}`}); }
-    if(deepCount>0){ const [dx,dy]=toScreen({x:Math.cos(-0.55)*ghostR*1.16, y:Math.sin(-0.55)*ghostR*1.16}); specs.push({pri:1, ax:dx, ay:dy, center:true, cls:'maparclbl', html:`deep fog<small>…${deepCount} more — templates stand for most</small>`}); }
+    // (P2) `offR: P[root.id].r` is the disc-radius nudge this anchor always carried baked into its ay —
+    // held separately now because it scales with zoom and the +3 does not.
+    specs.push({pri:0, wx:P[root.id].x, wy:P[root.id].y, offR:P[root.id].r, offPx:3, cls:'maphomelbl', below:true, html:`${esc(short(dlabel(root),28))}<small>${root.inboundCount||0} in · ${(root.linksTo||[]).length} out</small>`});
+    for(let d=1; d<=maxDepth; d++) specs.push({pri:1, ring:true, ringD:d, cls:'maprlbl', html:`${d} click${d===1?'':'s'}`});
+    if(unreachCount>0) specs.push({pri:1, wx:Math.cos(2.0)*nullR, wy:Math.sin(2.0)*nullR, center:true, cls:'maparclbl', html:`not linked from home — ${unreachCount} page${unreachCount===1?'':'s'}`});
+    if(deepCount>0) specs.push({pri:1, wx:Math.cos(-0.55)*ghostR*1.16, wy:Math.sin(-0.55)*ghostR*1.16, center:true, cls:'maparclbl', html:`deep fog<small>…${deepCount} more — templates stand for most</small>`});
     let set=[];
     if(level==='near') set=capNodes.slice();
     else if(level==='mid'){ const bySec={}; capNodes.forEach(n=>{(bySec[n.section||'Other']=bySec[n.section||'Other']||[]).push(n)});
@@ -2001,29 +2177,22 @@ function initDashboard(){
       .slice(0, FAR_ANCHORS);
     set.sort((a,b)=>(b.inboundCount||0)-(a.inboundCount||0));
     // (v2.5.1 F3) one line, the label alone — the `from N` sub-line is gone from node pills (design ruling)
-    set.forEach(n=>{ const [sx,sy]=toScreen(P[n.id]); specs.push({pri:2+(1-(n.inboundCount||0)/maxCapIn), ax:sx, ay:sy, dr:P[n.id].r*z, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}`}); });
-    if(level==='near') ghostShown.forEach(f=>{ const [sx,sy]=toScreen(P[f.id]); specs.push({pri:3, ax:sx, ay:sy, dr:P[f.id].r*z, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}); });
+    set.forEach(n=>specs.push({pri:2+(1-(n.inboundCount||0)/maxCapIn), wx:P[n.id].x, wy:P[n.id].y, dr:P[n.id].r, cls:'mapnlbl', below:true, node:n, html:`${esc(short(dlabel(n),18))}`}));
+    if(level==='near') ghostShown.forEach(f=>specs.push({pri:3, wx:P[f.id].x, wy:P[f.id].y, dr:P[f.id].r, cls:'mapghostlbl', below:true, html:`${esc(short(f.pattern||f.label||'',16))}<small>from ${f.inboundCount||f.count||1}</small>`}));
     specs.sort((a,b)=>a.pri-b.pri);
     const els=specs.map(s=>{ const e=document.createElement('div'); e.className=s.cls; e.style.visibility='hidden'; e.innerHTML=s.html; labelsEl.appendChild(e); return e; });
     const placed=[...committed];
-    specs.forEach((s,i)=>{ const e=els[i]; const w=e.offsetWidth, h=e.offsetHeight; let cands=[];
-      if(s.ring){ for(const a of [0,-0.35,0.35,-0.7,0.7,Math.PI]) cands.push([s.cx+Math.cos(a)*s.rr - w/2, s.cy+Math.sin(a)*s.rr - h/2]); }
-      // the two arc labels (`not linked from home`, `deep fog …`) used to get exactly ONE candidate, so a
-      // single disc in the way dropped them outright — the map then lost a whole caption with no fallback.
-      // They now walk outward along their own bearing, which keeps them on their arc.
-      else if(s.center){ const ux=s.ax-(VW/2+mapView.panX), uy=s.ay-(VH/2+mapView.panY);
-        for(const k of [0, 0.08, -0.08, 0.17, -0.17, 0.27]) cands.push([s.ax+ux*k-w/2, s.ay+uy*k-h/2]); }
-      // (v2.5) pills are bigger than the bare labels these six candidates were tuned for, so the ladder
-      // gains four diagonals — placement odds matter most at the far tier, where §4's anchors have to
-      // survive a crowded little world.
-      else { const dr=s.dr||0, d=0.72; cands=[[s.ax-w/2, s.ay+dr+3],[s.ax-w/2, s.ay-dr-3-h],[s.ax+dr+4, s.ay-h/2],[s.ax-dr-4-w, s.ay-h/2],
-          [s.ax+dr*d+4, s.ay+dr*d+3],[s.ax-dr*d-4-w, s.ay+dr*d+3],[s.ax+dr*d+4, s.ay-dr*d-3-h],[s.ax-dr*d-4-w, s.ay-dr*d-3-h],
-          [s.ax-w/2, s.ay+dr+18],[s.ax-w/2, s.ay+dr+34]]; }
+    specs.forEach((s,i)=>{ const e=els[i]; const w=e.offsetWidth, h=e.offsetHeight;
+      const cands=candidatesFor(s, w, h);
       let ok=false;
-      for(const [lx,ly] of cands){ const box={left:lx,top:ly,right:lx+w,bottom:ly+h};
+      for(let ci=0; ci<cands.length; ci++){ const [lx,ly]=cands[ci]; const box={left:lx,top:ly,right:lx+w,bottom:ly+h};
         if(box.left<2||box.top<2||box.right>VW-2||box.bottom>VH-2) continue;
         if(placed.some(p=>ovl(p,box))) continue;
-        e.style.left=lx+'px'; e.style.top=ly+'px'; e.style.visibility='visible'; placed.push(box); ok=true; break; }
+        e.style.left=lx+'px'; e.style.top=ly+'px'; e.style.visibility='visible'; placed.push(box); ok=true;
+        // (P2) the slot, the measured size and the world-anchored spec — everything reanchorLabels() needs
+        // to reproduce this exact position at any other camera without measuring anything again.
+        anchored.push({el:e, s, w, h, slot:ci});
+        break; }
       if(!ok) e.remove();
     });
     // safety net — guarantee 0 overlaps at rest: forward pass keeps higher-priority labels, hides any later clash
@@ -2031,9 +2200,23 @@ function initDashboard(){
       [...labelsEl.children].forEach(e=>{ if(e.style.visibility==='hidden') return; const r=e.getBoundingClientRect();
         const box={left:r.left-paneR.left,top:r.top-paneR.top,right:r.right-paneR.left,bottom:r.bottom-paneR.top};
         if(committed.some(d=>ovl(d,box)) || kept.some(k=>ovl(k,box))) e.style.visibility='hidden'; else kept.push(box); }); }
-    // overlays text
+    // (P2) a pill the safety net hid is not on the map, so it has no business on the frame path either
+    anchored=anchored.filter(a=>a.el.style.visibility!=='hidden' && a.el.parentNode);
+  }
+  // (P2) THE OVERLAY TEXT IS NOT CAMERA WORK. These three strings are pure functions of the library —
+  // they never once referred to zoom or pan — and they were being rebuilt, innerHTML and all, on every
+  // frame of every gesture, from inside the label pass. They belong here, run when the map is built or
+  // resized, and nowhere near applyMapView().
+  function renderMapOverlays(){
     const explored=capNodes.length+1, known=explored+lockedTotal, pct=known?100*explored/known:0;
-    document.getElementById('mapstats').innerHTML=`<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home · every unlock pushes the fog back`;
+    // ── (P5) THE RING CLAIM IS BOUNDED, AND NOW SAYS SO ──────────────────────────────────────────────
+    // clickDepth is min(true depth, crawl depth). Measured: the crawl depth was 2 in every one of the six
+    // workspaces checked, and the greatest clickDepth on the map is 2 in five of them (wikipedia reaches 3
+    // only because later `--urls` pulls went past where the crawl stopped). So the ring axis is partly
+    // measuring a CLI flag, and this line was presenting it as plain truth. "as far as this capture went"
+    // is the whole fix: the encoding is unchanged and still honest, the sentence now carries its bound.
+    // One line, no layout change. Canon: ux-copy.md, dated.
+    document.getElementById('mapstats').innerHTML=`<b>${pct<1?pct.toFixed(1):Math.round(pct)}% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back`;
     document.getElementById('mapnote').textContent='rings = how many clicks from home · hover a page for its real links · drag to pan, scroll to zoom';
     // (covered-shapes) the two conditional rows. Retiring covered ghosts means a small product can now
     // legitimately have ZERO ghosts on the map (xflow-platform-user: all 3 shapes covered) — a legend that
@@ -2045,12 +2228,20 @@ function initDashboard(){
        <span class="lg"><i style="width:11px;height:11px;border:2px solid var(--dim);border-radius:50%"></i>explored, dormant caption</span>
        ${ghostShown.length?`<span class="lg"><i style="width:11px;height:11px;border:2px dashed var(--dim);border-radius:50%;opacity:.6"></i>ghost in the fog — locked</span>`:''}
        ${capNodes.concat([root]).some(n=>n.standsFor>1)?`<span class="lg"><i style="width:11px;height:11px;border:2px solid var(--tpl);border-radius:50%"></i>×N — one example, stands for N</span>`:''}
-       <span class="lg" style="border-top:1px solid var(--line);padding-top:5px">hover a region for its district</span>`;
+       <span class="lg" style="border-top:1px solid var(--line);padding-top:5px">hover a region for its district</span>
+       <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>`;
   }
 
   // ---- regions (hover → highlight + card anchored to territory) ----
+  // (P2) the card's own size is measured ONCE, when its content is written, and cached. This runs from
+  // applyMapView() whenever a district card is open, and `offsetWidth` is a forced synchronous layout
+  // exactly like the getBoundingClientRect loop P2 removed — reading it per frame would have left the
+  // frame path with a measurement in it after all the work of taking one out. It cannot go stale: the
+  // only thing that changes the card's size is new innerHTML, and that is where the measurement lives.
+  let dcardSize={w:170,h:64};
+  function measureCard(){ dcardSize={w:dcardEl.offsetWidth||170, h:dcardEl.offsetHeight||64}; }
   function positionCard(rg, el){ const [sx,sy]=toScreen({x:rg.cx, y:rg.y}); let x=sx, y=sy-8;
-    dcardEl.style.left='0'; dcardEl.style.top='0'; const w=dcardEl.offsetWidth||170, h=dcardEl.offsetHeight||64;
+    const w=dcardSize.w, h=dcardSize.h;
     x=Math.max(w/2+6, Math.min(VW-w/2-6, x)); y=Math.max(60, Math.min(VH-h-10, y-h));
     dcardEl.style.left=x+'px'; dcardEl.style.top=y+'px'; dcardEl.style.transform='translate(-50%,0)'; }
   // the hover wash is #maphot — ONE shape moved onto the hovered territory, outside the region opacity
@@ -2066,7 +2257,7 @@ function initDashboard(){
     const share = rg.explored+rg.fog ? Math.round(100*rg.explored/(rg.explored+rg.fog)) : 100;
     dcardEl.innerHTML=`<h4>${esc(rg.name)}</h4><p>${rg.explored} explored${rg.fog?` · ${rg.fog} in the fog`:''}${rg.states?` · ${rg.states} ${rg.states===1?'page has':'pages have'} states`:''}</p>
       <div class="dbar" title="explored share of this district"><i style="width:${rg.explored?`max(2px, ${share}%)`:'0'}"></i></div>`;
-    dcardEl.style.display='block'; positionCard(rg, el); }
+    dcardEl.style.display='block'; measureCard(); positionCard(rg, el); }
   function hideRegion(){ const hot=world.querySelector('#maphot'); if(hot) hot.style.display='none';
     hotRegion=null; dcardEl.style.display='none'; paintRegionHover(null); }
   // (M3.2/M3.3) the whole hover paint in one place, and it is a full REPAINT rather than a diff: every
@@ -2085,13 +2276,38 @@ function initDashboard(){
 
   // ---- hover links + peek + click ----
   let hoverId=null;
-  function drawLinks(id){ const n=byId[id]; if(!n||!P[id]){ linesEl.innerHTML=''; return; }
-    const seg=(a,b,out)=>{ const A=P[a],B=P[b]; if(!A||!B) return ''; const [x1,y1]=toScreen(A),[x2,y2]=toScreen(B);
-      return `<line class="${out?'eout':'ein'}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; };
-    let s=''; (n.linksTo||[]).forEach(t=>s+=seg(id,t,true)); (n.linkedFrom||[]).forEach(t=>s+=seg(t,id,false)); linesEl.innerHTML=s; }
+  // (P3) world coordinates — no toScreen(), because the parent transform already is the camera. That is
+  // what took this function off the frame path: it runs on hover and on nothing else.
+  // (P4) EVERY EDGE CARRIES ITS OWN DIRECTION. `seg(a,b)` is always source → target, so one rule covers
+  // both sets: the stroke is at its M4 alpha at the SOURCE and brightens toward the TARGET. Hovering a
+  // page, brightness gathering ON the disc means pages pointing at it; brightness gathering AWAY means
+  // pages it points at — which is exactly the read that was missing when a ring-2 page's outbound link to
+  // home looked like proof it was one click from home.
+  function drawLinks(id){ const n=byId[id]; if(!linesEl) return;
+    if(!n||!P[id]){ linesEl.innerHTML=''; return; }
+    let defs='', lines='', k=0;
+    // (P4) THE EDGE IS TRIMMED TO THE TWO RIMS, and that is what makes the ramp readable rather than
+    // merely present. Drawn centre-to-centre, the first and last ~20% of every stroke is under an opaque
+    // disc, so the reader never sees either extreme of the gradient — measured on flipkart, the visible
+    // span ran 0.53→0.78 alpha for a 1.14× brightness gain at 100%, which is not a cue. Trimmed, the
+    // whole 0.46→0.82 range is on screen. +3 clears the disc's own `0 0 0 3px --canvas` halo, so a line
+    // starts at the edge of the disc rather than inside its glow.
+    const seg=(a,b,out)=>{ const A=P[a],B=P[b]; if(!A||!B) return;
+      const dx=B.x-A.x, dy=B.y-A.y, d=Math.hypot(dx,dy); if(d<1) return;
+      const ux=dx/d, uy=dy/d;
+      const x1=A.x+ux*(A.r+3), y1=A.y+uy*(A.r+3), x2=B.x-ux*(B.r+3), y2=B.y-uy*(B.r+3);
+      if((x2-x1)*ux + (y2-y1)*uy < 2) return;   // the two discs are touching — there is no line to draw
+      const gid=`mlg${k++}`;
+      // gradientUnits="userSpaceOnUse" over the same trimmed endpoints: the ramp IS the visible line, so
+      // it needs no size of its own and cannot stretch, thin out or fall off at any zoom.
+      defs+=`<linearGradient id="${gid}" class="${out?'g-out':'g-in'}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"><stop class="s0" offset="0"/><stop class="s1" offset="1"/></linearGradient>`;
+      lines+=`<line class="${out?'eout':'ein'}" stroke="url(#${gid})" vector-effect="non-scaling-stroke" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`; };
+    (n.linksTo||[]).forEach(t=>seg(id,t,true));
+    (n.linkedFrom||[]).forEach(t=>seg(t,id,false));
+    linesEl.innerHTML=`<defs>${defs}</defs>${lines}`; }
   world.addEventListener('mouseover', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n){ hoverId=n.id; drawLinks(n.id); showPeek(n, e.clientX, e.clientY); } } });
   world.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
-  world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ hoverId=null; linesEl.innerHTML=''; hidePeek(); } });
+  world.addEventListener('mouseout', e=>{ const b=e.target.closest('[data-mapid]'); if(b){ hoverId=null; if(linesEl) linesEl.innerHTML=''; hidePeek(); } });
   world.addEventListener('click', e=>{ if(mapDragged) return; const b=e.target.closest('[data-mapid]'); if(b){ const n=byId[b.getAttribute('data-mapid')]; if(n) selectPage(n); } });
 
   // ═════════ (v2.5.1 F5) THE MOTION CONTROLLER ═════════
@@ -2143,16 +2359,27 @@ function initDashboard(){
     mapView.zoom=z1; mapView.panX = cx - VW/2 - wx*z1; mapView.panY = cy - VH/2 - wy*z1; applyMapView(); }
   const mapPane=document.getElementById('pane-map');
   const mapArea=document.getElementById('maparea');
+  // (P2) A WHEEL GESTURE HAS NO END EVENT, so the settle is an idle timer — 90ms after the last tick, which
+  // is longer than the gap between events inside one trackpad pinch and short enough to feel immediate.
+  // Every frame in between re-anchors; this is the one place that re-runs the collision pass and the tier.
+  // (P2) the pointer→pane conversion reads the CACHED pane origin. `mapArea.getBoundingClientRect()` here
+  // was the last forced synchronous layout on the zoom path — one per wheel event, i.e. one per frame.
+  // computeLayout() caches it, and the only two things that can move #maparea both route through the map's
+  // resize listener: a window resize, and dismissing the file:// banner (which now says so — see
+  // mountFileBanner, where that was a pre-existing staleness bug in its own right).
+  let wheelSettleT=null;
   mapArea.addEventListener('wheel', e=>{ if(!mapPane.classList.contains('active')) return; e.preventDefault();
     suspendMapMotion();   // (F5·4) wheel is direct manipulation: same-frame, never eased
-    const r=mapArea.getBoundingClientRect(); zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:0.893); }, {passive:false});
+    zoomAt(e.clientX-panePos.left, e.clientY-panePos.top, e.deltaY<0?1.12:0.893);
+    clearTimeout(wheelSettleT); wheelSettleT=setTimeout(placeLabels, 90); }, {passive:false});
   let panning=false, sx0=0, sy0=0, mapDragged=false;
   mapArea.addEventListener('mousedown', e=>{ if(e.target.closest('#mapzoom')) return; suspendMapMotion();
     panning=true; mapDragged=false; sx0=e.clientX; sy0=e.clientY; world.style.cursor='grabbing'; });
   addEventListener('mousemove', e=>{ if(!panning) return; const dx=e.clientX-sx0, dy=e.clientY-sy0; if(Math.abs(dx)+Math.abs(dy)>3) mapDragged=true;
     mapView.panX+=dx; mapView.panY+=dy; sx0=e.clientX; sy0=e.clientY; applyMapView(); });
-  addEventListener('mouseup', ()=>{ if(panning){ panning=false; world.style.cursor=''; setTimeout(()=>mapDragged=false, 0); } });
-  mapArea.addEventListener('dblclick', e=>{ if(e.target.closest('[data-mapid]')||e.target.closest('#mapzoom')) return; resetView(); });
+  // (P2) mouseup IS the pan's settle event — one collision pass per drag, not one per mousemove
+  addEventListener('mouseup', ()=>{ if(panning){ panning=false; world.style.cursor=''; placeLabels(); setTimeout(()=>mapDragged=false, 0); } });
+  mapArea.addEventListener('dblclick', e=>{ if(e.target.closest('[data-mapid]')||e.target.closest('#mapzoom')) return; resetView(); placeLabels(); });
   // F4·3: clicking empty map canvas deselects → the rail returns to the ledger. Lives on #maparea (the
   // transformed #mapworld doesn't cover the whole visible area), skipping nodes and floating controls.
   mapArea.addEventListener('click', e=>{ if(mapDragged) return;
@@ -2164,7 +2391,10 @@ function initDashboard(){
   document.getElementById('zfitbtn').onclick=()=>easedZoom(resetView);
   function resetView(){ mapView.zoom=1; mapView.panX=0; mapView.panY=0; applyMapView(); }
 
-  function resize(){ computeLayout(); renderWorld(); applyMapView(); }
+  // (P2) renderMapOverlays() runs BEFORE the collision pass, and that order is load-bearing: the pass
+  // treats #maplegend / #mapstats / #mapzoom / #mapnote as committed geometry, and it skips any of them
+  // whose offsetWidth is 0 — so a pass that ran before they had content would place pills underneath them.
+  function resize(){ computeLayout(); renderWorld(); renderMapOverlays(); commitMapView(); }
   function fit(){ resize(); }
   addEventListener('resize', ()=>{ if(document.getElementById('pane-map').classList.contains('active')) resize(); });
 
@@ -2290,7 +2520,7 @@ function initDashboard(){
       const coveredHtml = coveredShapeHtml(covered, 'cov');
       el.innerHTML = `<div class="railpanel">${CLOSE}<h2>${esc(dlabel(n))}</h2>
         <div class="route">${esc(n.route)}</div>
-        ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank" aria-label="open full screenshot">${img2(n.screenshot,'pshot')}</a>`:''}
+        ${n.screenshot?`<a href="${esc(n.screenshot)}" target="_blank" aria-label="open full screenshot">${img2(shotSrc(n),'pshot','',n.screenshot)}</a>`:''}
         <div class="meta">downloaded ${when}${n.standsFor?` · stands for <b>${n.standsFor}</b> pages`:''} · linked from ${n.inboundCount||0} · ${depthTxt}</div>
         <div class="desc">${n.descPending?'<span class="meta">— caption dormant, waiting for your AI</span>':esc(n.desc||'')} ${n.descPending?'':'<span class="ai" title="model-written orientation, not extracted fact">ai</span>'}</div>
         <button class="btn primary" id="pnl-expand" style="width:100%;margin-top:12px">Expand ↗ Open the full page doc</button>
@@ -2668,7 +2898,9 @@ function initDashboard(){
     if(ev.link){ if(ev.link.page) link=`<button class="elink" data-goto="page/${esc(ev.link.page)}">open the page</button>`;
       else if(ev.link.tab){ const lbl=ev.link.tab==='map'?'open the map':ev.link.tab==='design'?'open Design language':'see what it wrote'; link=`<button class="elink" data-goto="${esc(ev.link.tab)}">${lbl}</button>`; } }
     let thumbs='';
-    if(!compact && ev.kind==='capture'){ const t=DATA.nodes.filter(n=>n.screenshot).slice(0,5).map(n=>`<img src="${esc(n.screenshot)}" loading="lazy" alt="">`).join(''); if(t) thumbs=`<div class="thumbs">${t}</div>`; }
+    // (P1) five 64×40 tiles that used to be five full-page PNGs. `loading="lazy"` deferred the cost, it
+    // never removed it — the journal is a scrolling column, so they all arrive.
+    if(!compact && ev.kind==='capture'){ const t=DATA.nodes.filter(n=>n.screenshot).slice(0,5).map(n=>`<img src="${esc(shotSrc(n))}" loading="lazy" alt="">`).join(''); if(t) thumbs=`<div class="thumbs">${t}</div>`; }
     // guided/hygiene events carry per-item detail lines (F4). Plain text only — a hygiene finding can
     // name a since-pruned page, so these are never links. Compact rail trims to 3; journal shows all.
     let dlines='';
@@ -2968,7 +3200,7 @@ function initDashboard(){
     // The mono route line moved off the face; it still leads the rail panel and the page doc.
     const cardHtml = (n)=>`<button class="pg" data-card="${esc(n.id)}" title="${esc(n.route||'')}">
         ${n.kind==='template'?`<span class="count">stands for ${n.standsFor}</span>`:''}
-        ${img2(n.screenshot,'shot')}
+        ${img2(shotSrc(n),'shot','',n.screenshot)}
         <span class="m"><span class="nm">${esc(dlabel(n))}</span>
         <span class="cap${n.descPending?' dorm':''}">${n.descPending?'— caption dormant, waiting for your AI':esc(n.desc||'')}</span></span></button>`;
     const ghostHtml = (f)=>`<button class="pg locked" data-goto="map"><span class="shot">not downloaded yet</span>
@@ -3141,7 +3373,8 @@ function initDashboard(){
       // F1 restore: reopen the rail panel we expanded from + reapply camera on return (F4·5). v2.4.2 F4:
       // stacked, the camera still restores but the rail must NOT swap — there is no rail-swap below the
       // breakpoint, in either direction.
-      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; applyMapView(); if(nn && !isStacked()) openPanel(nn); } }
+      // (P2) restoring a camera is a discrete jump, not a gesture frame — it commits (re-places the labels)
+      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; commitMapView(); if(nn && !isStacked()) openPanel(nn); } }
     // v2.6 F2.4: the bento can only be measured once its pane is on screen (a hidden pane has no
     // geometry), so the balance decision is (re)taken on every reveal.
     if(name==='design' && window.__bentoBalance) window.__bentoBalance();

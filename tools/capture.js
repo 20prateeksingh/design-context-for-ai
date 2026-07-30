@@ -30,6 +30,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { writeThumb } = require('./thumb.js');
 
 // ── Args ──────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -535,6 +536,17 @@ async function writeSnapshot(page, context, requestedUrl, meta, outDir) {
     });
   }
   await page.evaluate(() => document.querySelectorAll('[id^="__dck"]').forEach(e => { e.style.visibility = e.dataset.dckVis || ''; delete e.dataset.dckVis; })).catch(() => {});
+
+  // 1b. the render-time thumbnail, derived from the PNG we just wrote. Here because this is the cheap
+  // moment — the file is on disk and warm — but NOT because a browser is needed: tools/thumb.js does the
+  // decode/downscale/re-encode in integer arithmetic on Node's own zlib, so build-index.js produces the
+  // same bytes when it backfills a library captured before this shipped. Never fatal: a page with no
+  // thumbnail renders its full screenshot everywhere, which is exactly what every page did before.
+  // Pages only — a state's screenshot renders in a 150×92 strip and is out of scope (see thumb.js).
+  if (!meta.subdir) {
+    const t = writeThumb(dir);
+    if (!t.ok) console.log(`   thumbnail skipped for ${slug} — ${t.reason} (the full screenshot renders instead)`);
+  }
 
   // 2. verbatim copy + computed tokens + outbound links + loading markers (read-only DOM passes)
   const [content, tokens, linksOut, title, loadingMarkers] = [

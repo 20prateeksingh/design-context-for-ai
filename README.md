@@ -54,7 +54,8 @@ your-product/
 │   ├── ia/sitemap.json      ← your product's navigation, mapped
 │   └── pages/<page>/        ← per page: page.md digest · screenshot.png ·
 │                              editable page.html · verbatim content.md ·
-│                              style tally · provenance meta
+│                              style tally · provenance meta ·
+│                              thumb.png (what the dashboard draws — derived)
 ├── wireframes/              ← your design explorations (starts empty)
 ├── tools/ · skills/         ← the machinery + the AI's instructions
 └── profiles/                ← your browser login (created on first login; stays on your machine)
