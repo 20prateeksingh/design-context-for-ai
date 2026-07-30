@@ -1,5 +1,48 @@
 # UX copy canon
 
+## 2026-07-30 — map legibility (M1–M4 + §R rider): one ruling reversed, zero strings changed
+
+`prds/map-legibility-round.md`. **No user-visible string in the dashboard changed in this round** — M1
+(disc sizing), M2 (clustering), M3 (region boundaries + member hover) and M4 (hover links) are all
+geometry and paint. The legend still reads `explored — size = how linked-to`, and it is still true: size
+is still inbound-link count, over a narrower range. `#mapstats` still prints *rings are honest
+clicks-from-home*, and this round is the first build in which that sentence is literally true rather
+than nearly true (radial drift was up to 86px; one xflowpay disc read back to the wrong ring). The
+§R rider is CSS only.
+
+**One recorded ruling is reversed, and the entry exists to record it.**
+
+> **2026-07-28 ruling (reversed):** offered three ways to stop the `Everything else` catch-all from
+> swallowing the pointer, Prateek rejected option 1 — "make the catch-all inert" — because it *"hides
+> real district stats"*, and chose smaller-area-wins instead. That shipped as the §R largest-first paint
+> order.
+>
+> **2026-07-30 ruling (current):** the catch-all is **pointer-inert**. It keeps its background fill; it
+> loses hover, the `#maphot` wash and the district card.
+>
+> **What changed is the reading of the stats, not the preference.** `computeRegions()` builds the
+> catch-all from every nav section that has exactly ONE member, so its card was reporting
+> `explored = <number of one-page sections>`, `fog = 0`, `states = N` — an aggregate over sections that
+> have nothing to do with each other. That is a count of "sections with one page", not a district's
+> stats, so the 2026-07-28 objection turns out not to apply to what the card actually said. The arc
+> label already carries the headline count, and every one of those pages still has its own disc, its own
+> hover peek and its own rail panel. Nothing readable was lost.
+>
+> **The §R largest-first paint order stays.** Two *named* districts can still nest, and §R is what gives
+> the pointer to the smaller one. Inert-catch-all solves the motivating case more directly; it does not
+> replace the rule, and removing it would reopen the nested-named-regions case.
+>
+> Targeted by the region's `merged` flag, never by matching the string `Everything else` — the name is a
+> label, the flag is the fact.
+
+**Copy that is now load-bearing in a new way** (unchanged text, new obligation):
+
+| string | where | what now depends on it |
+|---|---|---|
+| `rings are honest clicks-from-home` | `#mapstats` | every captured disc is clamped to its own ring band, so the claim is exact. Do not widen `BAND_MAX` past half the ring pitch without re-reading this line. |
+| `explored — size = how linked-to` | `#maplegend` | still inbound count, now over 32–62px and normalised against **captured pages only**. A ghost can no longer shrink a real page. |
+| `hover a region for its district` | `#maplegend` | true of named districts only. The catch-all has no hover — and no boundary — by design. |
+
 ## 2026-07-30 — busy states everywhere: a reduced-motion-safe ring, and a progress pill inside the capture window (B1–B2)
 
 `prds/busy-states-everywhere.md`. B1 is a CSS/JS fix, not new copy (the ring's existing labels are
