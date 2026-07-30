@@ -761,6 +761,13 @@
   .hygfoot li { font-size:11px; color:var(--dim); padding:4px 0; border-top:1px solid var(--line); }
   .hygfoot li:first-child { border-top:0; }
   .hygfilehint { font-size:11px; color:var(--dim); margin-top:8px; }
+  /* (I2) the disclosure toggle — a real button, not the hover-reveal `.hygfoot` details pattern above
+     uses, because a HOVER can't be the trigger for the whole card (constraint: keyboard-operable). The
+     count stays in `.etitle`, inside the button, so it is never lost while collapsed. */
+  .hygsummary { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+                background:none; border:0; padding:0; margin:0; text-align:left; font:inherit; color:inherit; cursor:pointer; }
+  .hygsummary:hover .etitle { color:var(--accent-strong); }
+  .hygchev { font-size:11px; font-weight:600; color:var(--link); flex:none; white-space:nowrap; }
   /* the journal pill's unacked-warnings count chip (clears once fixed/acked — never on view alone) */
   .jpill .jcount { display:inline-flex; align-items:center; justify-content:center; min-width:15px; height:15px; padding:0 4px;
     border-radius:8px; background:var(--warn); color:var(--bg); font-size:9.5px; font-weight:700; margin-left:1px; }
@@ -1591,6 +1598,7 @@ function initDashboard(){
   let pageOrigin = 'home';                     // provenance for the page-doc return affordance (F1)
   let mapView = { zoom:1, panX:0, panY:0 };    // persisted map camera (F1 restore · F2 zoom/pan)
   let mapReopen = null;                        // node id whose panel to reopen on return to map
+  let mapFocusPending = false;                 // I1: true when a locked Atlas tile sent us here — center the camera on arrival, rather than merely restoring it (the page-doc round trip leaves this false)
   let guidedLive = null;                       // guided-capture live state (F5): {running,count,lastCapture}
 
   // ── (P1) THE SMALL RASTER, AND ITS FALLBACK ────────────────────────────────────────────────────────
@@ -2390,6 +2398,11 @@ function initDashboard(){
   document.getElementById('zoutbtn').onclick=()=>easedZoom(()=>zoomAt(VW/2, VH/2, 0.83));
   document.getElementById('zfitbtn').onclick=()=>easedZoom(resetView);
   function resetView(){ mapView.zoom=1; mapView.panX=0; mapView.panY=0; applyMapView(); }
+  // (I1) center the camera on a node's world position, at whatever zoom is already set — reuses the
+  // same mapView the pan/zoom gestures write to, so a subsequent pan or zoom starts from here rather
+  // than from a second camera state. P is only valid post-layout; called after resize()/fit() has run.
+  function centerOnNode(id){ const p=P[id]; if(!p) return;
+    mapView.panX = -p.x*mapView.zoom; mapView.panY = -p.y*mapView.zoom; }
 
   // (P2) renderMapOverlays() runs BEFORE the collision pass, and that order is load-bearing: the pass
   // treats #maplegend / #mapstats / #mapzoom / #mapnote as committed geometry, and it skips any of them
@@ -2416,6 +2429,14 @@ function initDashboard(){
     if(isStacked()){
       if(!n.locked) return openFullDoc(n.id);
       openPanel(n); const r=railTarget(); if(r && r.scrollIntoView) r.scrollIntoView({block:'start'}); return;
+    }
+    // (I1) a locked tile selected from OFF the map (i.e. the Atlas) has no rail of its own to open into —
+    // the unlock offer lives in the map's rail panel. Route there via the same mapReopen hand-off the
+    // page-doc round trip already uses, and flag it for a camera re-centre (that round trip does not
+    // want one: it restores exactly the view the designer left). A locked disc clicked ON the map is
+    // already home and keeps its existing behaviour — this branch only fires when the map isn't active.
+    if(n.locked && !document.getElementById('pane-map').classList.contains('active')){
+      mapReopen = n.id; mapFocusPending = true; location.hash = 'map'; return;
     }
     openPanel(n);
   }
@@ -2964,6 +2985,12 @@ function initDashboard(){
   // Locked copy lives in prds/hygiene-speaks-designer.md §F4 (verbatim, also appended to ux-copy.md).
   // Source of truth: DASH.overview.hygiene — the SAME live runHygiene() findings (with F1's stable keys
   // + acknowledged flags) build-index.js computes every rebuild, never the historical hygiene.json snapshot.
+  // (I2) per-session, same principle as the Palette⇄Proportions switcher (F3, design tab): a plain
+  // variable, nothing written to storage. It cannot literally be "a class + hidden, nothing rebuilt"
+  // like that switcher, because ledgerBody() — and this card inside it — IS torn down and rebuilt on
+  // every trip back to the ledger (tab switch, panel close); the variable is what survives that rebuild.
+  // Reset to true (collapsed) only by a full reload, when the script re-runs from scratch.
+  let hygCollapsed = true;
   function pageLabelOf(slug){ const n = byId[slug]; return n ? dlabel(n) : slug; }
   // E15: cap a hygiene-card label at ~48 chars on a word boundary — two full site-generic <title>s (e.g.
   // matching Flipkart product pages) read as unreadable noise in a one-line finding otherwise.
@@ -3123,13 +3150,34 @@ function initDashboard(){
     const footItems = infos.map(it=>`<li>${esc(hygInfoLine(it))}</li>`).join('');
     const foot = infos.length ? `<details class="hygfoot"><summary>${infos.length} more note${infos.length===1?'':'s'} — nothing needed from you</summary><ul>${footItems}</ul></details>` : '';
     const fileHint = serverMode ? '' : `<div class="hygfilehint">Fixes need the kit's server — run <code>tools/start.sh</code></div>`;
-    return `<div class="ent hero" id="hygcard"><div class="emeta">the kit</div>
+    // (I2) N===0 has nothing to disclose — one row, never a collapsed card implying hidden content.
+    if (N===0) return `<div class="ent hero" id="hygcard"><div class="emeta">the kit</div>
       <span class="etitle">${esc(title)}</span>
       ${body}${foot}${fileHint}
+    </div>`;
+    const collapsed = hygCollapsed;
+    return `<div class="ent hero" id="hygcard"><div class="emeta">the kit</div>
+      <button type="button" class="hygsummary" id="hygtoggle" aria-expanded="${collapsed?'false':'true'}" aria-controls="hygbody">
+        <span class="etitle">${esc(title)}</span>
+        <span class="hygchev" aria-hidden="true">${collapsed?'Show details ▸':'Hide details ▾'}</span>
+      </button>
+      <div id="hygbody"${collapsed?' hidden':''}>
+        ${body}${foot}${fileHint}
+      </div>
     </div>`;
   }
   function wireHygieneCard(root){
     const card = root.querySelector('#hygcard'); if (!card) return;
+    // (I2) direct handler, not routed through the [data-hyg-act] delegate below — this toggles local
+    // DOM + the module-level flag in place, rather than a full re-render through ledgerBody().
+    const toggle = card.querySelector('#hygtoggle');
+    if (toggle) toggle.onclick = () => {
+      hygCollapsed = !hygCollapsed;
+      const body = card.querySelector('#hygbody');
+      toggle.setAttribute('aria-expanded', hygCollapsed?'false':'true');
+      toggle.querySelector('.hygchev').textContent = hygCollapsed?'Show details ▸':'Hide details ▾';
+      if (body) body.hidden = hygCollapsed;
+    };
     card.addEventListener('click', async (e)=>{
       const b = e.target.closest('[data-hyg-act]'); if (!b) return;
       const act = b.getAttribute('data-hyg-act'), key = b.getAttribute('data-hyg-key');
@@ -3203,7 +3251,7 @@ function initDashboard(){
         ${img2(shotSrc(n),'shot','',n.screenshot)}
         <span class="m"><span class="nm">${esc(dlabel(n))}</span>
         <span class="cap${n.descPending?' dorm':''}">${n.descPending?'— caption dormant, waiting for your AI':esc(n.desc||'')}</span></span></button>`;
-    const ghostHtml = (f)=>`<button class="pg locked" data-goto="map"><span class="shot">not downloaded yet</span>
+    const ghostHtml = (f)=>`<button class="pg locked" data-ghost="${esc(f.id)}"><span class="shot">not downloaded yet</span>
         <span class="m"><span class="nm">${esc(f.pattern||f.label||'locked')}</span><span class="rt">linked from ${f.inboundCount||f.count||1} pages</span>
         <span class="unlock">Unlock</span></span></button>`;
     const overflow = overflowN>0 ? `<button class="pg locked" data-goto="map"><span class="shot">…and ${overflowN} more on the map</span>
@@ -3253,6 +3301,12 @@ function initDashboard(){
       c.onclick=()=>{ const n=byId[c.dataset.card]; if(n) selectPage(n); };
       c.addEventListener('focus', ()=>{ const n=byId[c.dataset.card]; const r=c.getBoundingClientRect(); if(n) showPeek(n, r.right-40, r.top); });
       c.addEventListener('blur', hidePeek);
+    });
+    // (I1) a locked frontier tile carries its own node id — routed through the same selectPage(n) entry
+    // point a captured card uses, rather than the generic [data-goto] tab switch every other locked
+    // surface (the overflow tile, the "Locked (N)" filter chip) still uses on purpose.
+    atlas.querySelectorAll('.pg[data-ghost]').forEach(c=>{
+      c.onclick=()=>{ const n=byId[c.dataset.ghost]; if(n) selectPage(n); };
     });
     document.querySelectorAll('#pane-home .filt[data-filt]').forEach(b=>b.onclick=()=>{
       document.querySelectorAll('#pane-home .filt[data-filt]').forEach(x=>x.classList.toggle('on', x===b));
@@ -3374,7 +3428,11 @@ function initDashboard(){
       // stacked, the camera still restores but the rail must NOT swap — there is no rail-swap below the
       // breakpoint, in either direction.
       // (P2) restoring a camera is a discrete jump, not a gesture frame — it commits (re-places the labels)
-      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null; commitMapView(); if(nn && !isStacked()) openPanel(nn); } }
+      if(mapReopen){ const nn=byId[mapReopen]; mapReopen=null;
+        // (I1) only a hand-off FROM the Atlas asks for a re-centre; the page-doc "← Back to map" hand-off
+        // leaves mapFocusPending false and commitMapView() below reapplies the untouched mapView as-is.
+        if(mapFocusPending){ mapFocusPending=false; if(nn) centerOnNode(nn.id); }
+        commitMapView(); if(nn && !isStacked()) openPanel(nn); } }
     // v2.6 F2.4: the bento can only be measured once its pane is on screen (a hidden pane has no
     // geometry), so the balance decision is (re)taken on every reveal.
     if(name==='design' && window.__bentoBalance) window.__bentoBalance();

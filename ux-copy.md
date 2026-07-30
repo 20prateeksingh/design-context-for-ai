@@ -1,5 +1,20 @@
 # UX copy canon
 
+## 2026-07-30 — dashboard interaction round: the hygiene card's expand/collapse labels
+
+`prds/dashboard-interaction-round.md`, I2. One string exists in two states; nothing else in this round
+touches copy (I1 is a routing fix, no new text).
+
+> **New:** `Show details ▸` (collapsed) / `Hide details ▾` (expanded)
+
+The hygiene card's toggle button, `#hygtoggle`'s `.hygchev` span. The locked title string —
+`Worth a look — N thing(s) in the library` / `Library check — all clean` — does not change and is not
+touched by this entry; it is what stays visible in the collapsed row, which is how the card keeps the
+"loud, never silent" rule while collapsed. "Show/Hide details" was chosen over a bare chevron alone
+because the button has no visible text otherwise for a screen reader that does not surface
+`aria-expanded`, and over "Expand/Collapse" because "details" names what is behind the toggle (the
+findings) rather than describing the mechanism.
+
 ## 2026-07-30 — map performance and direction (P1–P5): the ring claim gets its bound, and the links say which way they go
 
 `prds/map-performance-and-direction.md`. Three strings change and one is added. P1–P3 are geometry,
