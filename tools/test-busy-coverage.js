@@ -23,6 +23,16 @@
  *      truthy second argument. This is the exact shape of the historical bug and the cheapest possible
  *      guard against its recurrence: a call site with a missing/falsy button argument fails here even
  *      though it would run the capture just fine.
+ *   3. REDUCED-MOTION (§R rider, map-legibility-round) — every looping indicator in the stylesheet
+ *      resolves to a RUNNING animation under `prefers-reduced-motion`, asserted as a CLASS rather than
+ *      one instance at a time. Checks 1 and 2 guard the JS side of "the kit shows it is working"; this
+ *      one guards the CSS side, and it is the check that would have caught `.spin` and `.livedot` on its
+ *      own. The bug it exists for: the stylesheet opens with a blanket `*{animation:none!important}`, so
+ *      ANY indicator that loops at rest is silently frozen by reduced motion unless it carries its own
+ *      higher-specificity `!important` override. `.ring` got one in `17cb7e6`; its two siblings did not,
+ *      and nothing noticed for a round. So instead of naming the indicators, this check DERIVES them —
+ *      every selector in the sheet that declares an infinite animation — and requires each one to be
+ *      either overridden or listed in FROZEN_BY_DESIGN with a reason.
  *
  * Usage: node tools/test-busy-coverage.js      (exit 0 = pass, 1 = fail)
  */
@@ -142,5 +152,82 @@ for (const name of ['runCapture', 'launchGuided']) {
 console.log('\ntest-busy-coverage — both covered-shape instances are wired');
 ok(TEMPLATE.includes("wireCoveredShape(el, covered, 'cov')"), "rail panel instance wired: wireCoveredShape(el, covered, 'cov')");
 ok(TEMPLATE.includes("wireCoveredShape(el, pdCovered, 'pdcov')"), "page-doc instance wired: wireCoveredShape(el, pdCovered, 'pdcov')");
+
+// ── 3. REDUCED-MOTION — every looping indicator still runs under prefers-reduced-motion ─────────────
+// Selectors that are ALLOWED to be frozen by the blanket rule. Each needs a reason, so freezing a new
+// indicator is a conscious act recorded here rather than an omission nobody sees.
+const FROZEN_BY_DESIGN = {
+  '.skel::after': "a skeleton's SHAPE already conveys loading, and it is not a discrete action — the one exception the motion-pass comment names",
+};
+
+// Strip CSS comments, pull the stylesheet, and lift out the reduced-motion blocks (balanced braces).
+function balancedFrom(src, openIdx) { // openIdx = index OF the '{'
+  let depth = 0;
+  for (let i = openIdx; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (!depth) return { inner: src.slice(openIdx + 1, i), end: i + 1 }; }
+  }
+  return { inner: src.slice(openIdx + 1), end: src.length };
+}
+const STYLE = (TEMPLATE.match(/<style>([\s\S]*?)<\/style>/) || [, ''])[1].replace(/\/\*[\s\S]*?\*\//g, '');
+
+// The reduced-motion blocks come out; what is left is the "normal" cascade the blanket rule kills.
+const RM_RE = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g;
+let normal = '', rmText = '', cursor = 0, mm2;
+while ((mm2 = RM_RE.exec(STYLE))) {
+  const brace = STYLE.indexOf('{', mm2.index + '@media'.length);
+  const { inner, end } = balancedFrom(STYLE, brace);
+  normal += STYLE.slice(cursor, mm2.index);
+  rmText += inner + '\n';
+  cursor = end; RM_RE.lastIndex = end;
+}
+normal += STYLE.slice(cursor);
+
+// Walk back from an `animation:` declaration to the selector that owns it. @keyframes bodies need no
+// special handling: the walk stops at the FIRST brace behind the rule's own `{`, and a keyframes block's
+// outer `}` is exactly that — so a rule following one still reads its own selector, not the keyframes'.
+function selectorFor(src, declIdx) {
+  const open = src.lastIndexOf('{', declIdx);
+  if (open === -1) return null;
+  let start = 0;
+  for (let i = open - 1; i >= 0; i--) if (src[i] === '}' || src[i] === '{') { start = i + 1; break; }
+  return src.slice(start, open).replace(/\s+/g, ' ').trim();
+}
+const ANIM_RE = /animation\s*:\s*([^;}]+)/g;
+const looping = [];
+let a1;
+while ((a1 = ANIM_RE.exec(normal))) {
+  if (!/\binfinite\b/.test(a1[1])) continue;
+  const sel = selectorFor(normal, a1.index);
+  if (sel && !looping.some(l => l.sel === sel)) looping.push({ sel, value: a1[1].trim() });
+}
+
+// The reduced-motion overrides, one entry per individual selector in each rule's selector list.
+const overrides = {};
+const ANIM_RE2 = /animation\s*:\s*([^;}]+)/g;
+let a2;
+while ((a2 = ANIM_RE2.exec(rmText))) {
+  const sel = selectorFor(rmText, a2.index);
+  if (!sel) continue;
+  sel.split(',').forEach(s => { overrides[s.trim()] = a2[1].trim(); });
+}
+
+console.log('\ntest-busy-coverage — reduced motion: every looping indicator still animates (class-level guard)');
+ok(looping.length > 0, 'found at least one looping animation in the stylesheet', `found ${looping.length}`);
+ok(/^none\s*!important/.test(overrides['*'] || ''),
+  'the blanket `*{animation:none!important}` reduced-motion rule is still present (this guard is only meaningful while it is)',
+  `\`*\` resolves to \`${overrides['*'] || '(absent)'}\``);
+for (const { sel } of looping) {
+  if (FROZEN_BY_DESIGN[sel]) { ok(true, `${sel} — frozen by design: ${FROZEN_BY_DESIGN[sel]}`); continue; }
+  const ov = overrides[sel];
+  ok(!!ov, `${sel} — has a prefers-reduced-motion override`,
+    'no reduced-motion rule targets this selector, so the blanket `*{animation:none!important}` freezes it');
+  if (!ov) continue;
+  ok(!/^\s*none\b/.test(ov), `${sel} — its reduced-motion animation is not \`none\``, `resolves to \`${ov}\``);
+  ok(/\binfinite\b/.test(ov), `${sel} — its reduced-motion animation still loops`, `resolves to \`${ov}\``);
+  ok(/!important/.test(ov), `${sel} — carries !important, so it outranks the blanket rule`, `resolves to \`${ov}\``);
+  ok(!/\btransform\b|\brotate\b/.test(ov) && sel !== '*',
+    `${sel} — the substitute is a class-selector rule (beats \`*\` on specificity), not another transform`);
+}
 
 finish();

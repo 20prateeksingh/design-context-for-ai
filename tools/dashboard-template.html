@@ -432,7 +432,13 @@
   .spin { width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--accent-strong); border-radius:50%;
           margin:22px auto; animation:spin 1s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce){ .spin { animation:none; } }
+  /* (§R rider) .spin is the onboarding wizard's ONLY "the kit is working" signal while a first-time
+     designer's login and first capture run — and rotation is exactly what the blanket rule at the top of
+     this stylesheet (`*{animation:none!important}`) strips, which left a motionless circle wearing a
+     coloured top border. Same substitution .ring got: an opacity pulse, no transform, so it stays inside
+     the motion policy. Needs its own !important to outrank the blanket rule — importance ties, so
+     specificity decides, and .spin (a class) beats the universal selector. */
+  @media (prefers-reduced-motion: reduce){ .spin { animation:ringpulse 1s ease-in-out infinite !important; } }
   .prog { max-width:760px; margin:5vh auto 40px; }
   .prog h2 { font-size:21px; font-weight:680; }
   .prog .counters { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:16px 0; }
@@ -517,7 +523,20 @@
   .livedot.hot { background:var(--warn); animation-duration:.9s; }
   @keyframes livepulse { 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--accent-strong) 45%, transparent); opacity:1; } 50%{ box-shadow:0 0 0 6px transparent; opacity:.5; } }
   @keyframes liveframe { 0%,100%{ box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-strong) 25%, transparent); } 50%{ box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-strong) 55%, transparent); } }
-  @media (prefers-reduced-motion: reduce){ .ent.live{ animation:none; } .livedot,.livedot.hot{ animation:none; } }
+  /* (§R rider) the live heartbeat keeps beating under reduced motion, same policy as .ring and .spin —
+     two different substitutions for two different reasons:
+       · `livepulse` expands a halo from 0 to 6px of spread. A growing ring IS motion, so .livedot takes
+         the shared `ringpulse` opacity fade instead; .hot keeps its faster cadence, which is what hot means.
+       · `liveframe` never moves anything — both keyframes are `0 0 0 1px` and only the hairline's ALPHA
+         changes, i.e. it is already an opacity pulse in box-shadow clothing. So it simply keeps running.
+         Freezing it did not leave a static ring, it removed the ring outright (.ent.live declares no
+         box-shadow of its own), so a live entry became indistinguishable from a finished one.
+     Both need !important to beat the blanket `*{animation:none!important}`; both are class selectors, so
+     the specificity tie-break goes their way. */
+  @media (prefers-reduced-motion: reduce){
+    .ent.live { animation:liveframe 2.4s ease-in-out infinite !important; }
+    .livedot, .livedot.hot { animation:ringpulse 1s ease-in-out infinite !important; }
+    .livedot.hot { animation-duration:.9s !important; } }
   /* F1 capture menu — anchored under "+ Capture again"; fixed so it never grows the header */
   #recapmenu { position:fixed; z-index:60; min-width:288px; max-width:min(92vw,340px); background:var(--panel-2);
                border:1px solid var(--line); border-radius:12px; box-shadow:var(--elev); padding:6px; display:none; }
@@ -833,9 +852,17 @@
      recorded exception to "nothing loops," never a contradiction of it: `document.getAnimations()` is
      still empty once the map settles AND once every in-flight request has resolved or rejected.
      Reduced motion needs no new rules for THIS pass — the :root block kills every animation and
-     transition outright, so no transform motion survives it. .ring/.spin/.livedot carry their own
-     `prefers-reduced-motion` rule each (a static ring in place of a spin) since the settled-render gate
-     is orthogonal to whether a real action is still running. */
+     transition outright, so no transform motion survives it. (§R rider, 2026-07-30 — this paragraph used
+     to claim "a static ring in place of a spin", which is no longer what any of them does.) The in-flight
+     indicators each carry their own `prefers-reduced-motion` rule that OUTRANKS that blanket kill and
+     keeps looping, because a static indicator is not an indicator: .ring and .spin swap rotation for the
+     shared `ringpulse` opacity fade, .livedot swaps its expanding halo for the same, and .ent.live's
+     hairline-ALPHA breathe (which never moved anything) simply keeps running. Not one of the four is a
+     transform, so the motion policy is intact, and the settled-render gate stays orthogonal to whether a
+     real action is still in flight. `.skel::after` is the one deliberate exception — a skeleton's SHAPE
+     already conveys loading and it is not a discrete action, so its shimmer stays frozen.
+     tools/test-busy-coverage.js asserts this as a CLASS (every looping indicator, exemptions declared),
+     not one instance at a time — the instance kept recurring because nothing guarded the class. */
   @keyframes mzfade  { from { opacity:0; } }
   @keyframes mzpop   { from { opacity:0; transform:translate(-50%,-50%) scale(.92); } }
   @keyframes mzlift  { from { opacity:0; transform:scale(.92); } }
