@@ -72,6 +72,10 @@ for (const [name, entry] of Object.entries(PROMPTS)) {
   try { resolved[name] = String(entry(FIXTURE_SLUG)); ok(true, `PROMPTS.${name}() resolves to a string`); }
   catch (e) { ok(false, `PROMPTS.${name}() resolves to a string`, e.message); }
 }
+// prds/beta-marker.md §R: A.12 (patternMining) joined the 11 — assert the count explicitly, so a 13th
+// prompt landing without a deliberate bump here fails loudly instead of just falling through into the
+// LOCKED_TOKENS/LOCKED_NEG "new prompt" failures below.
+ok(Object.keys(resolved).length === 12, 'PROMPTS carries exactly 12 entries', `${Object.keys(resolved).length} found`);
 
 // ── Canonical shape: what a build always produces, regardless of product ──────────────────────────
 // Root-level files build-index.js/capture.js always write once ANY capture has run. Anything under
@@ -164,6 +168,9 @@ const LOCKED_TOKENS = {
   designNew: { code: ['`ASSUMED: …`', '`design-context/`', '`design-context/registry.json`', '`node tools/shot.js`', '`notes.md`', '`skills/wireframe-on-snapshot/SKILL.md`', '`tokens.json`', '`wireframes/new/<kebab-case name for this concept, your choice>/round-1/`'], sec: ['§7'], ph: ['‹describe it›'] },
   askQuestion: { code: ['`INDEX.md`', '`design-context/registry.json`'], ph: ['‹your question›'] },
   figma: { code: [] },
+  // A.12 is a first canonization, not a reshape — its "locked" set is simply its own shipped tokens,
+  // pinned here so a future edit to this prompt has to update this table deliberately, same as the 11.
+  patternMining: { code: ['`page.html`'] },
 };
 const CLASSES = { code: /`[^`]+`/g, sec: /§\s*\d+/g, flag: /--[a-z][a-z-]*/g, ph: /‹[^›]+›/g };
 const uniq = (s, re) => [...new Set(s.match(re) || [])].sort();
@@ -186,6 +193,7 @@ const LOCKED_NEG = {
   designNew: { never: 2 },
   askQuestion: {},
   figma: {},
+  patternMining: { "don't": 1 },
 };
 const negMultiset = (s) => (s.match(NEGATION) || []).reduce((m, x) => { const k = x.toLowerCase(); m[k] = (m[k] || 0) + 1; return m; }, {});
 

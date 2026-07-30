@@ -50,6 +50,12 @@
   header.band .wrap { display:flex; align-items:center; gap:16px; min-height:56px; }
   .mark { font-size:15px; font-weight:700; letter-spacing:-.01em; }
   .mark span { font-weight:400; color:var(--dim); }
+  /* (prds/beta-marker.md B2) same neutral chip language as the dashboard's #betachip — status, not a
+     problem, no accent token, so it never fights the header's own hairline-and-dim palette. */
+  .beta-mark { font-size:10px; font-weight:650; letter-spacing:.04em; text-transform:uppercase;
+               color:var(--dim); background:transparent; border:1px solid var(--line-2);
+               border-radius:999px; height:20px; padding:0 8px; display:inline-flex; align-items:center;
+               white-space:nowrap; }
   header.band nav { margin-left:auto; display:flex; align-items:center; gap:6px; }
   header.band nav a { color:var(--dim); font-size:13.5px; padding:6px 10px; border-radius:8px;
                       text-decoration:none; }
@@ -251,6 +257,7 @@
 <header class="band">
   <div class="wrap">
     <span class="mark">Design Context <span>Kit</span></span>
+    <span class="beta-mark">Beta</span>
     <nav>
       <a href="#how" class="hidesm">How it works</a>
       <a href="#library" class="hidesm">The library</a>
