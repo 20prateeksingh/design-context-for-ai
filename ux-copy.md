@@ -1,5 +1,55 @@
 # UX copy canon
 
+## 2026-07-30 — map performance and direction (P1–P5): the ring claim gets its bound, and the links say which way they go
+
+`prds/map-performance-and-direction.md`. Three strings change and one is added. P1–P3 are geometry,
+paint and file plumbing and change no copy at all.
+
+### The ring claim now carries its bound (P5)
+
+> **Superseded:** ~~`rings are honest clicks-from-home`~~
+> **Current:** `rings are honest clicks-from-home, as far as this capture went`
+
+`#mapstats`. Nothing about the encoding changed and the old sentence was not a lie — but it was
+*unbounded*, and the bound is real: `clickDepth` is `min(true depth, crawl depth)`. Measured across all
+nine libraries at the time of writing, the crawl stopped at depth **2** in seven of them and depth **1**
+in two (`kit-dashboard`, `testing-grounds-kit`), and in seven of nine the deepest ring on the map is
+exactly the crawl's own limit. So the ring axis is partly reporting a CLI flag, and a reader has no way
+to tell the difference between "nothing is three clicks away" and "we stopped looking at two".
+
+The correction is six words, not a redesign, and that is deliberate: the claim was already the honest
+one available. Two readings were rejected — *rings are clicks-from-home up to the crawl depth* (accurate
+and unreadable; "crawl depth" is not a phrase a designer owns) and dropping "honest" (the word is doing
+work — it distinguishes this axis from the decorative fog, and the M2 round is what earned it).
+
+**A depth-1 library reads correctly too**, which is the case worth checking: on `kit-dashboard` the map
+is a single ring, and *as far as this capture went* is exactly what one ring means.
+
+### Direction is now stated, not just drawn (P4)
+
+New `#maplegend` row: `a link brightens toward where it points`, with a gradient swatch.
+
+The stroke ramp is the cue (see the build report for the measured brightness gain); this row is the key
+to it, and it belongs in the legend rather than in `#mapnote` for two reasons. `#mapnote` is the map's
+one deliberately pill-less line, so it is the one place text can land on a bright disc thumbnail — the
+map-legibility round already logged a real 1.51:1 contrast failure there on airbnb — and it is already
+three clauses long. The legend is a surface with a hairline, it already explains every other spatial
+encoding, and it puts the key in the same screenshot as the thing it explains.
+
+### The hover peek states both directions
+
+> **Superseded:** ~~`linked from N pages`~~
+> **Current:** `N in · M out`
+
+`#peek`'s footer. The peek was the one place a reader could check a link count, and it reported only
+inbound — so on a page whose single visible edge went *out* to home, the peek could not settle the
+question the strokes had raised. `N in · M out` is the phrasing the home pill has used since v2.5.1, so
+this is one form in two places rather than a second form. It is also shorter than the line it replaces,
+so the footer row is unchanged in height.
+
+Locked (frontier) nodes keep `linked from N pages`: they have no captured `linksTo`, so an `M out` there
+would be a zero that means "not downloaded", not "links nowhere".
+
 ## 2026-07-30 — map legibility (M1–M4 + §R rider): one ruling reversed, zero strings changed
 
 `prds/map-legibility-round.md`. **No user-visible string in the dashboard changed in this round** — M1

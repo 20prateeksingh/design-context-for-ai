@@ -11,6 +11,11 @@
  *   • pages/<slug>/page.md — per-page digest: facts (route, template, headings, link
  *                          graph) + a marked "What this page is" section that the
  *                          describe step (AI, labeled) fills in.
+ *   • pages/<slug>/thumb.png — the render-time raster every on-screen consumer of a page's face
+ *                          shows instead of the multi-megapixel screenshot. BACKFILL path: a library
+ *                          captured before thumbnails shipped gets them here, so no workspace has to
+ *                          re-capture just to render fast. capture.js writes the same bytes at capture
+ *                          time; see tools/thumb.js for the size derivation and the determinism story.
  *
  * Idempotent: re-running regenerates all derived files but PRESERVES the AI-written
  * description between the ai:begin / ai:end markers in each page.md.
@@ -22,6 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { domainToUnicode } = require('url');
+const { backfillThumbs, thumbRel } = require('./thumb.js');
 
 const AI_BEGIN = '<!-- ai:begin method=ai — written by the describe step, NOT ground truth -->';
 const AI_END = '<!-- ai:end -->';
@@ -37,7 +43,12 @@ const PENDING = '_(not yet described — run the describe step)_';
 // because the nine canonical workspaces were re-copied by hand while the stamp never moved. Measured at
 // bump time: the six frozen landing-shots-* workspaces carried v1 stamps against materially different
 // content and the check was silent on every one.
-const KIT_SURFACES_VERSION = 2;
+// v3 (2026-07-30): P1 added a per-page derived binary, pages/<slug>/thumb.png, and with it a rule an
+// older copy does not carry — LOOK AT screenshot.png, NEVER at thumb.png. A workspace on the v2 copy has
+// those files in every page folder and has never been told what they are, which is exactly the kind of
+// silent gap the stamp exists to surface: a describe run could ground a page's screen doc in a 762px
+// downscale and call it pixel truth.
+const KIT_SURFACES_VERSION = 3;
 
 // journal actor canon — CLOSED set. The dashboard's journal filter chips (All/You/The kit/Your AI)
 // assume every event's actor is exactly one of these three, so each entry matches exactly one filter.
@@ -389,6 +400,14 @@ function buildIndex(libDir) {
   if (!hasPages) return buildEmptyIndex(libDir, manifest);
 
   const sitemap = JSON.parse(fs.readFileSync(path.join(libDir, 'ia', 'sitemap.json'), 'utf8'));
+
+  // 0. thumbnails — the backfill path. A page whose thumb.png is missing, or OLDER than its
+  // screenshot.png, gets one derived here; anything current is skipped untouched, so this is a no-op on
+  // the second run and on every library captured after thumbnails shipped. The mtime rule is what makes
+  // a re-capture invalidate a stale thumbnail without any bookkeeping. Deterministic: tools/thumb.js
+  // writes the same bytes from the same screenshot, run to run and here versus capture.js — which is
+  // what lets a derived binary sit inside a build-twice-byte-identical gate at all.
+  const thumbs = backfillThumbs(libDir);
 
   // 1. load every page's meta + existing AI description
   const pages = {};
@@ -1025,6 +1044,13 @@ function buildIndex(libDir) {
         label: m.navLabel || templateLabel(m) || (m.title || slug).slice(0, 40), displayLabel: displayLabelOf(slug), route: m.route,
         desc: p.description ? p.description.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim() : null,
         screenshot: `pages/${slug}/screenshot.png`, pageHtml: `pages/${slug}/page.html`, pageMd: `pages/${slug}/page.md`,
+        // ADDITIVE, and only when the file is really on disk: `screenshot` keeps its name and meaning
+        // (it is still the artifact, still what the "open full screenshot" links point at), and `thumb`
+        // is the small raster the on-screen consumers render. null on a page whose thumbnail could not
+        // be derived, which is what makes a part-migrated library render correctly — every consumer
+        // falls back to `screenshot`. Deliberately NOT written into registry.json: an agent reading the
+        // library must never be handed a downsampled stand-in for pixel truth.
+        thumb: thumbRel(libDir, slug),
         capturedAt: m.capturedAt, standsFor: m.template ? m.collapsed + 1 : null,
         states: p.states, notes: p.notes, descPending: !p.description,
         inboundCount: p.linkedFrom.length, clickDepth: depths[slug], section: sectionOf(m.route),
@@ -1121,7 +1147,7 @@ function buildIndex(libDir) {
   ].join('\n');
   fs.writeFileSync(path.join(libDir, 'INDEX.md'), index, 'utf8');
 
-  return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene };
+  return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene, thumbs };
 }
 
 module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl, deriveSkips }; // routeKey for the mirror test; deriveBrand & helpers for test-brand.js; deriveSkips for test-capture-log.js
@@ -1130,5 +1156,11 @@ if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');
   const r = buildIndex(libDir);
   console.log(`✅  INDEX.md + registry.json + ${r.pages} page.md files (${r.described} described, ${r.pages - r.described} pending)`);
+  // honesty rule #5: a page whose thumbnail could not be derived renders its full screenshot instead —
+  // that is a real state, so it is named rather than left to be noticed as slowness.
+  if (r.thumbs && (r.thumbs.written || r.thumbs.failed.length)) {
+    console.log(`🖼   thumbnails: ${r.thumbs.written} written, ${r.thumbs.skipped} already current` +
+      (r.thumbs.failed.length ? ` · ${r.thumbs.failed.length} could not be derived (full screenshot renders instead): ${r.thumbs.failed.map(f => `${f.slug} — ${f.reason}`).join('; ')}` : ''));
+  }
   try { if (r.hygiene) console.log(require('./hygiene.js').formatHygiene(r.hygiene)); } catch (_) {}
 }
