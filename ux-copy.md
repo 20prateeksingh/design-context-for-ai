@@ -1,5 +1,50 @@
 # UX copy canon
 
+## 2026-07-30 — beta marker (B1–B2) and the twelfth prompt (§R)
+
+`prds/beta-marker.md`, off Prateek's 2026-07-29 field test: *"Can we add a beta tag to our product and
+our website because technically our software is still in beta?"* Two new strings.
+
+### The beta marker (B1/B2)
+
+> **New:** `Beta`
+
+One word, two surfaces, same wording so it reads as one claim rather than two: the dashboard's `#betachip`
+(`tools/dashboard-template.html`, next to the brand in `#shell`, single-sourced as `BETA_LABEL` inside
+`boot()`) and the landing page's `.beta-mark` (`docs/index.html`, next to the `.mark` in the header band).
+Both render the word in the same neutral `--dim`/`--line-2` chip language — status, not a problem, so it
+is never mistaken for the `--warn`-colored `file://` banner or a hygiene finding. Neither surface's other
+identity strings ("AI Design context", "Design Context Kit") were touched — B3 only single-sources the
+*beta* marker; the product name stays exactly as fragmented as it already was (that's Prateek's open
+decision, tracked separately — see the BUILD-REPORT's B3 section for the full occurrence map).
+
+### A.12 — Learn what pattern mining will do (§R rider)
+
+`prds/beta-marker.md` §R. A twelfth copyable prompt has lived in the Components bento's dormant teaser
+(`tools/dashboard-template.html`) since the pattern-mining slot was added — an inline string literal,
+outside the `PROMPTS` object, absent from this file and from `tools/test-prompts.js`'s coverage, and the
+only copyable chip in the product that didn't share the other eleven's shape (`prds/prompt-readability.md`,
+`fbf2559`). Promoted into `PROMPTS.patternMining`, reshaped to the same shape, and now covered by
+`test-prompts.js` (12 prompts, count asserted).
+
+> **New:**
+````
+Explain what 'pattern mining' would add to this design-context library.
+
+- It would analyze the captured `page.html` files for repeating components — buttons, cards, rows — so new designs reuse the product's real parts.
+- Describe what the Components section would then show.
+- Don't run anything yet — just explain.
+````
+
+Unlike A.1–A.11's reshape, this is a **first canonization**, not a reshape of a previously-locked string —
+so its wording was checked against the Components card's own current copy ("Components — the product's
+repeating parts" / "Mined components are in `patterns.json`") rather than preserved byte-for-byte from the
+pre-existing inline literal. It matched; only the layout and two backtick spans (`page.html`) changed, to
+match the other eleven prompts' own convention of backticking filenames. No `‹placeholder›`, so the
+`FILL THIS IN:` marker line doesn't apply — the shared-shape assertions in `test-prompts.js` that only run
+`if (text.includes('‹'))` simply don't fire for this prompt, which is what "holds" means for one with no
+placeholder.
+
 ## 2026-07-30 — dashboard interaction round: the hygiene card's expand/collapse labels
 
 `prds/dashboard-interaction-round.md`, I2. One string exists in two states; nothing else in this round

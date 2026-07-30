@@ -66,6 +66,14 @@
            padding:0 var(--pad); background:var(--bg); border-bottom:1px solid var(--line); z-index:20; }
   #shell h1 { font-size:14px; font-weight:700; margin-right:8px; white-space:nowrap; }
   #shell h1 .mono { font-family:var(--mono); color:var(--dim); font-weight:400; font-size:12px; }
+  /* (prds/beta-marker.md B1) status, not a problem — --dim/--line-2, the same neutral family the file://
+     banner does NOT use (that one is --warn). Carries no --accent* token, so it renders identically
+     whichever product's colour the shell is wearing (§ whitelabel note above) — verified live rather
+     than only reasoned, on the fleet's two accent extremes. Sits before the tabs, so it never touches
+     the right-hand cluster's own geometry (v2.4.2 F3). */
+  #betachip { font-size:10px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:var(--dim);
+              background:transparent; border:1px solid var(--line-2); border-radius:999px; height:20px;
+              padding:0 8px; display:inline-flex; align-items:center; white-space:nowrap; }
   .tabs { display:flex; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:3px; }
   .tab { display:flex; align-items:center; gap:7px; border:0; background:none; color:var(--dim); font-size:13px;
          font-weight:550; padding:5px 13px; border-radius:6px; transition:background .2s,color .2s; }
@@ -1039,6 +1047,7 @@
 <body>
 <div id="shell">
   <h1 id="title"></h1>
+  <span class="betachip" id="betachip"></span>
   <div class="tabs" role="tablist">
     <button class="tab active" data-tab="home" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>Home</button>
     <button class="tab" data-tab="map" role="tab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><circle cx="13.5" cy="3" r="1.5"/><circle cx="2.5" cy="4" r="1.5"/><circle cx="12.5" cy="13" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><path d="M9.7 6.7 12.4 4M6.2 6.9 3.7 4.9M9.6 9.4l1.9 2.6M6.3 9.3 4.1 11.6"/></svg>Map</button>
@@ -1226,6 +1235,17 @@ const PROMPTS = {
     + "- Open the dashboard, go to the page you want, and click ⧉ Copy for Figma.\n"
     + "- Paste into your Figma file (⌘V).\n"
     + "- It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
+  // A.12 (prds/beta-marker.md §R — promoted from an inline pchip() string literal, the Components
+  //       bento's dormant teaser; content checked against that card's current copy ("Components — the
+  //       product's repeating parts" / "Mined components are in patterns.json") before canonizing —
+  //       still accurate, wording otherwise reshaped rather than preserved verbatim, since this is a
+  //       first canonization, not a reshape of a locked prior string. Shared shape, no ‹placeholder›.)
+  patternMining: () =>
+    "Explain what 'pattern mining' would add to this design-context library.\n"
+    + "\n"
+    + "- It would analyze the captured `page.html` files for repeating components — buttons, cards, rows — so new designs reuse the product's real parts.\n"
+    + "- Describe what the Components section would then show.\n"
+    + "- Don't run anything yet — just explain.",
 };
 const COPY_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M3.4 10.5H3A1.5 1.5 0 0 1 1.5 9V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.4"/></svg>';
 function pchip(label, text, ghost){ return `<button type="button" class="pchip${ghost?' ghost':''}" data-prompt="${esc(text)}">${COPY_SVG}${esc(label)}</button>`; }
@@ -1570,6 +1590,9 @@ function mountAttemptBanner(a){
   // v2.4: the top bar carries the KIT's identity ("AI Design context") in every mode — the per-product
   // name lives entirely in content (the Home H1). The browser <title> keeps the product (tab identity).
   document.getElementById('title').innerHTML = 'AI Design <span class="mono">context</span>';
+  // (prds/beta-marker.md B1/B3) single source for the chip's wording in this file — canon: ux-copy.md
+  const BETA_LABEL = 'Beta';
+  document.getElementById('betachip').textContent = BETA_LABEL;
   // file:// can never have the kit's server behind it — skip the probe there (it would only paint a
   // scheme error into the console; §8.J wants file:// consoles clean). Any http(s) host still probes.
   if (location.protocol === 'file:') serverMode = false;
@@ -3520,7 +3543,7 @@ function initDashboard(){
                 <div class="cmeta">someday</div>
                 <div class="ctitle">Components</div>
                 <div class="cdetail">repeating patterns mined from your pages will land here</div>
-                <div style="margin-top:8px">${pchip('Learn what pattern mining will do', "Explain what 'pattern mining' would add to this design-context library: analyzing the captured page.html files for repeating components (buttons, cards, rows) so new designs reuse the product's real parts. Describe what the Components section would then show. Don't run anything yet — just explain.", true)}</div>
+                <div style="margin-top:8px">${pchip('Learn what pattern mining will do', PROMPTS.patternMining(), true)}</div>
               </div>`}
         </div>
       </div>`;
