@@ -32,7 +32,14 @@ _Windows: both `.sh` scripts are macOS/Linux only — `setup.sh` included. Subst
 
 ## After capture — use it
 
-**Any moment of your product, in Figma, editable, in one paste.** On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click **⧉ Copy for Figma** and paste into your Figma file (⌘V). It lands as editable **auto-layout layers**, not a flat image — arrange or restyle freely. No plugin, no extension, no Dev Mode, no paid seat; your library stays untouched. One caveat stated plainly: to keep the pasted text as text, the converter fetches public font files from a CDN during a copy — that single request is the only time the kit reaches the network on your behalf, and it carries none of your data.
+**Any moment of your product, in Figma, editable, in one paste.** On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click **⧉ Copy for Figma** and paste into your Figma file (⌘V). It lands as editable **auto-layout layers**, not a flat image — arrange or restyle freely. No plugin, no extension, no Dev Mode, no paid seat; your library stays untouched.
+
+Two network moments, stated plainly, because a copy is the one thing here that reaches outside your machine:
+
+- **A copy loads Figma's own converter from `mcp.figma.com`** at the moment you click. It is Figma's code, fetched fresh each time rather than shipped inside the kit, and it runs in your browser like any other script on the page.
+- **If that host can't be reached** — you're offline, or your network blocks it — the copy falls back to the converter bundled under `tools/vendor/`, which fetches public font files from a CDN so your pasted text stays text instead of disappearing. The success message names whichever converter ran, so you always know which one you got.
+
+Neither path uploads your page or your library. The conversion happens entirely on your machine, and no data of yours is sent to either host.
 
 The dashboard's **Use it** tab turns the library into next moves — every button copies a ready-to-paste prompt with your real file paths already in it. In short:
 
@@ -76,4 +83,4 @@ macOS/Linux with [Node.js](https://nodejs.org) (LTS). `tools/setup.sh` handles t
 
 ## Credits
 
-Figma paste powered by [@figit/dom-to-figma](https://www.npmjs.com/package/@figit/dom-to-figma) (MIT), vendored under `tools/vendor/`.
+Figma paste is powered by Figma's own `capture.js`, loaded at copy time from `mcp.figma.com` — Figma's code, hotlinked and never redistributed here. The offline fallback is [@figit/dom-to-figma](https://www.npmjs.com/package/@figit/dom-to-figma) (MIT), vendored under `tools/vendor/`.
