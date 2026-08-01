@@ -2729,7 +2729,22 @@ function initDashboard(){
   let figmaCache = null;   // { key, item, html } — a converted payload kept for a focused click:
                            //   both the two-phase re-arm (F2·3) AND the same-page repeat-copy cache (§4·5)
 
+  // ── capture.js — Figma's OWN engine, and now the primary one (figma-exit-capture-js, F1) ──
+  // A measured A/B (2026-08-01, paste-verified) put this ahead of dom-to-figma on 6 features and
+  // level on 5: radial-gradient, transform:rotate(), ::after content and inline SVG all survive
+  // here and are dropped there, and gradient angles come through unmirrored.
+  //
+  // ⛔ NEVER vendor, copy, commit or inline this file. It is loaded at RUNTIME, by <script src>,
+  // from Figma's own server. That is the whole reason the dashboard may use it at all: the kit's
+  // Chrome extension had to vendor it (MV3 forbids remote code) and vendoring is redistribution
+  // of a proprietary file. A plain local HTML page hotlinking a publicly served script is not.
+  // `_dom-to-figma.js` stays vendored because it is MIT; this one must never be.
+  const CAPTURE_JS_URL = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
+  const CAPTURE_LOAD_MS = 15000;   // script fetch budget — offline/CSP failure falls back (F3)
+  const CAPTURE_RUN_MS  = 90000;   // serialize budget; big pages are slow, a hang must not be silent
+
   // Lazy-load the 830KB vendored bundle on first use ONLY — first paint never pays for it (§4·5).
+  // Now the FALLBACK path (F3), so a copy that goes through capture.js never fetches it at all.
   function loadFigmaLib(){
     if (figmaLib) return Promise.resolve(figmaLib);
     if (typeof window.DomToFigma !== 'undefined'){ figmaLib = window.DomToFigma; return Promise.resolve(figmaLib); }
@@ -2741,12 +2756,77 @@ function initDashboard(){
     });
   }
 
+  // Convert the already-mounted, already-sized iframe through capture.js and return the SAME payload
+  // shape dom-to-figma returns, so the cache, the re-arm and attemptWrite below are untouched.
+  //
+  // We do NOT let capture.js write the clipboard itself, and we do NOT await what it returns. Reading
+  // the minified source (2026-08-01): its clipboard branch builds the figmeta/figh2d text/html envelope,
+  // awaits a focus gate, writes, and only THEN returns `bd().promise` — which resolves solely from the
+  // "Close" handler of a success bar it injects into its own document. Offscreen, nobody can click that,
+  // so on SUCCESS that promise never settles; only FAILURES settle (as {success:false,error}). Awaiting
+  // it would hang every copy. So we intercept the write, take the envelope, and treat a settled promise
+  // as the error channel. Intercepting also means the write that reaches the OS still happens in the TOP
+  // document on the user's real gesture (attemptWrite) — which is what answers hazard 1 below.
+  async function captureViaFigma(frame){
+    const w = frame.contentWindow, doc = frame.contentDocument;
+    await new Promise((resolve, reject)=>{
+      const s = doc.createElement('script');
+      s.src = CAPTURE_JS_URL;
+      s.onload = ()=>resolve();
+      s.onerror = ()=>reject(new Error('capture.js did not load (offline, blocked, or CSP)'));
+      doc.head.appendChild(s);
+      setTimeout(()=>reject(new Error('capture.js load timed out')), CAPTURE_LOAD_MS);
+    });
+    if (!w.figma || typeof w.figma.captureForDesign !== 'function') throw new Error('capture.js exposed no captureForDesign');
+
+    // HAZARD 1 (focus) — capture.js parks on a `focus` event whenever its own document is unfocused,
+    // and an offscreen iframe never is. Answered at the source: focus() first, and since the real
+    // clipboard write is ours and happens later under a genuine gesture, the iframe's own check is
+    // told the truth it needs. No synthetic events, no mounting in the top document.
+    try { w.focus(); } catch(_){}
+    const realHasFocus = doc.hasFocus;
+    doc.hasFocus = ()=>true;
+
+    // Take the ClipboardItem instead of letting it reach the OS clipboard.
+    let grabbed = null, resolveGrab;
+    const got = new Promise(res => { resolveGrab = res; });
+    const stubWrite = async (items)=>{ grabbed = items && items[0]; resolveGrab(); };
+    const clip = w.navigator.clipboard;
+    const realWrite = clip && clip.write;
+    if (clip) clip.write = stubWrite;
+    else Object.defineProperty(w.navigator, 'clipboard', { value: { write: stubWrite }, configurable: true });
+    if (typeof w.ClipboardItem === 'undefined'){   // file:// realms can lack it; capture.js constructs one
+      w.ClipboardItem = function(data){ this._data = data; this.types = Object.keys(data); };
+      w.ClipboardItem.prototype.getType = function(t){ return Promise.resolve(this._data[t]); };
+    }
+
+    try {
+      let failure = null;
+      const settled = Promise.resolve()
+        .then(()=> w.figma.captureForDesign({ selector: 'body' }))
+        .then(r => { failure = (r && r.error) || 'capture.js finished without writing a payload'; },
+              e => { failure = (e && e.message) || String(e); });
+      await Promise.race([
+        got,
+        settled.then(()=>{ if (!grabbed) throw new Error(failure); }),
+        new Promise((_, rej)=>setTimeout(()=>rej(new Error('capture.js timed out')), CAPTURE_RUN_MS))
+      ]);
+      if (!grabbed) throw new Error(failure || 'capture.js produced no payload');
+      const html = await (await grabbed.getType('text/html')).text();
+      if (!/data-h2d="<!--\(figh2d\)/.test(html)) throw new Error('capture.js payload carried no figh2d envelope');
+      // Rebuild in the TOP realm — a cross-realm ClipboardItem is not reliably accepted by our write.
+      return { item: new ClipboardItem({ 'text/html': new Blob([html], { type:'text/html' }) }), html, bytes: html.length };
+    } finally {
+      if (clip && realWrite) clip.write = realWrite;
+      doc.hasFocus = realHasFocus;
+    }
+  }
+
   // Convert one snapshot → a Figma clipboard payload. The snapshot's page.html runs in a hidden,
   // OFFSCREEN same-origin iframe (never display:none — computed styles need real layout) so we convert
   // the TRUE product DOM, not the dashboard. Width rule (F2·2) lands the frame at the snapshot's natural
   // width (min 1440 — the capture viewport) so nothing crops. The iframe is always torn down (F2·hygiene).
   async function convertSnapshot(src, name){
-    const lib = await loadFigmaLib();
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:0;visibility:hidden';
@@ -2777,9 +2857,20 @@ function initDashboard(){
       await Promise.allSettled(imgs.map(img => img.decode ? img.decode() : Promise.resolve()));
       height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);   // re-measure: a decoded image with no reserved box can reflow the page
       frame.style.height = height + 'px';
-      const conv = lib.createFigmaConverter();   // default font loader — embeds real fonts so Figma keeps the text
-      const result = await conv.convert({ element: doc.body, width, height, name });
-      return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0 };
+      // Primary = capture.js (F1). Any failure — offline, CSP, load timeout, an unresolved hazard, a
+      // payload with no figh2d envelope — degrades to the vendored dom-to-figma engine (F3), which is
+      // announced in the UI rather than swallowed. Offline is a first-class path for this product.
+      try {
+        const payload = await captureViaFigma(frame);
+        payload.engine = 'capture';
+        return payload;
+      } catch (e) {
+        console.warn('[figma] capture.js unavailable — falling back to dom-to-figma:', (e && e.message) || e);
+        const lib = await loadFigmaLib();
+        const conv = lib.createFigmaConverter();   // default font loader — embeds real fonts so Figma keeps the text
+        const result = await conv.convert({ element: doc.body, width, height, name });
+        return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0, engine: 'domToFigma' };
+      }
     } finally {
       frame.remove();
     }
@@ -2845,7 +2936,7 @@ function initDashboard(){
     toast('big pages take ~10 seconds', true);
     try {
       const payload = await convertSnapshot(src, name);
-      figmaCache = { key: src, item: payload.item, html: payload.html };
+      figmaCache = { key: src, item: payload.item, html: payload.html, engine: payload.engine };
       toast('', false); const t=document.getElementById('toast'); if(t) t.style.display='none';
       if (document.hasFocus()){
         const r = await attemptWrite(figmaCache);
