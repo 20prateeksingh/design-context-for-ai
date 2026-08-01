@@ -2925,14 +2925,20 @@ function initDashboard(){
       + ' data-figma-name="' + esc(name) + '">' + FIG_LABEL + '</button>';
   }
   function setFigBtn(btn, text, cls){ btn.textContent = text; btn.className = 'figbtn' + (btn.classList.contains('mini') ? ' mini' : '') + (cls ? ' ' + cls : ''); }
-  function figSuccess(btn){
+  function figSuccess(btn, engine){
     // (figmaCache is intentionally kept — an instant same-page repeat copy skips re-conversion, §4·5)
     setFigBtn(btn, FIG_LABEL, '');
     btn.disabled = false;
-    toast('Copied — paste into Figma (⌘V). It lands as editable layers.');
+    // F3 — which engine did this copy is never silent. Falling back to dom-to-figma is a real
+    // degradation (it drops radial-gradients, transform:rotate(), ::after and inline SVG), so the
+    // designer is told, in the success state, rather than discovering it at paste. Names no paste
+    // shortcut on purpose: this dashboard runs on both platforms and ⌘V is wrong on Windows.
+    toast(engine === 'domToFigma'
+      ? 'Copied — offline fallback. Some effects may be simplified.'
+      : 'Copied — editable layers via Figma capture. Paste into your Figma file.');
     // F3 — record the exit in the ledger (server mode only; file:// copies work but are logged silently).
     if (serverMode){ const slug = btn.getAttribute('data-figma-slug'), state = btn.getAttribute('data-figma-state') || null;
-      if (slug) api('/api/figma-copy', state ? { slug, state } : { slug }); }
+      if (slug) api('/api/figma-copy', Object.assign({ slug }, state ? { state } : null, engine ? { engine } : null)); }
   }
   function figRearm(btn){   // F2·3: payload is cached; the NEXT click (a fresh gesture) writes instantly
     setFigBtn(btn, 'Ready — click to copy', 'armed'); btn.disabled = false;
@@ -2952,7 +2958,7 @@ function initDashboard(){
     // focused, write it instantly (no re-convert); if still unfocused, re-arm again.
     if (figmaCache && figmaCache.key === src){
       if (document.hasFocus()){ btn.disabled = true;
-        try { const r = await attemptWrite(figmaCache); r === 'ok' ? figSuccess(btn) : figRearm(btn); }
+        try { const r = await attemptWrite(figmaCache); r === 'ok' ? figSuccess(btn, figmaCache.engine) : figRearm(btn); }
         catch(_){ figFail(btn); }
       } else { figRearm(btn); }
       return;
@@ -2966,7 +2972,7 @@ function initDashboard(){
       toast('', false); const t=document.getElementById('toast'); if(t) t.style.display='none';
       if (document.hasFocus()){
         const r = await attemptWrite(figmaCache);
-        r === 'ok' ? figSuccess(btn) : figRearm(btn);
+        r === 'ok' ? figSuccess(btn, figmaCache.engine) : figRearm(btn);
       } else {
         figRearm(btn);   // converted, but focus was lost mid-conversion — re-arm for a fresh-gesture write
       }

@@ -891,3 +891,25 @@ and the section body states the font request in the open rather than omitting it
 **CLAUDE.md / AGENTS.md — hard-rule additions** (E5, E16 — not dashboard copy, but canon-worthy standing instructions): the describe-step exception to "never edit library files" (rule 1); the designer-owned `annotations.json.hygiene` block + derived `foldedInto`/`template` fields, one sentence each surface.
 
 **INDEX.md front-matter** (E4 — new, machine-readable, first six lines): ` ```\ndescribed: N/M · states: N · frontier: N · offOrigin: N hosts · labels: scraped\n``` `
+
+## 2026-08-01 — Figma exit moves to capture.js (F1–F5)
+
+`prds/figma-exit-capture-js.md`. The designer-facing **⧉ Copy for Figma** now runs Figma's own
+capture.js, with the vendored dom-to-figma bundle kept as a real fallback. Two engines means the
+success state can no longer be one fixed sentence: falling back is a genuine loss of fidelity
+(radial-gradient, `transform: rotate()`, `::after` content and inline SVG are all dropped by
+dom-to-figma), so it is announced rather than discovered at paste time.
+
+**Copy-for-Figma success toast** (F3 — was one engine-blind sentence; now names the engine):
+- capture.js: `Copied — editable layers via Figma capture. Paste into your Figma file.`
+- dom-to-figma fallback: `Copied — offline fallback. Some effects may be simplified.`
+> Superseded (struck 2026-08-01): `Copied — paste into Figma (⌘V). It lands as editable layers.`
+
+Both strings deliberately name **no paste shortcut**. The old one hard-coded `⌘V`, which is simply
+wrong on Windows — where this build and its gates ran, and where the kit's launch path now falls
+back to Edge. Naming no shortcut is cheaper than branching on platform and cannot go stale.
+
+> **Still hard-coded elsewhere (found, not fixed by this round):** `⌘V` survives in prompt **A.10**
+> (`figma`, the copy-a-prompt string) and in the Use-it tab's prose paragraph. Both are wrong on
+> Windows for the same reason. A.10 is canon with a stable ID and this brief's house rule was
+> *canon verbatim*, so neither was touched here — they need their own decision.
