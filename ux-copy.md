@@ -913,3 +913,21 @@ back to Edge. Naming no shortcut is cheaper than branching on platform and canno
 > (`figma`, the copy-a-prompt string) and in the Use-it tab's prose paragraph. Both are wrong on
 > Windows for the same reason. A.10 is canon with a stable ID and this brief's house rule was
 > *canon verbatim*, so neither was touched here — they need their own decision.
+
+### 2026-08-01b — the two remaining `⌘V` hard-codes, made platform-aware
+
+The entry above recorded these as *found, not fixed*, because the round's house rule was **canon
+verbatim**. Prateek's call, same day: make them platform-agnostic. Both now branch on the existing
+`IS_MAC` constant (`tools/dashboard-template.html:1107`) rather than asserting a Mac shortcut.
+
+**A.10 `figma`** (the copy-a-prompt string — addressed to the designer, not to a model):
+`- Paste into your Figma file (${IS_MAC ? '⌘V' : 'Ctrl+V'}).`
+> Superseded (struck 2026-08-01): `- Paste into your Figma file (⌘V).`
+
+**Use-it tab — "Take any page straight into Figma"** paragraph:
+`… click ⧉ Copy for Figma and paste into your Figma file (${IS_MAC ? '⌘V' : 'Ctrl+V'}). …`
+> Superseded (struck 2026-08-01): `… paste into your Figma file (⌘V). …`
+
+Both are rendered in the designer's own browser, so the branch resolves against the machine actually
+reading the string. The Copy-for-Figma **success toast** stays deliberately shortcut-free — a
+transient confirmation does not need to teach a keystroke, and not naming one cannot go stale.

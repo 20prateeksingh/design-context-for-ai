@@ -1233,7 +1233,7 @@ const PROMPTS = {
     "How do I get a captured page into Figma?\n"
     + "\n"
     + "- Open the dashboard, go to the page you want, and click ⧉ Copy for Figma.\n"
-    + "- Paste into your Figma file (⌘V).\n"
+    + "- Paste into your Figma file (" + (IS_MAC ? "⌘V" : "Ctrl+V") + ").\n"
     + "- It lands as editable auto-layout layers — arrange or restyle freely; the library stays untouched.",
   // A.12 (prds/beta-marker.md §R — promoted from an inline pchip() string literal, the Components
   //       bento's dormant teaser; content checked against that card's current copy ("Components — the
@@ -3909,7 +3909,7 @@ function initDashboard(){
       <div class="mode">
         <span class="badge">new</span>
         <h3>Take any page straight into Figma</h3>
-        <p>On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click <b>⧉ Copy for Figma</b> and paste into your Figma file (⌘V). It lands as editable auto-layout layers — arrange or restyle freely; your library stays untouched. No plugin, no Dev Mode, no paid seat.</p>
+        <p>On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click <b>⧉ Copy for Figma</b> and paste into your Figma file (${IS_MAC?'⌘V':'Ctrl+V'}). It lands as editable auto-layout layers — arrange or restyle freely; your library stays untouched. No plugin, no Dev Mode, no paid seat.</p>
         <div class="chiprow">${pchip('How to copy for Figma', PROMPTS.figma(), true)}</div>
       </div>
       <div class="mode">
