@@ -54,6 +54,46 @@ this file is a dated ledger, and rewriting what a past build shipped would destr
 that the claim was ever made. So a repo-wide grep for the old phrase still returns that one
 historical line, by design.
 
+### The same round, F3 — the README's Windows note, and the last two static `⌘V`s
+
+**This closes the loop the `2026-08-01b` entry left open.** That entry made the dashboard's `⌘V`
+strings branch on `IS_MAC`, and correctly noted that markdown cannot branch. The two static files
+that carry the same string were never revisited, so they shipped a Mac keystroke to Windows readers.
+Both are now shortcut-free rather than platform-branched — the same call the success toast made, for
+the same reason: not naming a keystroke cannot go stale.
+
+**`README.md`** — the Figma-paste sentence:
+
+> **New:** `click ⧉ Copy for Figma and paste into your Figma file.`
+> Superseded (struck 2026-08-02): ~~`click ⧉ Copy for Figma and paste into your Figma file (⌘V).`~~
+
+**`skills/capture-product/SKILL.md`** — the §6 wrap-up line, quoted from prompt canon **A.10**. This
+one was the worst of the three, because the reader is the **assistant**: a wrong keystroke here gets
+repeated to a Windows designer in conversation, where no grep will ever find it. So the fix also
+states *why*, to stop it being re-added:
+
+> **New:** `… one click copies that snapshot to the clipboard and it pastes into Figma as editable auto-layout layers. Don't name a paste shortcut — the designer may be on Windows, where ⌘V is wrong; the dashboard's own copy is platform-aware and this file can't be.`
+> Superseded (struck 2026-08-02): ~~`… it pastes into Figma (⌘V) as editable auto-layout layers.`~~
+
+**`README.md`'s Windows note** — rewritten, three things wrong with it. It contained the same `&&`
+that parse-errors in PowerShell (so the note written *for* Windows readers did not run there); it
+said *"the Windows path hasn't been through a cold-start test yet"*, which stopped being true on
+2026-08-02; and the capture command it pointed at omitted `--logged-out`, without which the first
+real command a terminal designer runs **fails on any public site**.
+
+> **New:** `Windows: both .sh scripts are macOS/Linux only — setup.sh included. Run these three lines instead, one at a time (Windows PowerShell has no &&, and chaining them is a parse error that stops the line before anything in it runs): … The node commands above then work exactly as shown. Windows has been through a cold-start run of both routes — the AI-assisted one and this one — and capture, the dashboard, design-language extraction and folder paths containing spaces all came through clean. What it doesn't get is the double-click convenience: the .sh scripts need Git Bash, and even there they won't open your browser for you, so open the dashboard URL yourself.`
+> Superseded (struck 2026-08-02): ~~`… Substitute npm install --prefix tools and then cd tools && npx playwright install chromium … The Windows path hasn't been through a cold-start test yet, so the AI-assisted route above is the better bet there.`~~
+
+Two calls worth recording:
+
+- **The untested claim is replaced, not just deleted.** Saying nothing would leave a Windows reader
+  guessing; a blanket *"hasn't been tested"* costs trust for no reason once it has been. So the new
+  copy names what was actually exercised and, in the same breath, the one thing Windows genuinely
+  doesn't get — the double-click. Specific caveats buy trust where blanket ones spend it.
+- **`Requirements` had to move with it.** It still read *"macOS/Linux with Node.js"*, which flatly
+  contradicts a note claiming Windows works. Now `macOS, Linux or Windows`, pointing Windows readers
+  at the three commands instead of at `setup.sh`.
+
 ## 2026-08-01 — dark capture and modern color (`prds/dark-capture-and-modern-color.md`)
 
 Off a live capture of `tailwindcss.com` that came back as a white page with a three-color palette.
@@ -972,6 +1012,11 @@ back to Edge. Naming no shortcut is cheaper than branching on platform and canno
 > (`figma`, the copy-a-prompt string) and in the Use-it tab's prose paragraph. Both are wrong on
 > Windows for the same reason. A.10 is canon with a stable ID and this brief's house rule was
 > *canon verbatim*, so neither was touched here — they need their own decision.
+>
+> **CLOSED 2026-08-02** — the two dashboard strings on 2026-08-01b (see below), and the last two
+> *static* copies, which no `IS_MAC` branch could reach, in the `pre-ship-fixes` F3 entry at the top
+> of this file. One `⌘` remains in the shipped tree: `docs/index.html`'s copy-button fallback
+> (`Press ⌘C`), which is a JS string and so was left to a round allowed to change code.
 
 ### 2026-08-01b — the two remaining `⌘V` hard-codes, made platform-aware
 
