@@ -1137,9 +1137,18 @@ function buildIndex(libDir) {
   // 830KB, so it's NEVER inlined into the single-file dashboard — the dashboard lazy-loads it on the
   // first Copy-for-Figma click (dashboard first-paint cost unchanged). Absent-safe: if the vendored
   // file is missing, the build still succeeds and the dashboard shows its own paste-help toast.
+  // Both derived assets below carry a licence banner. `tools/vendor/` holds the full licence texts,
+  // but the DERIVED copies are what actually ship inside a designer's workspace — and MIT and the SIL
+  // OFL both require the copyright notice to travel with the copy, not merely to exist upstream. A
+  // bare copyFileSync/writeFileSync left third-party bytes in the library with no notice attached.
+  // The banners are static strings, so determinism is unaffected.
   try {
     const vendored = path.join(__dirname, 'vendor', 'dom-to-figma.iife.js');
-    if (fs.existsSync(vendored)) fs.copyFileSync(vendored, path.join(libDir, '_dom-to-figma.js'));
+    if (fs.existsSync(vendored)) {
+      const banner = '/*! @figit/dom-to-figma v0.2.1 | MIT | Copyright (c) 2026 Figit'
+        + ' | full licence: tools/vendor/LICENSE-dom-to-figma */\n';
+      fs.writeFileSync(path.join(libDir, '_dom-to-figma.js'), banner + fs.readFileSync(vendored, 'utf8'), 'utf8');
+    }
   } catch (e) { console.log(`⚠ dom-to-figma copy: ${e.message.split('\n')[0]}`); }
 
   // 4d. _fallback-font.js — the vendored fallback typeface, so the dom-to-figma fallback can always
@@ -1151,7 +1160,11 @@ function buildIndex(libDir) {
     const font = path.join(__dirname, 'vendor', 'inter-latin-400-normal.woff2');
     if (fs.existsSync(font)) {
       const b64 = fs.readFileSync(font).toString('base64');
-      fs.writeFileSync(path.join(libDir, '_fallback-font.js'), `window.__KIT_FALLBACK_FONT=${JSON.stringify(b64)};\n`, 'utf8');
+      const banner = '/*! Inter (latin 400 normal) | SIL Open Font License 1.1'
+        + ' | Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)'
+        + ' | full licence: tools/vendor/LICENSE-inter */\n';
+      fs.writeFileSync(path.join(libDir, '_fallback-font.js'),
+        banner + `window.__KIT_FALLBACK_FONT=${JSON.stringify(b64)};\n`, 'utf8');
     }
   } catch (e) { console.log(`⚠ fallback font: ${e.message.split('\n')[0]}`); }
 
