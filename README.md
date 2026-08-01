@@ -26,13 +26,22 @@ tools/start.sh                                        # deps + server + dashboar
 tools/setup.sh                                        # one-time: install dependencies + browser
 node tools/login.js --url https://app.example.com     # log in once, close the window (only if you sign in)
 node tools/capture.js --url https://app.example.com   # capture → design-context/
+node tools/capture.js --url https://example.com --logged-out   # a public site: no login, no profile
 ```
 
-_Windows: both `.sh` scripts are macOS/Linux only — `setup.sh` included. Substitute `npm install --prefix tools` and then `cd tools && npx playwright install chromium`, and run the two `node` commands as shown; `node tools/map.js --port 4173` gives you the dashboard. The Windows path hasn't been through a cold-start test yet, so the AI-assisted route above is the better bet there._
+_Windows: both `.sh` scripts are macOS/Linux only — `setup.sh` included. Run these three lines instead, **one at a time** (Windows PowerShell has no `&&`, and chaining them is a parse error that stops the line before anything in it runs):_
+
+```
+npm install --prefix tools --no-fund --no-audit
+npx --prefix tools playwright install chromium
+node tools/map.js --port 4173
+```
+
+_The `node` commands above then work exactly as shown. Windows has been through a cold-start run of both routes — the AI-assisted one and this one — and capture, the dashboard, design-language extraction and folder paths containing spaces all came through clean. What it doesn't get is the double-click convenience: the `.sh` scripts need Git Bash, and even there they won't open your browser for you, so open the dashboard URL yourself._
 
 ## After capture — use it
 
-**Any moment of your product, in Figma, editable, in one paste.** On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click **⧉ Copy for Figma** and paste into your Figma file (⌘V). It lands as editable **auto-layout layers**, not a flat image — arrange or restyle freely. No plugin, no extension, no Dev Mode, no paid seat; your library stays untouched.
+**Any moment of your product, in Figma, editable, in one paste.** On any page — the Home atlas panel, the Map panel, or a page doc (and each captured state) — click **⧉ Copy for Figma** and paste into your Figma file. It lands as editable **auto-layout layers**, not a flat image — arrange or restyle freely. No plugin, no extension, no Dev Mode, no paid seat; your library stays untouched.
 
 Two network moments, stated plainly, because a copy is the one thing here that reaches outside your machine:
 
@@ -44,7 +53,7 @@ Neither path uploads your page or your library. The conversion happens entirely 
 The dashboard's **Use it** tab turns the library into next moves — every button copies a ready-to-paste prompt with your real file paths already in it. In short:
 
 - **With the Claude desktop app (recommended, no terminal):** open it on **this folder** — it reads this workspace's instructions and knows every page. Ask it to *describe the pages*, *wireframe on a page*, or *what's missing?* Open it on the folder itself, not the folder above: that's how the kit's instructions load in full.
-- **With the Claude Code CLI:** same thing from a terminal — `cd <your-workspace> && claude`.
+- **With the Claude Code CLI:** same thing from a terminal — `cd <your-workspace>`, then `claude`.
 - **With another AI coding tool** (Cursor, Windsurf): point it at `AGENTS.md`, then tell it to read `design-context/INDEX.md`.
 - **With a chat-only AI** (claude.ai, ChatGPT): use the Use-it tab's **Copy context bundle** button — it assembles a self-contained summary you paste in, no file access needed.
 - **By hand:** any `design-context/pages/<slug>/page.html` opens in your browser and is an editable design baseline.
@@ -79,7 +88,7 @@ Repeating pages collapse to one representative: 300 product pages that share a l
 
 ## Requirements
 
-macOS/Linux with [Node.js](https://nodejs.org) (LTS). `tools/setup.sh` handles the rest.
+macOS, Linux or Windows, with [Node.js](https://nodejs.org) (LTS). On macOS/Linux `tools/setup.sh` handles the rest; on Windows use the three commands in the note above, since the `.sh` scripts need Git Bash.
 
 ## Credits
 
