@@ -1,5 +1,59 @@
 # UX copy canon
 
+## 2026-08-02 — the network disclosure is rewritten: it described a converter that is no longer the one that runs (`prds/pre-ship-fixes.md`, F2)
+
+**This supersedes the `2026-07-30 — README discloses the one outbound request` entry below.** That
+entry's string was true when written and is now false. `73e3492` made Figma's own `capture.js` the
+**primary** converter, loaded at click time from `mcp.figma.com`, with the vendored MIT bundle demoted
+to fallback — so the claim that the font-CDN request is *"the only time the kit reaches the network on
+your behalf"* understates the kit's egress by one host, and that host was named in **zero**
+user-facing documents. A factual, privacy-adjacent misstatement is the worst possible thing to be
+wrong about in a product whose whole pitch is honesty, and it is the first thing a designer's employer
+checks.
+
+The old string had been deliberately synchronised **word-for-word** across three surfaces, so all
+three had to change together. Found by grepping the phrase repo-wide rather than trusting the brief's
+list of files — which named `README.md` and `ux-copy.md` but not the landing page:
+
+- `README.md` — the Figma-paste paragraph in "After capture — use it"
+- `docs/index.html` — the Figma section's `<p class="note">`, i.e. the **public** page
+- this file — a dated quotation, left standing as history (see below)
+
+**Retired string** (all live surfaces):
+
+> ~~One caveat stated plainly: to keep the pasted text as text, the converter fetches public font files from a CDN during a copy — that single request is the only time the kit reaches the network on your behalf, and it carries none of your data.~~
+
+**New, `README.md`** — a two-item list rather than one sentence, because there are now two moments and
+compressing them into one clause is how the first version went stale:
+
+> **Two network moments, stated plainly, because a copy is the one thing here that reaches outside your machine:**
+> - **A copy loads Figma's own converter from `mcp.figma.com`** at the moment you click. It is Figma's code, fetched fresh each time rather than shipped inside the kit, and it runs in your browser like any other script on the page.
+> - **If that host can't be reached** — you're offline, or your network blocks it — the copy falls back to the converter bundled under `tools/vendor/`, which fetches public font files from a CDN so your pasted text stays text instead of disappearing. The success message names whichever converter ran, so you always know which one you got.
+>
+> Neither path uploads your page or your library. The conversion happens entirely on your machine, and no data of yours is sent to either host.
+
+**New, `docs/index.html`** — the same substance in one sentence, because the note sits under a diagram
+and a list would break the section:
+
+> Arrange or restyle freely; your Figma library stays untouched. Two network moments, stated plainly: a copy loads Figma's own converter from `mcp.figma.com` at the moment you click, and if that host can't be reached it falls back to the converter bundled with the kit, which fetches public font files from a CDN so your pasted text stays text. Neither uploads your page — the conversion happens in your own browser, and no data of yours is sent to either host.
+
+Three wording calls worth keeping:
+
+- **"loads … from `mcp.figma.com`", not "fetches a script".** The host is the fact a security reviewer
+  is looking for, so it is named in prose, not left implicit in a URL.
+- **The fallback is described by its trigger, not its name.** A designer does not need to know the
+  words *dom-to-figma* to understand "if that host can't be reached". The engine names live in
+  Credits, which is also corrected in this round — it credited only the MIT bundle, which is now the
+  understudy.
+- **"no data of yours is sent to either host" replaces "it carries none of your data".** The old
+  phrasing was scoped to a single request; the new one is scoped to both, which is the claim that has
+  to hold.
+
+The retired string is left **quoted intact** in the 2026-07-30 entry below rather than edited out:
+this file is a dated ledger, and rewriting what a past build shipped would destroy the only record
+that the claim was ever made. So a repo-wide grep for the old phrase still returns that one
+historical line, by design.
+
 ## 2026-08-01 — dark capture and modern color (`prds/dark-capture-and-modern-color.md`)
 
 Off a live capture of `tailwindcss.com` that came back as a white page with a three-color palette.
@@ -305,6 +359,11 @@ already identical in both.
 never the stub.**
 
 ## 2026-07-30 — README discloses the one outbound request (`prds/small-open-items-round.md`, S3)
+
+> **SUPERSEDED 2026-08-02** — see the `pre-ship-fixes` F2 entry at the top of this file. The string
+> quoted below was accurate on `5799f11` and became false on `73e3492`, when `capture.js` from
+> `mcp.figma.com` became the primary converter and this font-CDN request stopped being the only one.
+> It is quoted here as history; do not copy it onto any surface.
 
 `grep -ci "cdn\|font\|no network"` on `README.md` returned 0 — the kit's honesty thesis is its whole pitch,
 and the Figma-paste font-CDN request had already been through two claims audits on other surfaces (the
