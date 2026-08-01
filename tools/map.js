@@ -558,11 +558,66 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n🗺  Design context: http://localhost:${PORT}`);
+// ── Port selection ─────────────────────────────────────────────────────────────
+// start.sh has always scanned 4173-4182, reused THIS workspace's own server when it found it
+// (matched on /api/status workspacePath, not merely an open port), and explained itself. map.js
+// had none of that: a bare listen() with no 'error' handler, so a busy port became an unhandled
+// 'error' event and a raw Node stack trace. That asymmetry only ever hurt Windows, where start.sh
+// cannot run at all and map.js is the ONLY entry point — hit for real on 2026-07-31.
+//
+// The workspacePath match is the part that matters most: without it, a second workspace started on
+// a busy port silently shows you the FIRST workspace's library. Same class as the known
+// "map.js serves the wrong library when invoked by path from another directory" bug.
+const PORT_RANGE = 10;
+const PORT_EXPLICIT = args.includes('--port');
+
+function statusWorkspace(port) {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/api/status', timeout: 800 }, (res) => {
+      let d = ''; res.on('data', (c) => (d += c));
+      res.on('end', () => { try { resolve(JSON.parse(d).workspacePath || null); } catch { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+function announce(port) {
+  console.log(`\n🗺  Design context: http://localhost:${port}`);
   console.log(`   Empty library → the dashboard runs onboarding (URL, sign-in, capture — no terminal).`);
   console.log(`   (Local only — nothing is exposed beyond this machine. Ctrl+C to stop.)\n`);
-});
+}
+
+async function listenOn(port, attempt = 0) {
+  server.removeAllListeners('error');
+  server.once('error', async (e) => {
+    if (e.code !== 'EADDRINUSE') { console.error(e); process.exit(1); }
+
+    // Is that our OWN workspace already serving? Then don't start a second one.
+    const ws = await statusWorkspace(port);
+    if (ws && path.resolve(ws) === path.resolve(KIT)) {
+      console.log(`\n🗺  This workspace's dashboard is already running: http://localhost:${port}`);
+      console.log(`   Open that URL — no need to start a second server.\n`);
+      process.exit(0);
+    }
+
+    const who = ws ? `another workspace (${ws})` : 'another program';
+    if (PORT_EXPLICIT) {
+      console.error(`\n✗ Port ${port} is already in use by ${who}.`);
+      console.error(`  Pick a free one:  node tools/map.js --port ${port + 1}\n`);
+      process.exit(1);
+    }
+    if (attempt + 1 >= PORT_RANGE) {
+      console.error(`\n✗ Ports ${PORT}-${PORT + PORT_RANGE - 1} are all in use. Stop one and try again.\n`);
+      process.exit(1);
+    }
+    console.log(`→ Port ${port} is in use by ${who}; using ${port + 1} for this workspace instead.`);
+    listenOn(port + 1, attempt + 1);
+  });
+  server.listen(port, '127.0.0.1', () => announce(port));
+}
+
+listenOn(PORT);
 
 // On shutdown (Ctrl+C / restart), take a running guided session down WITH us — otherwise its headed
 // Chrome outlives the server, keeps the profile lock, and every future launch fails on the lock
