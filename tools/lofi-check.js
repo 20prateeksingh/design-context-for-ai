@@ -32,8 +32,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('playwright');
-
+const { launchChromium } = require('./launch.js');
 const args = process.argv.slice(2);
 const files = args.filter(a => !a.startsWith('--'));
 const flag = f => args.includes(f);
@@ -126,7 +125,7 @@ const H = (n, status, h, d) => add(R.heuristic, n, status, h, d);    // warn →
 
 (async () => {
   // ── The DOM pass and the pixel pass share ONE page load ─────────────────────────────────────────
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   let blocked = 0, pageErrors = [];
   const page = await browser.newPage({ viewport: { width: VIEWPORT_W, height: 900 } });
   // "no network" is a house rule, not an aspiration — enforce it rather than hoping the snapshot is

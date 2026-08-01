@@ -27,6 +27,8 @@
  */
 
 const { chromium } = require('playwright');
+const { launchChromium, launchPersistent } = require('./launch.js');
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -828,7 +830,7 @@ if (require.main === module) (async () => {
     const OUT_DIR = path.join(KIT_DIR, 'design-context');
     fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
     console.log(`\n🚀 Login-page capture (logged-out, ephemeral) — ${START_URL}\n`);
-    const browser = await chromium.launch({ headless: HEADLESS });
+    const browser = await launchChromium({ headless: HEADLESS });
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
     const actionLog = [];
@@ -879,10 +881,10 @@ if (require.main === module) (async () => {
     let gctx, gbrowser = null;
     try {
       if (guidedEphemeral) {
-        gbrowser = await chromium.launch({ headless: false });
+        gbrowser = await launchChromium({ headless: false });
         gctx = await gbrowser.newContext({ viewport: null });
       } else {
-        gctx = await chromium.launchPersistentContext(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
+        gctx = await launchPersistent(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
       }
     } catch (e) {
       // F3: profile-ABSENT is handled above and never reaches here — this catch is only the profile-
@@ -1052,7 +1054,7 @@ if (require.main === module) (async () => {
       console.log(`   ℹ no browser profile — capturing logged-out (fine for public pages).`);
       console.log(`     If these pages need your login: node tools/login.js --url ${firstTarget}  then re-run.`);
     }
-    browser = await chromium.launch({ headless: HEADLESS });
+    browser = await launchChromium({ headless: HEADLESS });
     context = await browser.newContext({ viewport: VIEWPORT });
   } else {
     if (!fs.existsSync(PROFILE_DIR)) {
@@ -1061,7 +1063,7 @@ if (require.main === module) (async () => {
     }
     console.log(banner);
     try {
-      context = await chromium.launchPersistentContext(PROFILE_DIR, { headless: HEADLESS, viewport: VIEWPORT });
+      context = await launchPersistent(PROFILE_DIR, { headless: HEADLESS, viewport: VIEWPORT });
     } catch (e) {
       if (/existing browser session|already in use/i.test(e.message)) {
         console.error(`\n❌  The capture browser profile is still open in another window`);
