@@ -2779,11 +2779,15 @@ function initDashboard(){
     });
     if (!w.figma || typeof w.figma.captureForDesign !== 'function') throw new Error('capture.js exposed no captureForDesign');
 
-    // HAZARD 1 (focus) — capture.js parks on a `focus` event whenever its own document is unfocused,
-    // and an offscreen iframe never is. Answered at the source: focus() first, and since the real
-    // clipboard write is ours and happens later under a genuine gesture, the iframe's own check is
-    // told the truth it needs. No synthetic events, no mounting in the top document.
-    try { w.focus(); } catch(_){}
+    // HAZARD 1 (focus) — capture.js parks forever on a `focus` event whenever its own document is
+    // unfocused, and an offscreen iframe never is. Its ONLY focus gate is a document.hasFocus() check,
+    // so overriding that in the iframe's realm answers it completely. The real clipboard write is ours
+    // and happens later in the TOP document under the user's genuine gesture, so nothing is bypassed.
+    //
+    // Deliberately NOT contentWindow.focus() — measured, it moves focus into the hidden iframe and the
+    // TOP document then reports hasFocus() === false, so attemptWrite re-arms and the designer has to
+    // click Copy a second time, every time. The brief's escalation ladder is unnecessary and its first
+    // rung is actively harmful here.
     const realHasFocus = doc.hasFocus;
     doc.hasFocus = ()=>true;
 
@@ -2822,6 +2826,23 @@ function initDashboard(){
     }
   }
 
+  // The snapshot's content height, with the iframe's own viewport floor defeated (F2).
+  // `documentElement.scrollHeight` can never report less than the frame's clientHeight, so a snapshot
+  // SHORTER than the frame measured as a full frame-height and capture.js duly built a frame that tall —
+  // 865px of dead space on a 35px state, measured. But it is only wrong when it is flooring: on a page
+  // taller than the frame it is the right answer AND it includes the body margins that body.scrollHeight
+  // drops (plus: 951 vs 935, measured). So trust it whenever it exceeds the frame, and only fall back to
+  // the content measure when it has clearly bottomed out. Deliberately NOT a deepest-descendant scan:
+  // an overhanging carousel reports right:5986 on a 1440 page, and the same trick inflates height.
+  // `short` is decided ONCE, against the frame's baseline height, and reused for the post-decode
+  // re-measure — by then the frame has been grown to the content, so clientHeight would equal
+  // scrollHeight and every page would look floored (which would silently drop plus's 16px of body
+  // margin, 951 → 935).
+  function contentHeight(doc, short){
+    if (short) return Math.max(doc.body.scrollHeight || 0, 1);
+    return Math.max(doc.documentElement.scrollHeight || 0, doc.body.scrollHeight || 0, 1);
+  }
+
   // Convert one snapshot → a Figma clipboard payload. The snapshot's page.html runs in a hidden,
   // OFFSCREEN same-origin iframe (never display:none — computed styles need real layout) so we convert
   // the TRUE product DOM, not the dashboard. Width rule (F2·2) lands the frame at the snapshot's natural
@@ -2829,6 +2850,7 @@ function initDashboard(){
   async function convertSnapshot(src, name){
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
+    frame.setAttribute('scrolling', 'no');   // F2 — no scrollbar, so no 8px width overshoot in the frame
     frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:1440px;height:900px;border:0;visibility:hidden';
     document.body.appendChild(frame);
     try {
@@ -2840,11 +2862,15 @@ function initDashboard(){
       });
       const doc = frame.contentDocument;
       if(!doc || !doc.body) throw new Error('snapshot has no body');
+      doc.documentElement.style.overflow = 'hidden';   // F2 — belt-and-braces with scrolling="no" above
       await sleep(120);   // settle beat: let late styles/layout apply before we measure
       // width = max(documentElement.scrollWidth, body.scrollWidth, 1440) — the spike's crop is the regression test
       const width = Math.max(doc.documentElement.scrollWidth||0, doc.body.scrollWidth||0, 1440);
       if (Math.abs(width - 1440) > 1){ frame.style.width = width + 'px'; await sleep(80); }   // reflow at natural width, then re-measure height
-      let height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);
+      // Is the document actually shorter than the frame? Only meaningful while the frame is still at
+      // its baseline height — see contentHeight above.
+      const short = !((doc.documentElement.scrollHeight || 0) > frame.clientHeight);
+      let height = contentHeight(doc, short);
       // F1 — a `loading="lazy"` image only decodes once it enters the iframe's OWN rendered viewport,
       // and the frame was left at its initial 900px height, so nothing below the fold on a long page
       // ever got there. Grow the frame to the full content height, force every image eager as a
@@ -2855,7 +2881,7 @@ function initDashboard(){
       imgs.forEach(img => { if (img.loading === 'lazy') img.loading = 'eager'; });
       await sleep(80);   // let the now-full-height frame settle before decoding
       await Promise.allSettled(imgs.map(img => img.decode ? img.decode() : Promise.resolve()));
-      height = Math.max(doc.documentElement.scrollHeight||0, doc.body.scrollHeight||0, 1);   // re-measure: a decoded image with no reserved box can reflow the page
+      height = contentHeight(doc, short);   // re-measure: a decoded image with no reserved box can reflow the page
       frame.style.height = height + 'px';
       // Primary = capture.js (F1). Any failure — offline, CSP, load timeout, an unresolved hazard, a
       // payload with no figh2d envelope — degrades to the vendored dom-to-figma engine (F3), which is
