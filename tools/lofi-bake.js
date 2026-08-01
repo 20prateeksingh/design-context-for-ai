@@ -20,48 +20,61 @@
 // CLI USAGE (headless — bakes a saved wireframe copy without opening a tab yourself):
 //   node tools/lofi-bake.js <file.html>
 // Writes <file>.baked.html next to the input; the original wireframe file is untouched.
+//
+// COLOR PARSING LIVES IN tools/color.js, NOT HERE. This file used to match rgb()/rgba() only, which
+// made it a NO-OP that reported success on any page whose computed styles are a modern color space —
+// on a Tailwind v4 page every color property is oklch(), so the guard below skipped all of them and
+// the wireframe exported to Figma in full brand color while printing a tidy stats line. One parser,
+// shared with build-index.js, so there is one place to teach the next color function.
+// IN THE DEVTOOLS CONSOLE, PASTE tools/color.js FIRST — it defines window.__dckColor, which this file
+// requires. The CLI path below injects both for you.
 if (typeof window !== 'undefined') {
 window.lofiBake = function lofiBake() {
+  const C = window.__dckColor;
+  if (!C) throw new Error('lofiBake: tools/color.js must be loaded first (it defines window.__dckColor)');
   const GRAY_IMG = '#939393';
   const PROPS = ['color', 'backgroundColor', 'borderTopColor', 'borderRightColor',
     'borderBottomColor', 'borderLeftColor', 'outlineColor', 'textDecorationColor',
     'columnRuleColor', 'caretColor', 'fill', 'stroke'];
 
-  const luma = (r, g, b) => Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
-  const grayify = (v) => v.replace(/rgba?\(([^)]+)\)/g, (m, inner) => {
-    const p = inner.split(/[,\s/]+/).filter(Boolean).map(Number);
-    if (p.length < 3 || p.some(Number.isNaN)) return m;
-    const y = luma(p[0], p[1], p[2]);
-    return p.length > 3 ? `rgba(${y}, ${y}, ${y}, ${p[3]})` : `rgb(${y}, ${y}, ${y})`;
-  });
-
   let elements = 0, props = 0, images = 0, gradientsLeft = 0;
+  const colorsLeft = new Set();   // color functions color.js could not read — counted, never skipped
+
+  // grayscale(1) per the filter-effects spec, applied to the parsed color. A legacy rgb()/rgba()
+  // value takes its authored numbers through unrounded and unchanged, which is what keeps an
+  // already-baked wireframe re-baking byte-identical.
+  const luma = (r, g, b) => Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const grayify = (v) => C.replaceColors(v, (c) => {
+    const y = luma(c.r, c.g, c.b);
+    return c.hasAlpha ? `rgba(${y}, ${y}, ${y}, ${c.a})` : `rgb(${y}, ${y}, ${y})`;
+  }, (m) => colorsLeft.add(m));
 
   document.querySelectorAll('*').forEach((el) => {
     const cs = getComputedStyle(el);
     let touched = false;
     for (const prop of PROPS) {
       const v = cs[prop];
-      if (!v || v.indexOf('rgb') === -1) continue;
+      if (!C.hasColor(v)) continue;
       const g = grayify(v);
       if (g !== v) { el.style[prop] = g; props++; touched = true; }
     }
-    if (cs.boxShadow && cs.boxShadow !== 'none' && cs.boxShadow.indexOf('rgb') !== -1) {
+    if (cs.boxShadow && cs.boxShadow !== 'none' && C.hasColor(cs.boxShadow)) {
       const g = grayify(cs.boxShadow);
       if (g !== cs.boxShadow) { el.style.boxShadow = g; props++; touched = true; }
     }
     // background-image gradients: recolor the stops we can parse; count what we can't
     const bi = cs.backgroundImage;
     if (bi && bi !== 'none') {
-      if (bi.indexOf('gradient') !== -1 && bi.indexOf('rgb') !== -1) {
+      if (bi.indexOf('gradient') !== -1 && C.hasColor(bi)) {
         const g = grayify(bi);
         if (g !== bi) { el.style.backgroundImage = g; props++; touched = true; }
+        else gradientsLeft++;                  // every stop unreadable — reported, never silently skipped
       } else if (bi.indexOf('url(') !== -1) {
         el.style.backgroundImage = 'none';
         el.style.backgroundColor = GRAY_IMG;
         images++; touched = true;
       } else if (bi.indexOf('gradient') !== -1) {
-        gradientsLeft++;                       // named colors / color() — left alone, reported
+        gradientsLeft++;                       // named colors only — left alone, reported
       }
     }
     if (touched) elements++;
@@ -89,7 +102,11 @@ window.lofiBake = function lofiBake() {
   if (m) m.remove();
   document.documentElement.style.filter = 'none';
 
-  return { elements, props, images, gradientsLeftUnbaked: gradientsLeft };
+  const stats = { elements, props, images, gradientsLeftUnbaked: gradientsLeft };
+  // Additive and measured-or-absent: present only when something really could not be read, so an
+  // unknown color function is loud on the way out instead of leaving a clean-looking stats line.
+  if (colorsLeft.size) stats.colorsLeftUnbaked = [...colorsLeft].sort();
+  return stats;
 };
 }
 
@@ -107,6 +124,10 @@ const { launchChromium } = require('./launch.js');
     const browser = await launchChromium();
     try {
       const page = await browser.newPage();
+      // color.js goes in as an INIT script, not a <script> tag: addScriptTag would leave its whole
+      // source inside the saved .baked.html (page.content() serialises the live DOM), bloating every
+      // Figma-bound wireframe and moving bytes that have nothing to do with the bake.
+      await page.addInitScript({ path: path.join(__dirname, 'color.js') }); // defines window.__dckColor
       await page.goto('file://' + abs);
       await page.addScriptTag({ path: __filename });
       const stats = await page.evaluate(() => window.lofiBake());

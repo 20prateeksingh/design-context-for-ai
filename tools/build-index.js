@@ -28,6 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const { domainToUnicode } = require('url');
 const { backfillThumbs, thumbRel } = require('./thumb.js');
+const color = require('./color.js');
 
 const AI_BEGIN = '<!-- ai:begin method=ai — written by the describe step, NOT ground truth -->';
 const AI_END = '<!-- ai:end -->';
@@ -190,14 +191,20 @@ function extractMetaDescription(html) {
 // ── Token aggregation: merge per-page computed-tokens into observed scales ────
 // Statistics only (frequency + clustering), stamped method:heuristic. Deterministic:
 // stable sort (count desc, value asc), timestamps from the manifest, never Date.now().
+// Chrome's getComputedStyle keeps a page's authored color space — a Tailwind v4 page hands back
+// `oklch(…)` and `lab(…)`, never rgb(). This used to match rgb()/#hex only and return null for the
+// rest, which the `if (n)` guard below then dropped with no counter and no note: 90% of
+// tailwindcss.com's color evidence, 85 of its 89 distinct colors, and a Design language tab that
+// showed the four survivors *confidently*. tools/color.js is now the one parser (see its header for
+// the out-of-gamut policy); it is byte-for-byte identical to this function's old output on all 10,608
+// color values across the 22 captured workspaces, and adds the 386 it used to throw away.
 function normColor(v) {
-  const m = v.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-  if (!m) return v.startsWith('#') ? { hex: v.toUpperCase(), alpha: false } : null;
-  const hex = '#' + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, '0')).join('').toUpperCase();
-  return { hex, alpha: m[4] !== undefined && +m[4] < 1 };
+  return typeof v === 'string' ? color.toHex(v) : null;
 }
+const colorFnOf = (v) => { const m = /^\s*([a-zA-Z-]+)\(/.exec(String(v)); return m ? m[1].toLowerCase() : String(v).trim().slice(0, 24); };
 function aggregateTokens(pagesDir, slugs) {
   const cats = { colors: new Map(), typography: new Map(), spacing: new Map(), radius: new Map(), shadows: new Map() };
+  const unknownColors = new Map(); // raw value → observations, for the counter that used to not exist
   const bump = (map, key, count, slug, extra) => {
     if (!map.has(key)) map.set(key, { count: 0, pages: new Set(), ...extra });
     const e = map.get(key); e.count += count; e.pages.add(slug);
@@ -206,7 +213,14 @@ function aggregateTokens(pagesDir, slugs) {
     const tp = path.join(pagesDir, slug, 'computed-tokens.json');
     if (!fs.existsSync(tp)) continue;
     const t = JSON.parse(fs.readFileSync(tp, 'utf8'));
-    for (const c of t.colors || []) { const n = normColor(c.value); if (n) bump(cats.colors, n.hex, c.count, slug, { alpha: n.alpha }); }
+    for (const c of t.colors || []) {
+      const n = normColor(c.value);
+      if (!n) { unknownColors.set(c.value, (unknownColors.get(c.value) || 0) + c.count); continue; }
+      bump(cats.colors, n.hex, c.count, slug, { alpha: n.alpha });
+      // Set only when true, never `false` — an always-present key would move tokens.json on every
+      // workspace that has nothing to disclose.
+      if (n.gamutMapped) cats.colors.get(n.hex).gamutMapped = true;
+    }
     for (const y of t.typography || []) {
       const [size, weight, family] = y.value.split(' / ');
       bump(cats.typography, y.value, y.count, slug, { size: parseFloat(size) || 0, weight, family });
@@ -220,7 +234,7 @@ function aggregateTokens(pagesDir, slugs) {
     .sort((a, b) => b.count - a.count || (a.value < b.value ? -1 : 1));
   const multiPage = slugs.length > 1;
   const keep = (arr) => multiPage ? arr.filter(x => x.pages >= 2) : arr;
-  const colors = list(cats.colors, ['alpha']), typography = list(cats.typography, ['size', 'weight', 'family']);
+  const colors = list(cats.colors, ['alpha', 'gamutMapped']), typography = list(cats.typography, ['size', 'weight', 'family']);
   const spacing = list(cats.spacing, ['px']), radius = list(cats.radius, ['px']), shadows = list(cats.shadows);
   // scale inference: spacing/radius ladder (values seen on 2+ pages, sorted; base-unit share via divisibility)
   const ladder = (arr) => {
@@ -230,10 +244,30 @@ function aggregateTokens(pagesDir, slugs) {
     return { steps: vals, baseUnit: base, baseUnitShare: base ? +share(base).toFixed(2) : null };
   };
   const ramp = keep(typography).sort((a, b) => b.size - a.size || b.count - a.count);
+
+  // ── The two disclosures. Both obey measured-or-absent: a zero is not a finding, and emitting one
+  // would move tokens.json on every workspace that has nothing to report. Present ⇒ non-trivial.
+  const colorsOut = { top: keep(colors).slice(0, 48), droppedSinglePage: colors.length - keep(colors).length };
+  const gamutMapped = colors.filter(c => c.gamutMapped).length;
+  // `unparseable` is the actual root cause of the tailwindcss defect made visible: not that oklch()
+  // was unsupported, but that being unsupported COST NOTHING. The next unknown color function names
+  // itself here (and on stdout) instead of vanishing behind a confident four-color palette.
+  const unparseable = unknownColors.size ? {
+    values: unknownColors.size,
+    observations: [...unknownColors.values()].reduce((a, b) => a + b, 0),
+    functions: [...new Set([...unknownColors.keys()].map(colorFnOf))].sort(),
+    examples: [...unknownColors.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 5).map(([v]) => v),
+  } : null;
+  if (gamutMapped) colorsOut.gamutMapped = gamutMapped;
+  if (unparseable) colorsOut.unparseable = unparseable;
+  if (unparseable) console.log(`⚠  ${unparseable.observations} color observations in ${unparseable.values} unknown form(s) could not be parsed — ${unparseable.functions.join(', ')} (see tokens.json → colors.unparseable)`);
+
+  const GAMUT_NOTE = ' Some colors are outside sRGB and have been gamut-mapped (chroma reduced in OKLCh, CSS Color 4 §13.2) to give a copyable hex — those swatches are slightly less saturated than the product ships; see colors.gamutMapped.';
   return {
     method: 'heuristic',
-    note: 'OBSERVED values aggregated across captured pages and clustered by statistics — not the product’s authored tokens. Filtered = seen on 2+ pages (raw kept below).',
-    colors: { top: keep(colors).slice(0, 48), droppedSinglePage: colors.length - keep(colors).length },
+    note: 'OBSERVED values aggregated across captured pages and clustered by statistics — not the product’s authored tokens. Filtered = seen on 2+ pages (raw kept below).'
+      + (gamutMapped ? GAMUT_NOTE : ''),
+    colors: colorsOut,
     typography: { ramp: ramp.slice(0, 24), droppedSinglePage: typography.length - keep(typography).length },
     spacing: ladder(spacing), radius: ladder(radius),
     shadows: { top: keep(shadows).slice(0, 8), droppedSinglePage: shadows.length - keep(shadows).length },

@@ -1,5 +1,59 @@
 # UX copy canon
 
+## 2026-08-01 — dark capture and modern color (`prds/dark-capture-and-modern-color.md`)
+
+Off a live capture of `tailwindcss.com` that came back as a white page with a three-color palette.
+Two unrelated engine defects, one screen. Every string below is terminal or JSON — no dashboard copy
+changed in this round, and `dashboard-template.html` was not touched.
+
+### `--color-scheme` (D1)
+
+The flag itself, in `capture.js`'s usage block:
+
+> **New:** `[--color-scheme light|dark]  which face of a product that keys off `prefers-color-scheme` to capture. Also readable from design-context/product.json's `colorScheme`. UNSET = whatever the browser does by default (light).`
+
+and, as the last line of the multi-line usage error, deliberately phrased from the designer's side of
+the screen rather than the browser's — *the face you actually see*, not *the emulated media feature*:
+
+> **New:** `add --color-scheme dark to capture a dark product in the face you actually see`
+
+The crawl banner names it only when it was asked for, so an ordinary capture's banner is byte-identical
+to before:
+
+> **New (fragment):** `(depth 2, cap 25, dark scheme, read-only)`
+
+A value that is not one of the three accepted words is refused out loud and the capture continues on
+the default — never guessed at, never silently mapped to `dark` because it looked dark-ish:
+
+> **New:** `⚠  color scheme "aubergine" is not light | dark | no-preference — ignoring it and capturing the browser default.`
+
+### The two disclosures on the token path (D2)
+
+`tokens.json`'s `note` gains ONE sentence, and only when at least one color really was gamut-mapped —
+absent on every workspace with nothing to disclose, which is also what keeps 17 libraries byte-identical:
+
+> **New (appended to `tokens.json.note`):** `Some colors are outside sRGB and have been gamut-mapped (chroma reduced in OKLCh, CSS Color 4 §13.2) to give a copyable hex — those swatches are slightly less saturated than the product ships; see colors.gamutMapped.`
+
+And the counter that is the actual point of the round — being unsupported used to cost nothing, so an
+unknown color function has to name itself on stdout as well as in the file:
+
+> **New:** `⚠  21,796 color observations in 88 unknown form(s) could not be parsed — lab, oklab, oklch (see tokens.json → colors.unparseable)`
+
+New `tokens.json` keys, both present only when non-zero: `colors.gamutMapped` (count) and
+`colors.unparseable` (`{values, observations, functions, examples}`). Per-swatch, an entry carries
+`gamutMapped: true` only when chroma reduction actually moved the 8-bit hex — see the BUILD-REPORT for
+why "technically outside sRGB" is the wrong bar for a disclosure.
+
+### `lofi-bake` (D3)
+
+The bake's stats line gains one key, again only when something really could not be read:
+
+> **New (stats key):** `colorsLeftUnbaked: ["<the raw color function>", …]`
+
+and the console path now has a prerequisite, so it says so instead of failing on an undefined:
+
+> **New:** `lofiBake: tools/color.js must be loaded first (it defines window.__dckColor)`
+
 ## 2026-07-30 — beta marker (B1–B2) and the twelfth prompt (§R)
 
 `prds/beta-marker.md`, off Prateek's 2026-07-29 field test: *"Can we add a beta tag to our product and
