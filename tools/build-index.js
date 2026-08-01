@@ -944,12 +944,22 @@ function buildIndex(libDir) {
     for (const c of copies.slice(-FIGMA_LEDGER_CAP)) {
       if (!c || !c.slug || !c.at) continue;
       const label = pageLabelOf(c.slug);
-      events.push({ at: c.at, dateOnly: false, seq: 5, actor: 'you', kind: 'figma',
+      // `engine` is additive and absent-safe (F5): a ledger written by an older dashboard has no such
+      // field and derives exactly as before. Only the fallback is worth a line in the journal — a
+      // capture.js copy is the expected path and says nothing useful by naming itself.
+      const engine = (c.engine === 'capture' || c.engine === 'domToFigma') ? c.engine : null;
+      const ev = { at: c.at, dateOnly: false, seq: 5, actor: 'you', kind: 'figma',
         title: c.state ? `Sent ${label} › ${c.state} to Figma` : `Sent ${label} to Figma`,
-        detail: null,
-        // link only when the page is still in the library (a copied page could be pruned later) — a
-        // dead link would 404; matches the hygiene-event safety posture.
-        link: pages[c.slug] ? { page: c.slug } : null });
+        detail: engine === 'domToFigma' ? 'offline fallback — some effects simplified' : null };
+      // The key is OMITTED, not set to null, when the ledger doesn't know the engine. Emitting
+      // `engine: null` would be additive in the schema sense but would still rewrite registry.json
+      // in every workspace whose ledger predates this round — fleet-wide byte churn for no
+      // information. Omitting it keeps a legacy ledger deriving byte-identically to before.
+      if (engine) ev.engine = engine;
+      // link only when the page is still in the library (a copied page could be pruned later) — a
+      // dead link would 404; matches the hygiene-event safety posture.
+      ev.link = pages[c.slug] ? { page: c.slug } : null;
+      events.push(ev);
     }
   } catch (_) {}
 
