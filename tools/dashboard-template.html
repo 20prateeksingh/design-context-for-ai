@@ -2719,12 +2719,14 @@ function initDashboard(){
   // required (the copy works on file:// too, plus one font fetch — see below); the server, when present,
   // only records the exit.
   const FIG_LABEL = '⧉ Copy for Figma';
-  // Font handling: the pasted Figma TEXT only survives if the converter can embed real font bytes — a
-  // loader that returns no/empty bytes makes Figma drop the text and keep only images + frames. So we
-  // use the converter's DEFAULT font loader, which fetches the needed font (falling back to Inter) from
-  // cdn.jsdelivr.net/fontsource. That is the ONE external request the kit makes during a copy: a cacheable
-  // GET of public font files, no user data. (See figma-exit-copy-paste-2026-07: fully-offline text needs
-  // fonts vendored locally — a follow-up; text fidelity wins over the no-CDN purity in the meantime.)
+  // Font handling (F4): the pasted Figma TEXT only survives if the converter can embed real font bytes.
+  // A loader that returns no bytes makes Figma drop every text node — silently, totally, and invisibly
+  // until paste. The converter's DEFAULT loader fetches from cdn.jsdelivr.net/fontsource, so any page
+  // that blocks it loses ALL text: measured here, flipkart/plus went from 74 text nodes to 0 with the
+  // CDN blocked, and the brief measured the same total loss on stripe.com (CSP) and MDN (no CSP at all).
+  // So the loader below tries the real family first and falls back to a VENDORED Inter that is always
+  // present. A substituted typeface is vastly better than invisible text. The vendored file is the
+  // follow-up figma-exit-copy-paste-2026-07 left open, now closed.
   let figmaLib = null;     // the lazy-loaded DomToFigma module (loaded once, on first Copy click)
   let figmaCache = null;   // { key, item, html } — a converted payload kept for a focused click:
                            //   both the two-phase re-arm (F2·3) AND the same-page repeat-copy cache (§4·5)
@@ -2754,6 +2756,40 @@ function initDashboard(){
       s.onerror = ()=>reject(new Error('could not load the Figma converter'));
       document.head.appendChild(s);
     });
+  }
+
+  // The vendored fallback typeface, decoded once. Delivered as base64 inside `_fallback-font.js`
+  // (written by build-index.js) rather than a raw .woff2, because fetch() of a local file is blocked
+  // on file:// and a file:// copy is a supported path — a <script src> is not blocked.
+  let fallbackFontBytes = null;
+  function decodeFallbackFont(){
+    const b64 = window.__KIT_FALLBACK_FONT;
+    if (!b64) throw new Error('fallback font asset missing');
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    fallbackFontBytes = u8.buffer;
+    return fallbackFontBytes;
+  }
+  function loadFallbackFont(){
+    if (fallbackFontBytes) return Promise.resolve(fallbackFontBytes);
+    if (window.__KIT_FALLBACK_FONT) return Promise.resolve(decodeFallbackFont());
+    return new Promise((resolve, reject)=>{
+      const s = document.createElement('script'); s.src = '_fallback-font.js';
+      s.onload = ()=>{ try { resolve(decodeFallbackFont()); } catch(e){ reject(e); } };
+      s.onerror = ()=>reject(new Error('could not load the fallback font'));
+      document.head.appendChild(s);
+    });
+  }
+  // Real family when it resolves, vendored Inter when it does not — but ALWAYS valid bytes.
+  // resolvedWeight/Italic deliberately report 400/normal, the truth about the bytes being handed over:
+  // claiming the requested weight would label the node with a face these outlines are not, which is
+  // how text gets dropped again one layer down. Weight fidelity is the thing being traded away here.
+  function makeFontLoader(lib){
+    const upstream = lib.createFontsourceLoader ? lib.createFontsourceLoader() : null;
+    return async (spec)=>{
+      if (upstream){ try { return await upstream(spec); } catch(_){} }
+      return { bytes: await loadFallbackFont(), resolvedFamily: 'Inter', resolvedWeight: 400, resolvedItalic: false };
+    };
   }
 
   // Convert the already-mounted, already-sized iframe through capture.js and return the SAME payload
@@ -2893,7 +2929,7 @@ function initDashboard(){
       } catch (e) {
         console.warn('[figma] capture.js unavailable — falling back to dom-to-figma:', (e && e.message) || e);
         const lib = await loadFigmaLib();
-        const conv = lib.createFigmaConverter();   // default font loader — embeds real fonts so Figma keeps the text
+        const conv = lib.createFigmaConverter({ fontLoader: makeFontLoader(lib) });   // F4 — always real bytes
         const result = await conv.convert({ element: doc.body, width, height, name });
         return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0, engine: 'domToFigma' };
       }

@@ -1142,6 +1142,19 @@ function buildIndex(libDir) {
     if (fs.existsSync(vendored)) fs.copyFileSync(vendored, path.join(libDir, '_dom-to-figma.js'));
   } catch (e) { console.log(`⚠ dom-to-figma copy: ${e.message.split('\n')[0]}`); }
 
+  // 4d. _fallback-font.js — the vendored fallback typeface, so the dom-to-figma fallback can always
+  // hand Figma real font bytes (figma-exit-capture-js F4). Figma DROPS any text node whose font has
+  // no bytes, silently and totally, so a font-CDN failure used to mean a paste with zero text.
+  // Shipped as base64 inside a script rather than the raw .woff2 because fetch() of a local file is
+  // blocked on file://, and a file:// copy is a supported path here — a <script src> is not blocked.
+  try {
+    const font = path.join(__dirname, 'vendor', 'inter-latin-400-normal.woff2');
+    if (fs.existsSync(font)) {
+      const b64 = fs.readFileSync(font).toString('base64');
+      fs.writeFileSync(path.join(libDir, '_fallback-font.js'), `window.__KIT_FALLBACK_FONT=${JSON.stringify(b64)};\n`, 'utf8');
+    }
+  } catch (e) { console.log(`⚠ fallback font: ${e.message.split('\n')[0]}`); }
+
   // 5. INDEX.md — the human front door
   const line = (slug) => { const p = pages[slug]; const m = p.meta;
     const desc = p.description ? p.description.split(/(?<=\.)\s/)[0].replace(/\|/g, '\\|') : '_pending_';
