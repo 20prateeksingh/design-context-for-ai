@@ -554,7 +554,7 @@
             &nbsp; &nbsp; &nbsp;│ &nbsp;└ <b>Text</b><br>
             &nbsp; &nbsp; &nbsp;├ <b>Container</b> → <b>Text</b><br>
             &nbsp; &nbsp; &nbsp;└ <b>Margin</b> → <b>Container</b> → <b>Text</b></p>
-          <p class="note" style="margin-top:14px">Arrange or restyle freely; your Figma library stays untouched. One caveat stated plainly: to keep the pasted text as text, the converter fetches public font files from a CDN during a copy — that single request is the only time the kit reaches the network on your behalf, and it carries none of your data.</p>
+          <p class="note" style="margin-top:14px">Arrange or restyle freely; your Figma library stays untouched. Two network moments, stated plainly: a copy loads Figma's own converter from <code>mcp.figma.com</code> at the moment you click, and if that host can't be reached it falls back to the converter bundled with the kit, which fetches public font files from a CDN so your pasted text stays text. Neither uploads your page — the conversion happens in your own browser, and no data of yours is sent to either host.</p>
         </div>
       </div>
     </div>
