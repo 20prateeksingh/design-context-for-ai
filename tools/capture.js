@@ -21,6 +21,9 @@
  *     [--logged-out]          public capture, ephemeral context — no profile needed
  *     [--headless]            run without a visible window (default: visible)
  *     [--no-dismiss]          never auto-dismiss cookie banners
+ *     [--color-scheme light|dark]  which face of a product that keys off `prefers-color-scheme`
+ *                             to capture. Also readable from design-context/product.json's
+ *                             `colorScheme`. UNSET = whatever the browser does by default (light).
  *
  * The single sanctioned "click" is cookie-banner dismissal: a narrow allowlist of
  * consent-button texts (privacy-preserving option preferred), every dismissal logged.
@@ -56,7 +59,7 @@ const START_URL = getArg('--url', null) || CFG.url || null;
 const ONLY_URLS = getArg('--urls', null);   // selective capture: comma-separated URLs from the map's frontier
 const STATE = getArg('--state', null);      // state capture: <pageSlug>:<stateName>, with --url = the state's URL
 const GUIDED = hasFlag('--guided');         // guided capture: headed browser, human drives, snapshot on the overlay button
-if (require.main === module && !START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --guided --url <startUrl>   (human drives; snapshot button-only states/modals)\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)'); process.exit(1); }
+if (require.main === module && !START_URL && !ONLY_URLS) { console.error('Usage: node capture.js --url <product URL> [--depth 1|2] [--cap 25]\n       node capture.js --urls "<u1>,<u2>"          (selective frontier pull)\n       node capture.js --state <slug>:<name> --url <stateUrl>\n       node capture.js --guided --url <startUrl>   (human drives; snapshot button-only states/modals)\n       node capture.js --config design-context/product.json   (presets + url from the wizard)\n       node capture.js --login-page --url <product URL>        (signed-out surface → pages/login/)\n\n       add --color-scheme dark to capture a dark product in the face you actually see'); process.exit(1); }
 
 const PROFILE = getArg('--profile', 'default');
 const DEPTH = parseInt(getArg('--depth', String(CFG_PRESETS.depth != null ? CFG_PRESETS.depth : 1)), 10);
@@ -67,6 +70,30 @@ const NO_DISMISS = hasFlag('--no-dismiss');
 // says loggedIn:false. Otherwise logged-in (rides the persistent profile from login.js) — the default.
 const LOGGED_OUT = hasFlag('--logged-out') || LOGIN_PAGE || CFG.loggedIn === false;
 const VIEWPORT = { width: 1440, height: 900 };
+
+// ── Color scheme (D1) ─────────────────────────────────────────────────────────
+// Playwright builds every context as `colorScheme: 'light'` unless told otherwise, so a product that
+// keys off `prefers-color-scheme` — tailwindcss.com, and most modern docs/dev products — was captured
+// in its light face no matter what the designer sees in their own browser. The setting comes from
+// design-context/product.json (the same file the wizard writes and skills/capture-product/ reads, so
+// both front doors inherit it and cannot drift), with --color-scheme as the override re-capture needs.
+//
+// UNSET IS NOT 'light'. When nothing is configured we pass NO colorScheme at all, so a re-capture of
+// every workspace taken before this option existed renders byte-identically. That also means the kit
+// never silently follows the OPERATOR'S machine theme: 'no-preference' would make the captured face
+// depend on whichever laptop ran the crawl — an unrecorded input to a library whose whole claim is
+// deterministic, reproducible ground truth. Which face you want is a fact about the product, so it is
+// stated once in product.json and recorded in manifest.json, never inferred from the room.
+const COLOR_SCHEME = (() => {
+  const raw = getArg('--color-scheme', null) || CFG.colorScheme || null;
+  if (raw == null) return null;
+  const v = String(raw).trim().toLowerCase();
+  if (v === 'light' || v === 'dark' || v === 'no-preference') return v;
+  console.error(`⚠  color scheme "${raw}" is not light | dark | no-preference — ignoring it and capturing the browser default.`);
+  return null;
+})();
+// Spread into every browser-context construction. Empty when unset, so the option is absent, not 'light'.
+const CTX_SCHEME = COLOR_SCHEME ? { colorScheme: COLOR_SCHEME } : {};
 // D6: see writeSnapshot's screenshot step — chosen from real captured evidence (clean up to ~9.8k px on
 // some products, corrupted from ~10.7k px on others; no universal safe height), not the originally
 // hypothesized 16,384px GPU texture limit, which direct testing refuted.
@@ -831,7 +858,7 @@ if (require.main === module) (async () => {
     fs.mkdirSync(path.join(OUT_DIR, 'pages'), { recursive: true });
     console.log(`\n🚀 Login-page capture (logged-out, ephemeral) — ${START_URL}\n`);
     const browser = await launchChromium({ headless: HEADLESS });
-    const context = await browser.newContext({ viewport: VIEWPORT });
+    const context = await browser.newContext({ viewport: VIEWPORT, ...CTX_SCHEME });
     const page = await context.newPage();
     const actionLog = [];
     let loginCaptured = 0, loginSkipped = [], loginFailed = [];
@@ -882,9 +909,9 @@ if (require.main === module) (async () => {
     try {
       if (guidedEphemeral) {
         gbrowser = await launchChromium({ headless: false });
-        gctx = await gbrowser.newContext({ viewport: null });
+        gctx = await gbrowser.newContext({ viewport: null, ...CTX_SCHEME });
       } else {
-        gctx = await launchPersistent(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'] });
+        gctx = await launchPersistent(PROFILE_DIR, { headless: false, viewport: null, args: ['--window-size=1440,980'], ...CTX_SCHEME });
       }
     } catch (e) {
       // F3: profile-ABSENT is handled above and never reaches here — this catch is only the profile-
@@ -1041,7 +1068,7 @@ if (require.main === module) (async () => {
   let browser = null, context;
   const banner = STATE ? `\n🚀 State capture (read-only)\n`
     : ONLY_URLS ? `\n🚀 Selective capture (read-only)\n`
-    : `\n🚀 One-click capture${LOGGED_OUT ? ' (logged-out)' : ''} — ${START_URL}  (depth ${DEPTH}, cap ${CAP}, read-only)\n`;
+    : `\n🚀 One-click capture${LOGGED_OUT ? ' (logged-out)' : ''} — ${START_URL}  (depth ${DEPTH}, cap ${CAP}${COLOR_SCHEME ? `, ${COLOR_SCHEME} scheme` : ''}, read-only)\n`;
   // First target URL, for messages — START_URL is null in --urls mode, so never interpolate it raw.
   const firstTarget = START_URL || (ONLY_URLS ? ONLY_URLS.split(',')[0].trim() : '<product URL>');
   // A selective pull (--urls/--state) with no profile and no loggedIn signal from product.json is
@@ -1055,7 +1082,7 @@ if (require.main === module) (async () => {
       console.log(`     If these pages need your login: node tools/login.js --url ${firstTarget}  then re-run.`);
     }
     browser = await launchChromium({ headless: HEADLESS });
-    context = await browser.newContext({ viewport: VIEWPORT });
+    context = await browser.newContext({ viewport: VIEWPORT, ...CTX_SCHEME });
   } else {
     if (!fs.existsSync(PROFILE_DIR)) {
       console.error(`\n❌  No browser profile at profiles/${PROFILE} — logged-in capture needs one.\n   Run first: node tools/login.js --url ${firstTarget}\n   Capturing a public site? Re-run with --logged-out — no profile needed.\n`);
@@ -1063,7 +1090,7 @@ if (require.main === module) (async () => {
     }
     console.log(banner);
     try {
-      context = await launchPersistent(PROFILE_DIR, { headless: HEADLESS, viewport: VIEWPORT });
+      context = await launchPersistent(PROFILE_DIR, { headless: HEADLESS, viewport: VIEWPORT, ...CTX_SCHEME });
     } catch (e) {
       if (/existing browser session|already in use/i.test(e.message)) {
         console.error(`\n❌  The capture browser profile is still open in another window`);
@@ -1322,6 +1349,9 @@ if (require.main === module) (async () => {
   const manifest = {
     kit: 'design-context-kit v0.1', product: PRODUCT, startUrl: START_URL, resolvedOrigin: origin,
     capturedAt: new Date().toISOString(), depth: DEPTH, cap: CAP, capped, headless: HEADLESS,
+    // Present only when a color scheme was actually asked for (measured-or-absent): absent means the
+    // crawl took the browser default, which is what every library captured before D1 did.
+    ...(COLOR_SCHEME ? { colorScheme: COLOR_SCHEME } : {}),
     counts: { captured: results.ok.length, skipped: results.skipped.length, failed: results.failed.length },
     pages: results.ok, skipped: results.skipped, failed: results.failed,
     actions: actionLog,
@@ -1331,7 +1361,7 @@ if (require.main === module) (async () => {
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
   appendCaptureLog(OUT_DIR, {
     at: manifest.capturedAt, mode: 'crawl',
-    argsSummary: `--url ${START_URL} --depth ${DEPTH} --cap ${CAP}${HEADLESS ? ' --headless' : ''}`,
+    argsSummary: `--url ${START_URL} --depth ${DEPTH} --cap ${CAP}${HEADLESS ? ' --headless' : ''}${COLOR_SCHEME ? ` --color-scheme ${COLOR_SCHEME}` : ''}`,
     captured: results.ok.length, skipped: results.skipped, failed: results.failed,
     capHit: capped > 0,
   });
