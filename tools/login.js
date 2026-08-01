@@ -14,7 +14,7 @@
  * The profiles/ folder holds real session cookies. Never commit or share it.
  */
 
-const { chromium } = require('playwright');
+const { launchPersistent } = require('./launch.js');
 const path = require('path');
 
 const args = process.argv.slice(2);
@@ -35,7 +35,7 @@ if (!url) {
   console.log(`\n  Log in as you normally would, browse to make sure you're in,`);
   console.log(`  then CLOSE THE BROWSER WINDOW to finish.\n`);
 
-  const context = await chromium.launchPersistentContext(profileDir, {
+  const context = await launchPersistent(profileDir, {
     headless: false,
     viewport: null,
     args: ['--window-size=1440,900'],

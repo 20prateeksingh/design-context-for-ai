@@ -128,6 +128,21 @@ function startCapture(mode, res) {
   busy = true;
   capJob = { lines: [], _partial: '', running: true, code: null, mode, startedAt: new Date().toISOString() };
   console.log(`▶ capture (${mode}) ${cliArgs.join(' ')}`);
+  // Preflight the browser. chromium.executablePath() returns a path whether or not anything was
+  // ever downloaded — it does not check existence — so a missing install surfaces as an opaque
+  // mid-capture failure. start.sh:85 has always checked this correctly with `[ -f "$CHROME" ]`,
+  // but start.sh is the one entry point Windows cannot run, and this path (node map.js, the
+  // documented assistant route) never had a check at all. Found on the 2026-07-31 Windows run.
+  try {
+    const exe = require('playwright').chromium.executablePath();
+    if (exe && !fs.existsSync(exe)) {
+      const msg = 'Playwright browser not installed. Run:  npx playwright install chromium';
+      console.log(`✗ ${msg}`);
+      busy = false; capJob = null;
+      return json(res, 400, { ok: false, error: msg });
+    }
+  } catch (_) { /* playwright not resolvable here; the child will report it properly */ }
+
   const child = spawn(process.execPath, [path.join(__dirname, 'capture.js'), ...cliArgs], { cwd: __dirname });
   child.stdout.on('data', pushCaptureOutput);
   child.stderr.on('data', pushCaptureOutput);
@@ -137,6 +152,19 @@ function startCapture(mode, res) {
     busy = false;
     if (capJob) { capJob.running = false; capJob.code = code; }
     console.log(`■ capture (${mode}) exited ${code}`);
+    // A non-zero exit used to print ONLY that line. The child's real stderr went to the SSE
+    // stream and the ring buffer — i.e. only into the dashboard — so a crash was invisible to
+    // anyone reading the server console, and diagnosis meant bypassing the dashboard and
+    // re-running capture.js by hand. That cost real time during the 2026-07-31 Windows run.
+    // Mirror the tail here. Cross-platform; the honesty posture that makes a *blocked* run say
+    // so should apply just as much to a *crashed* one.
+    if (code !== 0 && capJob) {
+      const tail = capJob.lines.filter((l) => l.trim()).slice(-8);
+      if (tail.length) {
+        console.log(`  └ last ${tail.length} line(s) from capture:`);
+        for (const l of tail) console.log(`    ${l}`);
+      }
+    }
     broadcast('done', JSON.stringify({ code, mode }));
   });
   json(res, 200, { ok: true, mode });

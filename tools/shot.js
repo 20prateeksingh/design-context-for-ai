@@ -5,7 +5,7 @@
  *
  * Usage: node shot.js <file.html> [out.png] [--full] [--width 1440] [--height 900]
  */
-const { chromium } = require('playwright');
+const { launchChromium } = require('./launch.js');
 const path = require('path');
 
 const args = process.argv.slice(2);
@@ -15,7 +15,7 @@ const file = path.resolve(files[0] || '');
 const out = path.resolve(files[1] || file.replace(/\.html?$/, '') + '.preview.png');
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   const page = await browser.newPage({ viewport: {
     width: parseInt(getArg('--width', '1440'), 10), height: parseInt(getArg('--height', '900'), 10) } });
   await page.goto('file://' + file, { waitUntil: 'load', timeout: 30000 });

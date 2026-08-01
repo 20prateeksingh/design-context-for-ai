@@ -100,10 +100,11 @@ if (typeof module !== 'undefined' && require.main === module) {
     const fs = require('fs');
     const path = require('path');
     const { chromium } = require('playwright');
+const { launchChromium } = require('./launch.js');
     const input = process.argv[2];
     if (!input) { console.error('usage: node tools/lofi-bake.js <file.html>'); process.exit(1); }
     const abs = path.resolve(input);
-    const browser = await chromium.launch();
+    const browser = await launchChromium();
     try {
       const page = await browser.newPage();
       await page.goto('file://' + abs);
