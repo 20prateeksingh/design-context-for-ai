@@ -116,26 +116,44 @@ brings in kit updates later. Mention it in one line — it's a safety fact they'
 > I pointed the folder's git link at the kit as "upstream" rather than "origin", so there's no
 > way to accidentally push your captured pages to a public repo.
 
-**Without git** — download and unpack the zip instead:
+**Without git** — download and unpack the zip instead. Use the block for the designer's platform,
+one line at a time:
+
+**macOS / Linux** (bash or zsh):
 
 ```bash
 curl -L -o kit.zip https://github.com/20prateeksingh/design-context-for-ai/archive/refs/heads/main.zip
-unzip -q kit.zip && mv design-context-for-ai-main "<product-slug>" && rm kit.zip
+unzip -q kit.zip
+mv design-context-for-ai-main "<product-slug>"
+rm kit.zip
 cd "<product-slug>"
 ```
 
-On Windows without git, use PowerShell's `Invoke-WebRequest` + `Expand-Archive` equivalents.
+**Windows** (PowerShell) — `curl` there is an alias for `Invoke-WebRequest` and does not take `-L`,
+and there is no `unzip`, so it needs its own commands:
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/20prateeksingh/design-context-for-ai/archive/refs/heads/main.zip -OutFile kit.zip -UseBasicParsing
+Expand-Archive -Path kit.zip -DestinationPath .
+Move-Item design-context-for-ai-main "<product-slug>"
+Remove-Item kit.zip
+Set-Location "<product-slug>"
+```
 
 ---
 
 ## 4. Install the dependencies
 
-Two commands. The second is the slow one — say so before you run it.
+Two commands. The second is the slow one — say so before you run it. **Run them one line at a time**
+— these work as-is in bash, zsh and PowerShell, but only if you don't chain them:
 
-```bash
-npm install --prefix tools --no-fund --no-audit
-cd tools && npx playwright install chromium && cd ..
 ```
+npm install --prefix tools --no-fund --no-audit
+npx --prefix tools playwright install chromium
+```
+
+`--prefix tools` is doing real work in both lines: it keeps you in the workspace root, so there is no
+`cd` to chain and nothing to undo afterwards.
 
 Before the second command, tell them:
 
@@ -207,6 +225,8 @@ Don't send them off to copy a prompt into a different AI.
 |---|---|---|
 | `node: command not found` | Node isn't installed | §0's message. Don't install it yourself. |
 | `git: command not found` | No git | Use §3's zip path. |
+| `The token '&&' is not a valid statement separator` | Windows PowerShell — it has no `&&`, and this is a **parse** error, so nothing on the line ran | Run the commands on separate lines. Every command in this file is written to work that way. |
+| `A parameter cannot be found that matches parameter name 'L'` or `unzip: not recognized` | Windows PowerShell — `curl` is an alias for `Invoke-WebRequest`, and `unzip` doesn't exist | Use §3's PowerShell block, not the macOS/Linux one. |
 | Chromium download fails | Capture can't run | Say so, give the error, stop. |
 | Port 4173–4182 all busy | Other workspaces are running | Ask them to close another dashboard, or reuse it if it's the same product. |
 | Dashboard opens but says "Browsing only — the dashboard is open as a file" | You opened the HTML directly instead of the server URL | Go back to §5; use `http://localhost:<port>`. |
