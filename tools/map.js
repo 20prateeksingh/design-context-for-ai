@@ -403,13 +403,17 @@ const server = http.createServer((req, res) => {
         const fcPath = path.join(LIB, 'figma-copies.json');
         let fc = { copies: [] };
         try { const parsed = JSON.parse(fs.readFileSync(fcPath, 'utf8')); if (parsed && Array.isArray(parsed.copies)) fc = parsed; } catch (_) {}
-        fc.copies.push({ slug, state, at: new Date().toISOString() });
+        // `engine` is additive and optional (F5): which converter produced the payload, so the ledger
+        // can tell a first-party capture.js copy from an offline dom-to-figma fallback. Anything
+        // unrecognised is dropped rather than trusted — an older dashboard sends nothing at all.
+        const engine = data.engine === 'capture' || data.engine === 'domToFigma' ? data.engine : null;
+        fc.copies.push(Object.assign({ slug, state, at: new Date().toISOString() }, engine ? { engine } : null));
         try { fs.writeFileSync(fcPath, JSON.stringify(fc, null, 2), 'utf8'); }
         catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
         // Rebuild so the ledger updates — but not while a capture holds the build (its own exit rebuilds
         // and would race). If busy, the record is safely on disk; the next build derives the event.
         if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ figma-copy post-build: ${e.message.split('\n')[0]}`); } }
-        console.log(`⧉ figma-copy ${slug}${state ? ' › ' + state : ''}`);
+        console.log(`⧉ figma-copy ${slug}${state ? ' › ' + state : ''}${engine ? ` (${engine})` : ''}`);
         return json(res, 200, { ok: true });
       }
 
