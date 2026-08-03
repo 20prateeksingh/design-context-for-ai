@@ -98,6 +98,12 @@
                   min-width:84px; }
   .clone button:hover { background:#24242A; }
   .clone button[data-done="1"] { color:var(--ok); }
+  /* Platform labels + the hero's Windows pointer (N2). Deliberately quiet: they orient without
+     competing with the command itself. */
+  .plat-label { margin:0; font:600 11px/1 var(--sans); letter-spacing:.08em; text-transform:uppercase;
+                color:var(--dim); }
+  .note-win { margin:10px 0 0; font:400 12.5px/1.5 var(--sans); color:var(--dim); }
+  .note-win code { font:400 12px/1 var(--mono); color:var(--txt); }
 
   /* ── shared figure/panel language: --card + 1px --line + radius 10, like the dashboard's cards ── */
   .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
@@ -281,10 +287,16 @@
         <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
 
+      <!-- Three lines, not one `&&` chain: `&&` is a PARSE error in Windows PowerShell 5.1, so the
+           old one-liner ran NOTHING there — not even the clone. Separate lines paste and run on
+           every shell. The launcher differs by platform, so it is named below rather than guessed. -->
       <div class="clone">
-        <code id="clone-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product &amp;&amp; cd my-product &amp;&amp; tools/start.sh</code>
+        <code id="clone-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
+cd my-product
+tools/start.sh</code>
         <button type="button" id="clone-copy" data-for="clone-cmd" aria-label="Copy the clone command">Copy</button>
       </div>
+      <p class="note-win">On Windows, the last line is <code>tools\start.cmd</code>.</p>
 
     </div>
 
@@ -319,7 +331,7 @@
           <div class="body reveal">
             <p class="n">STEP 1</p>
             <h3>Run one script</h3>
-            <p><code>tools/start.sh</code> installs what it needs, starts a local server, and opens the dashboard. The dashboard asks three things — your product's URL, whether you sign in to use it, and what kind of product it is. You never answer a question in the terminal.</p>
+            <p><code>tools/start.sh</code> (or <code>tools\start.cmd</code> on Windows) installs what it needs, starts a local server, and opens the dashboard. The dashboard asks three things — your product's URL, whether you sign in to use it, and what kind of product it is. You never answer a question in the terminal.</p>
           </div>
           <div class="imgwrap">
             <img src="assets/step-onboard.webp" width="1280" height="1520"
@@ -585,14 +597,28 @@
       <h2>Copy the repo into a folder named after your product.</h2>
       <p class="lede">One workspace, one product. Then run the script and follow the dashboard.</p>
 
-      <div class="clone" style="margin-top:26px">
-        <code id="start-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product &amp;&amp; cd my-product &amp;&amp; tools/start.sh</code>
-        <button type="button" id="start-copy" data-for="start-cmd" aria-label="Copy the clone command">Copy</button>
+      <!-- Two labelled blocks rather than one chain with both launchers in it: a single block a
+           designer pastes wholesale must not contain a line that fails on their machine. Only the
+           third line differs; the clone and cd are identical. -->
+      <p class="plat-label">macOS / Linux</p>
+      <div class="clone" style="margin-top:8px">
+        <code id="start-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
+cd my-product
+tools/start.sh</code>
+        <button type="button" id="start-copy" data-for="start-cmd" aria-label="Copy the macOS or Linux setup commands">Copy</button>
+      </div>
+
+      <p class="plat-label" style="margin-top:18px">Windows</p>
+      <div class="clone" style="margin-top:8px">
+        <code id="start-cmd-win">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
+cd my-product
+tools\start.cmd</code>
+        <button type="button" id="start-copy-win" data-for="start-cmd-win" aria-label="Copy the Windows setup commands">Copy</button>
       </div>
 
       <div class="req">
         <span>Node 18 or newer</span>
-        <span>macOS or Linux</span>
+        <span>macOS, Linux or Windows</span>
         <span>no account, no key, no signup</span>
       </div>
 

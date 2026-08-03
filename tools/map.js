@@ -574,6 +574,11 @@ const server = http.createServer((req, res) => {
 // "map.js serves the wrong library when invoked by path from another directory" bug.
 const PORT_RANGE = 10;
 const PORT_EXPLICIT = args.includes('--port');
+// --open: open the dashboard in the default browser at the port we ACTUALLY bound. It exists so a
+// launcher doesn't have to guess: start.cmd cannot replicate start.sh's pre-flight port scan in
+// batch, and guessing 4173 would open ANOTHER workspace's dashboard when 4173 is theirs — the exact
+// failure the workspacePath match above exists to prevent. Deciding here inherits that logic free.
+const OPEN = args.includes('--open');
 
 function statusWorkspace(port) {
   return new Promise((resolve) => {
@@ -586,10 +591,23 @@ function statusWorkspace(port) {
   });
 }
 
+// Best-effort: a failure to open a browser must never take the server down — the URL is printed
+// either way, so the designer can always click it themselves.
+function openBrowser(url) {
+  try {
+    const [cmd, cmdArgs] =
+      process.platform === 'win32'  ? ['cmd',      ['/c', 'start', '', url]] :
+      process.platform === 'darwin' ? ['open',     [url]] :
+                                      ['xdg-open', [url]];
+    spawn(cmd, cmdArgs, { stdio: 'ignore', detached: true }).unref();
+  } catch (_) { /* printed above; nothing else to do */ }
+}
+
 function announce(port) {
   console.log(`\n🗺  Design context: http://localhost:${port}`);
   console.log(`   Empty library → the dashboard runs onboarding (URL, sign-in, capture — no terminal).`);
   console.log(`   (Local only — nothing is exposed beyond this machine. Ctrl+C to stop.)\n`);
+  if (OPEN) openBrowser(`http://localhost:${port}`);
 }
 
 async function listenOn(port, attempt = 0) {
@@ -602,6 +620,9 @@ async function listenOn(port, attempt = 0) {
     if (ws && path.resolve(ws) === path.resolve(KIT)) {
       console.log(`\n🗺  This workspace's dashboard is already running: http://localhost:${port}`);
       console.log(`   Open that URL — no need to start a second server.\n`);
+      // Double-clicking the launcher twice should still land the designer on the dashboard, not
+      // just print at them. Give the opener a beat to spawn before we exit.
+      if (OPEN) { openBrowser(`http://localhost:${port}`); setTimeout(() => process.exit(0), 300); return; }
       process.exit(0);
     }
 
