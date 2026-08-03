@@ -1,5 +1,105 @@
 # UX copy canon
 
+## 2026-08-04 (even later) — the landing page stops showing two different products (`prds/landing-page-wikipedia-assets.md`, F1–F3)
+
+`docs/index.html`, `docs/assets/*`. Five real dashboard views (`hero-map`, `tour-map`, `tour-tokens`,
+`tour-ledger`, `figma-before`) were re-shot from `wikipedia/` (38 pages, described 38/38, readiness 86)
+in place of `xflowpay.com` and the stale 41-page wikipedia capture, so the hero and every full-size
+tour panel below it are now one product instead of two. `step-capture` was re-shot as a genuine
+mid-flight capture of `en.wikipedia.org` in an isolated scratch workspace (never touching the real
+`wikipedia/` library); `step-design` was re-shot from Prateek's own wireframe round on the captured
+Wiknic meetup page (F3 — a wireframe was **consumed**, never authored). `step-onboard` and the seven
+`tile-*.webp` gallery images are untouched, per the brief's non-goals.
+
+**Method:** every number below was re-read from the live dashboard (`hero-probe2.js`, `badge-probe.js`,
+direct DOM evaluation) or from `wikipedia/design-context/registry.json` at build time, never carried
+over from the old copy. Full provenance table in the build report.
+
+### Hero (§1)
+
+| Was (xflowpay/old-wikipedia mix) | Now (wikipedia, 38 pages, live-read) |
+|---|---|
+| alt: `'38 in · 19 out'`, "thirty-two further captured pages", "two rings", "Three discs... the largest reading ×2.9k", `'DEEP FOG…4205 MORE...'`, `'0.8% of the known world explored'` | alt: `'35 in · 21 out'`, "thirty-five further captured pages", "three rings labelled one click, two clicks and three clicks", "Fifteen discs... the largest reading ×1.1k", `'DEEP FOG…4007 MORE...'`, `'0.9% of the known world explored'` |
+| figcaption: "forty-one pages downloaded, 4,593 still ghosts" | figcaption: "thirty-eight pages downloaded, 4,188 still ghosts" |
+
+The source comment above the hero (previously reciting the v1.3 F1 hero-contest numbers, which were
+about which library *won*, not about this library's own render) was rewritten to describe what this
+round did: reproduced the same winning tier (83%) against the freshly re-captured 38-page library.
+
+### The Map tab (§4, `#library`)
+
+| Was | Now |
+|---|---|
+| "a ghost covering thirteen blog pages... rather than all thirteen, because thirteen near-duplicates..." | "a ghost covering 131 assorted one-off pages... rather than all 131, because 131 near-duplicates..." |
+| "Eleven per cent of this product is explored" | "0.9 per cent of this product is explored" |
+| alt: `'/blog/:var — ... linked from 18 pages ...'`, `'13 pages share this layout...'`, `'Download all 13'` | alt: `'(assorted one-off pages) — ... linked from 23 pages ...'`, `'131 pages share this layout...'`, `'Download all 131'` |
+
+The selected ghost is a different *kind* on wikipedia: there is no `/blog/:var`-style templated route,
+so the frontier group that came up under `.mapghost` is `(assorted one-off pages)`, not a named
+template. Copy changed to match what is actually selected, not just the count.
+
+### Design language tab (§4)
+
+| Was | Now |
+|---|---|
+| "the product's darkest **navy** is `×32,939` across all eighteen pages and the accent is `×141` across four" | "the product's darkest **tone** is `×42,696` across all thirty-eight pages and the accent is `×24,479`, also across all thirty-eight" |
+| alt: "`41 single-page values kept in tokens.json`... twenty-one colour swatches... `#1F2741 ×32,939 on 18 pages`, down to `#E4E9FF ×5 on 5 pages`" | alt: "`161 single-page values kept in tokens.json`... forty-eight colour swatches... `#202122 ×42,696 on 38 pages`, down to `#DFF2EB ×2 on 2 pages`" |
+
+**"Darkest navy" became "darkest tone"** — not just a number swap. Wikipedia's most-used dark value,
+`#202122`, is a near-black charcoal, not a navy; the old word was true of xflow's palette and would
+have been a wrong colour claim if carried over unchanged.
+
+### The working ledger (§4)
+
+| Was | Now |
+|---|---|
+| body: "...here every page has been read, so it has moved on and asks for **the first design instead**. And the accent... **the entry names the hex and how many pages it was seen on.**" | body: "...here every page has been read, so it has moved on to **a hygiene note instead, a page nothing links to, with a fix prompt ready to copy**. And the accent... **observed, never guessed.**" |
+| alt: `'Library check — all clean — 3 more notes...'`; `'Borrowed your product's color — #5E76E3... observed across 4 pages'` | alt: `'THE KIT · Worth a look — 1 thing in the library · Show details ▸'`; `'AUG 4 · 02:50 AM · YOUR AI — Wireframes, Landing round 3 · 1 approach'` |
+
+**This is more than a number swap.** Wikipedia's ledger top slot is a hygiene note (an unreachable
+page, `Wikipedia:File_upload_wizard`), not the "make your first design" prompt, and no colour-borrow
+journal entry is in the 3-row crop this round's `--rows` cut keeps. The body paragraph and alt text
+were rewritten to describe what is actually in frame rather than force the old narrative onto new
+data. Em dashes inside the quoted UI strings (`"Worth a look — 1 thing..."`) are transcriptions of the
+dashboard's own rendered text, same exception as the 2026-08-04 sweep below.
+
+### Figma section (§6)
+
+Alt text's page name changed `Stablecoin Payments` → `Landing` (the captured page is now
+`wiki-main-page`, breadcrumbed "Home / Wiki / Landing" in the dashboard). No numbers in this section's
+copy needed changing — the alt text never quoted page-specific counts.
+
+### Step 2 — capture in progress (§2)
+
+Alt text rewritten for a real 10-of-18-page wikipedia capture (`10 pages captured, 2 templates
+collapsed, 0 skipped, 28 nav pages found`) in place of the old 6-of-8 xflow capture. Reproduced
+honestly: driven through the dashboard's own onboarding wizard (`https://en.wikipedia.org`, public),
+in an isolated scratch workspace this round created and deleted — the real `wikipedia/` library was
+never touched or re-captured.
+
+### Step 3 — your AI designs grounded (§2)
+
+Alt text rewritten for the `HEADCOUNT` card from `wikipedia/wireframes/.../round-1/03-potluck-board.html`
+(Prateek's own wireframe, consumed not authored — see build report § F3): "18 named of 49 allowed",
+"Going 1, Likely 12, Maybe 4, Can't go 1", "Almost everyone answered Likely, so the real number on the
+day is not knowable."
+
+### `#anyproduct` closing note — the sentence this whole brief exists to fix
+
+| Was | Now |
+|---|---|
+| "The hero at the top of this page is the wikipedia library shown large; every other full-size dashboard view here is one product, `xflowpay.com`, captured by the person who built the kit." | "The hero at the top of this page, and every other full-size dashboard view below it, is the same product: `en.wikipedia.org`." |
+
+This is the exact sentence quoted in the brief's own "why this change exists" section. Everything else
+in this round exists to make this sentence true.
+
+**Untouched, verified still true, not re-derived:** the seven-tile gallery section (§5) — its own
+`tile-wikipedia.webp` stays the old 41-page render per the brief's non-goals, so its alt text
+(`0.8%`, `×2.9k`, thirty-six discs), the `xflowpay.com` tile's own caption (`#5E76E3`, `11%`), the
+"Eighteen to forty-one pages... eleven per cent down to four-fifths of one" range, and the "all 256
+pages across the seven libraries" total are all still correct descriptions of images this round did
+not touch, and were checked rather than assumed.
+
 ## 2026-08-04 (later) — the landing page asks who you are before it hands you a command (`prds/landing-page-install-path-toggle.md`, F1–F4)
 
 `docs/index.html`. The hero's install area became a **two-option picker** (assistant preselected,

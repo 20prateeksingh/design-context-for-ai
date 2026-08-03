@@ -401,20 +401,19 @@ tools/start.sh</code>
 
     </div>
 
-    <!-- The hero map is en.wikipedia.org as of v1.3, and the swap was decided on the same measurement that
-         kept xflow in v1.2. Back then wikipedia won on structure (two rings, district arcs, a deep-fog chip
-         a single-ring library cannot produce) and lost on accent presence: 1 of its 37 discs wore the
-         product's accent against 8 of 18 on xflow — because the accent ring marks a page whose description
-         has been written, and that workspace had none. The describe run removed that cause: it is 41/41
-         now, and 33 of its 36 discs wear the measured Wikipedia blue. The remaining three are the purple
-         ×N covering discs shipped in 779ffbb, not undescribed pages. Criterion 5 is contested rather than
-         won — xflow still leads on proportion (100% vs 91.7%) and on accent pixels at its own tier — and
-         the call to flip was made on that full table, in prds/landing-page-v1.3-warm-BUILD-REPORT.md § F1. -->
+    <!-- The hero map is en.wikipedia.org, reshot for prds/landing-page-wikipedia-assets.md so every
+         full-size dashboard view on this page now comes from the same library instead of two different
+         products. Same winning tier v1.3 established (83%, via the dashboard's own − control) reproduced
+         against the freshly re-captured 38-page library: 38/38 described, readiness 86. 21 of 36 discs in
+         frame wear the measured Wikipedia blue (accent or accent-strong), the other 15 are the purple ×N
+         covering discs shipped in 779ffbb, not undescribed pages. Numbers re-read at build time with
+         hero-probe2.js and badge-probe.js against the live dashboard; see
+         prds/landing-page-wikipedia-assets-BUILD-REPORT.md. -->
     <div class="heroshot">
       <figure class="shot">
         <img src="assets/hero-map.webp" width="2200" height="1696"
-             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '38 in · 19 out', and thirty-two further captured pages ringed across two rings labelled one click and two clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Three discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×2.9k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4205 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.8% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
-        <figcaption>The Map, on a real capture of en.wikipedia.org: forty-one pages downloaded, 4,593 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
       </figure>
     </div>
   </section>
@@ -447,8 +446,8 @@ tools/start.sh</code>
             <p>It follows your product's links and downloads each page as a snapshot: the real HTML, a screenshot, every word of copy, and the styles it actually uses. Pages that share a layout collapse to one example, with the count kept. You watch it land, page by page, and it tells you what it capped or skipped.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/step-capture.webp" width="1400" height="1450"
-                 alt="The dashboard mid-capture, headed 'Capture in progress': counters reading 6 pages captured, 1 template collapsed, 0 skipped, 18 nav pages found, above a live log that includes the line 'dismissed banner via dismiss (logged)' and six captured pages with their sizes.">
+            <img src="assets/step-capture.webp" width="1400" height="705"
+                 alt="The dashboard mid-capture, headed 'Capture in progress': counters reading 10 pages captured, 2 templates collapsed, 0 skipped, 28 nav pages found, above a live log that opens with 'Nav discovery (nav-landmarks): 28 candidate pages' and ten captured Wikipedia pages with their sizes, from wiki-main-page to wiki-special-recentchanges.">
           </div>
         </article>
 
@@ -459,8 +458,8 @@ tools/start.sh</code>
             <p>Point Claude Code, Cursor, or a chat window at the library and ask for a change. A wireframe comes back built on the captured page itself: your product's own shell, spacing and content, reduced to lo-fi, with the new part marked as new. Then take any page into Figma in one paste.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/step-design.webp" width="1500" height="663"
-                 alt="A wireframe round on the captured Stablecoin Payments page: the product's real navigation bar in grayscale above a dashed region tagged 'NEW: FLOW SPINE', holding three numbered steps (create wallet addresses, buyer sends stablecoins, user withdraws in INR), each with small chips of supporting detail.">
+            <img src="assets/step-design.webp" width="1500" height="421"
+                 alt="A wireframe round on a captured Wikipedia meetup page: a dashed region tagged 'NEW: HEADCOUNT', holding a meter reading '18 named of 49 allowed' beside a by-answer breakdown (Going 1, Likely 12, Maybe 4, Can't go 1) and the note 'Almost everyone answered Likely, so the real number on the day is not knowable.'">
           </div>
         </article>
 
@@ -543,11 +542,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>The Map</h3>
             <p class="quote">Rings are honest clicks-from-home; the fog is what you haven't captured yet.</p>
-            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog. Click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering thirteen blog pages is selected: the kit offers one example of the shape rather than all thirteen, because thirteen near-duplicates teach your AI nothing new. Eleven per cent of this product is explored, and the kit says so instead of rounding up.</p>
+            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog. Click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering 131 assorted one-off pages is selected: the kit offers one example of the shape rather than all 131, because 131 near-duplicates teach your AI nothing new. 0.9 per cent of this product is explored, and the kit says so instead of rounding up.</p>
           </div>
           <div class="imgwrap">
             <img src="assets/tour-map.webp" width="1900" height="1188"
-                 alt="The Map tab with a frontier ghost selected: the hovered ghost reads '/blog/:var — not downloaded yet — linked from 18 pages — click to unlock', and the rail panel is headed 'Locked — not downloaded yet' with the line '13 pages share this layout — one example covers the shape for your AI', a 'Get one example' button, a quieter 'Download all 13', and a checkbox list of the specific URLs.">
+                 alt="The Map tab with a frontier ghost selected: the hovered ghost reads '(assorted one-off pages) — not downloaded yet — linked from 23 pages — click to unlock', and the rail panel is headed 'Locked — not downloaded yet' with the line '131 pages share this layout — one example covers the shape for your AI', a 'Get one example' button, a quieter 'Download all 131', and a checkbox list of the specific URLs.">
           </div>
         </article>
 
@@ -555,11 +554,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>Design language</h3>
             <p class="quote">Measured from your product, or absent.</p>
-            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages, every value carrying the count and page-spread behind it, as here, where the product's darkest navy is <code>×32,939</code> across all eighteen pages and the accent is <code>×141</code> across four. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out: values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
+            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages, every value carrying the count and page-spread behind it, as here, where the product's darkest tone is <code>×42,696</code> across all thirty-eight pages and the accent is <code>×24,479</code>, also across all thirty-eight. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out: values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
           </div>
           <div class="imgwrap">
-            <img src="assets/tour-tokens.webp" width="1900" height="609"
-                 alt="The Design language tab: a provenance strip reading 'Everything below is method: heuristic — values observed on the captured pages, aggregated and clustered by statistics — they are evidence of how the product is styled today, not its authored design tokens', then 'Filter: seen on 2+ pages (41 single-page values kept in tokens.json)', above a Palette / Proportions toggle and twenty-one colour swatches, each labelled with its hex, how many times it was seen and on how many pages: #1F2741 ×32,939 on 18 pages, down to #E4E9FF ×5 on 5 pages.">
+            <img src="assets/tour-tokens.webp" width="1900" height="885"
+                 alt="The Design language tab: a provenance strip reading 'Everything below is method: heuristic — values observed on the captured pages, aggregated and clustered by statistics — they are evidence of how the product is styled today, not its authored design tokens', then 'Filter: seen on 2+ pages (161 single-page values kept in tokens.json)', above a Palette / Proportions toggle and forty-eight colour swatches, each labelled with its hex, how many times it was seen and on how many pages: #202122 ×42,696 on 38 pages, down to #DFF2EB ×2 on 2 pages.">
           </div>
         </article>
 
@@ -567,11 +566,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>The working ledger</h3>
             <p class="quote">It borrows your product's own colour: observed, never guessed.</p>
-            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next, and it changes as the work lands: when pages are waiting to be read it asks for that, with the describe prompt ready to copy; here every page has been read, so it has moved on and asks for the first design instead. And the accent the dashboard wears is lifted from the product you captured: the entry names the hex and how many pages it was seen on.</p>
+            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next, and it changes as the work lands: when pages are waiting to be read it asks for that, with the describe prompt ready to copy; here every page has been read, so it has moved on to a hygiene note instead, a page nothing links to, with a fix prompt ready to copy. And the accent the dashboard wears is lifted from the product you captured: observed, never guessed.</p>
           </div>
           <div class="imgwrap">
-            <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="1002"
-                 alt="The working ledger: 'Library check — all clean — 3 more notes, nothing needed from you'; then 'NEXT · YOUR AI KNOWS YOUR PRODUCT NOW — Make your first thing — a wireframe on a real page, or a question answered from the library', with 'Copy a wireframe prompt' and 'Ask a question' buttons; then 'Borrowed your product's color — #5E76E3, the dashboard now wears it, observed across 4 pages'. The rail continues below the frame."></span>
+            <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="918"
+                 alt="The working ledger: 'THE KIT · Worth a look — 1 thing in the library · Show details ▸'; then 'NEXT · YOUR AI KNOWS YOUR PRODUCT NOW — Make your first thing — a wireframe on a real page, or a question answered from the library', with 'Copy a wireframe prompt' and 'Ask a question' buttons; then 'AUG 4 · 02:50 AM · YOUR AI — Wireframes, Landing round 3 · 1 approach'. The rail continues below the frame."></span>
           </div>
         </article>
 
@@ -637,7 +636,7 @@ tools/start.sh</code>
 
       <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't. A palette someone picked would be prettier than this, and that is rather the point. Nothing was configured per product. Where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo: absent rather than invented.</p>
 
-      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape (how many pages, how far from home, how much fog), which is all this section claims. Every map here has also been <b>read</b>: all 256 pages across the seven libraries carry a description, written by an AI and labelled <code>method: ai</code> in the library so it is never mistaken for a captured fact. That is what the accent rim marks: a page whose description exists. That is why these maps are warm where earlier versions of this page were pale. A purple <code>×N</code> disc is described too; it simply also stands for a template shape, so it wears that badge instead. The hero at the top of this page is the wikipedia library shown large; every other full-size dashboard view here is one product, <code>xflowpay.com</code>, captured by the person who built the kit.</p>
+      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape (how many pages, how far from home, how much fog), which is all this section claims. Every map here has also been <b>read</b>: all 256 pages across the seven libraries carry a description, written by an AI and labelled <code>method: ai</code> in the library so it is never mistaken for a captured fact. That is what the accent rim marks: a page whose description exists. That is why these maps are warm where earlier versions of this page were pale. A purple <code>×N</code> disc is described too; it simply also stands for a template shape, so it wears that badge instead. The hero at the top of this page, and every other full-size dashboard view below it, is the same product: <code>en.wikipedia.org</code>.</p>
 
       <p class="note" style="margin-top:12px">Nor does every page yield. Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home: amazon.in's run recorded seven of those (six <code>auth-redirect</code>, one <code>soft-404</code>), each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
     </div>
@@ -652,8 +651,8 @@ tools/start.sh</code>
 
       <div class="figma">
         <figure class="shot">
-          <img src="assets/figma-before.webp" width="1600" height="1860"
-               alt="A page doc in the dashboard for the Stablecoin Payments page: an actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML', the captured page's screenshot below it, and a rail listing what the page is, its link counts, and its capture history.">
+          <img src="assets/figma-before.webp" width="1600" height="1639"
+               alt="A page doc in the dashboard for the Landing page: an actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML', the captured page's screenshot below it, and a rail listing what the page is, its link counts, and its capture history.">
           <figcaption>Where the button lives: any page doc, any state, the Home atlas panel, the Map panel.</figcaption>
         </figure>
 
