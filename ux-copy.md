@@ -1,5 +1,112 @@
 # UX copy canon
 
+## 2026-08-04 (later) — the landing page asks who you are before it hands you a command (`prds/landing-page-install-path-toggle.md`, F1–F4)
+
+`docs/index.html`. The hero's install area became a **two-option picker** (assistant preselected,
+terminal second), shipping the ordering
+`wiki/decisions/assisted-entry-point-2026-07.md` decided on 2026-07-30 and the page never took:
+*"desktop app first, CLI second, chat-bundle third."* Every string below is new or changed.
+
+**All new copy in this round is em-dash-free**, per the sweep recorded in the section directly below
+this one. That sweep is what makes "match the page" mean *no em dashes* now, and the brief's own
+instruction to match the page therefore points the opposite way from the example it gives. See the
+build report's "what this brief got wrong."
+
+### Locked lines: all honoured, none re-worded
+
+| Locked string | State |
+|---|---|
+| **The bootstrap prompt** (`:409` above) `Read https://raw.githubusercontent.com/20prateeksingh/design-context-for-ai/main/INSTALL.md and follow it.` | **Byte-identical.** Moved from an `<em>` inside a paragraph into its own `<code id="ai-prompt">` with a Copy button. Verified by reading the clipboard back, not by inspecting the markup. |
+| **No-tracking line** `This page has no analytics. Like the kit: local-only.` | **Unchanged, still last in `#start`, still true.** No analytics, telemetry, font, CDN or external subresource was added: 0 external requests measured with the network blocked. |
+| **H1**, **Sub**, **principles strip** | Untouched. |
+
+### The picker
+
+**Options** (each rendered twice on the page, hero and `#start`, one shared selection). They name what
+the person wants, not the tooling category, because these are two different people rather than two
+settings:
+
+| | Label | Sub-label |
+|---|---|---|
+| default, preselected | `I'd rather not use a terminal` | `Your AI assistant installs it` |
+| | `I'll use the terminal` | `Three lines to paste` |
+
+**Panel headings** (visible **only** when JS has not run, where they replace the tab as each panel's
+label; `display:none` once the widget initialises):
+`If you'd rather not use a terminal` · `If you'll use the terminal` ·
+`What the assisted way in needs` · `What the terminal way in needs`
+
+**`aria-label`s:** tablists `How you want to install the kit` (hero) and `What your way in needs`
+(`#start`); buttons `Copy the setup prompt` and `Copy the setup commands`.
+
+### The assisted path, hero: two steps, presented as two steps
+
+A bare prompt in a copy box implies "this is the whole thing," and it is not: the folder is a real
+prerequisite, and an assistant asked to install into no particular place is being asked to guess.
+
+1. `Open your AI assistant on a folder where you keep projects. Make one if you need to; ~/Design Context is fine.`
+2. `Paste this prompt.` + the locked prompt above.
+
+**The honesty note under it** (carries the two load-bearing facts from the old `:625`/`:627` prose, plus
+F3's plain naming of the requirement instead of the brand):
+`Your assistant needs to read files on your machine and run commands, so a browser chat window will not do. Claude Code on the web will not either: it runs in a remote sandbox, with no local browser and no reachable localhost. Whatever you use, the assistant that installs the kit is then the AI that reads your library: same window, no second tool.`
+
+> Superseded (struck 2026-08-04) — the single-paragraph assisted lede, and the web-surface sentence that
+> used to live in the docs note. Reshaped and redistributed, not reworded away; every fact in both
+> survives above and in `#start`:
+> ~~Don't want to touch a terminal at all? Use the Claude desktop app. Open it on a folder where you keep projects (make one, `~/Design Context` is fine), and paste: "Read …INSTALL.md and follow it." It sets the kit up, opens the dashboard, and is then the AI that reads your library: same window, no second tool. The terminal CLI takes the same prompt. Either one needs a Claude subscription; the kit itself needs no account.~~
+> ~~Claude Code on the web won't work: the kit needs a browser and a local server on your own machine.~~
+
+### The terminal path, hero
+
+The command block is **unchanged from `9d99e38` (N2)** and stays three separate lines with the launcher
+named below it, never an `&&` chain (`&&` is a parse error in Windows PowerShell 5.1):
+`On Windows, the last line is tools\start.cmd.` — verbatim, moved into the panel.
+
+**New line**, and it is a claim, so it was checked against `tools/start.sh` rather than assumed:
+`It installs what it needs the first time, then opens the dashboard and hands you to the onboarding wizard.`
+
+### `#start` stops repeating the commands
+
+`#start` no longer carries any command. The same clone line used to appear in **three** places on one
+page (hero, `#start` macOS, `#start` Windows); it now appears **once**. `#start` reflects the same
+selection and answers the different question: what does the way in you picked require.
+
+| Was | Now |
+|---|---|
+| **H2** `Copy the repo into a folder named after your product.` | `One workspace, one product.` |
+| **Lede** `One workspace, one product. Then run the script and follow the dashboard.` | `Name the folder after the product you are capturing. The steps are at the top of the page; what each way in needs is here.` |
+| **Platform labels** `macOS / Linux` · `Windows` | Removed. The platform split now lives inside the terminal option only, as one line, not as a second axis across the page. |
+| **One shared pill row** | Two per-path rows (below). |
+
+**Requirements pills, assisted:** `an AI assistant with file access` · `Node 18 or newer` ·
+`macOS, Linux or Windows` · `no account, no key, no signup`
+
+**Requirements pills, terminal:** `Node 18 or newer` · `git` · `macOS, Linux or Windows` ·
+`no account, no key, no signup`
+
+`git` is **new**, and the split is the reason this second instance is worth rendering: `INSTALL.md:47`
+marks git *"useful, not required"* because §3 carries a no-git route, so git is a real requirement of
+the terminal path and genuinely not one of the assisted path. Paired with:
+`git is only for the clone. Without it, download the repo as a zip from GitHub instead.`
+
+**F3, vendor-neutral address with the tested/untested line drawn honestly** (assisted panel):
+`Cold-tested with Claude's desktop app and its terminal CLI, which is what INSTALL.md was written for. Assistants that read AGENTS.md are expected to work and have not been verified here, so if yours stalls, read that as unsupported rather than broken.`
+`Whichever assistant you use is its own product, on its own plan. The kit itself is free and needs no account.`
+
+> **One deliberate deviation from the brief, flagged for Prateek.** F3 said to keep `:626`'s
+> subscription honesty as *"the assistant needs its own paid plan."* Stated **vendor-neutrally** that
+> becomes false: the sentence now addresses tools with free tiers (Cursor, and Claude Code's own free
+> entry points), so a universal "needs a paid plan" would be exactly the kind of overclaim this page
+> exists to avoid. `is its own product, on its own plan` keeps the disclosure (you may well pay for it,
+> and it is not us) without asserting a price for every vendor. Revert on your word.
+
+> **Ledger drift found while writing this, not fixed here.** The `2026-07-2x` landing-page canon below
+> still records the requirements pills as `Node 18 or newer` · **`macOS or Linux`** ·
+> `no account, no key, no signup`. The shipped page has said `macOS, Linux or Windows` since the
+> Windows work, so that older entry has been stale for some rounds. Left as history per this file's own
+> rule that dated sections record what their round shipped.
+
 ## 2026-08-04 — em dashes swept out of the landing page's user-facing text (46 replacements, `docs/index.html` only)
 
 **This supersedes every string quoted in the dated sections below wherever an em dash appears in

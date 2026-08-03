@@ -98,12 +98,70 @@
                   min-width:84px; }
   .clone button:hover { background:#24242A; }
   .clone button[data-done="1"] { color:var(--ok); }
-  /* Platform labels + the hero's Windows pointer (N2). Deliberately quiet: they orient without
-     competing with the command itself. */
-  .plat-label { margin:0; font:600 11px/1 var(--sans); letter-spacing:.08em; text-transform:uppercase;
-                color:var(--dim); }
+  /* The Windows pointer (N2). Deliberately quiet: it orients without competing with the command.
+     `.plat-label` used to sit here for #start's two labelled blocks. Those blocks are gone (the
+     platform difference now lives inside the terminal option as this one line), so the class went
+     with them rather than staying behind as dead CSS. */
   .note-win { margin:10px 0 0; font:400 12.5px/1.5 var(--sans); color:var(--dim); }
   .note-win code { font:400 12px/1 var(--mono); color:var(--txt); }
+
+  /* ══ the way in (F1) ═════════════════════════════════════════════════════════════════════════════
+     Two different PEOPLE, not two settings, so the labels are first-person and selection is expressed
+     as SURFACE CONTINUITY rather than as a pill with a sliding indicator: the chosen answer is filled
+     with --panel, the same surface as the panel it opens, and its bottom hairline goes transparent so
+     the two read as one object; the unchosen answer stays recessed on --bg-deep behind its hairline.
+     That is the device .tree already uses for row.head, so this introduces no colour and no new idiom.
+     The strip is display:none until JS marks the container [data-ready]. With JS off there is therefore
+     no dead control and BOTH panels stay open, each under its own .panel-head.
+     No `overflow:hidden` here, deliberately: it would CLIP the global :focus-visible ring, which sits
+     2px outside a tab whose border box is flush with this container's inner edge. The tabs carry the
+     corner radii themselves instead, so the rounded corners survive and the focus ring stays whole. */
+  .pathpick { margin-top:22px; background:var(--panel); border:1px solid var(--line);
+              border-radius:10px; }
+  .pathpick-tabs { display:none; }
+  .pathpick[data-ready] .pathpick-tabs { display:grid; grid-template-columns:1fr 1fr; }
+  .ptab:first-child { border-top-left-radius:9px; }
+  .ptab:last-child { border-top-right-radius:9px; }
+  /* flex column, not block: a <button> centres its own content, so when one label wraps to two lines
+     and the other doesn't, the two labels stop sharing a baseline. Top-aligned keeps them scannable. */
+  .ptab { appearance:none; -webkit-appearance:none; background:var(--bg-deep); border:0;
+          border-bottom:1px solid var(--line); text-align:left; cursor:pointer; padding:13px 16px;
+          font:inherit; color:var(--dim); display:flex; flex-direction:column;
+          justify-content:flex-start; min-width:0; }
+  .ptab + .ptab { border-left:1px solid var(--line); }
+  .ptab .who { display:block; font:600 14.5px/1.3 var(--sans); letter-spacing:-.01em; }
+  .ptab .how { display:block; margin-top:3px; font:400 12px/1.35 var(--sans); }
+  .ptab:hover { color:var(--txt); }
+  .ptab[aria-selected="true"] { background:var(--panel); border-bottom-color:transparent;
+                                color:var(--txt); cursor:default; }
+  .pathpick-panel { padding:18px 16px 16px; }
+  .panel-head { font:600 15px/1.35 var(--sans); letter-spacing:-.01em; margin-bottom:12px; }
+  .pathpick[data-ready] .panel-head { display:none; }
+  /* the assistant path is a real two-step sequence, so it is numbered; the mono index is .step's own */
+  .pstep { display:grid; grid-template-columns:auto minmax(0,1fr); gap:0 12px; }
+  .pstep + .pstep { margin-top:16px; }
+  .pstep .n { font:400 11.5px/1.85 var(--mono); color:var(--dim); letter-spacing:.1em; }
+  .pstep .t p { font-size:14.5px; }
+  .pstep .t code { font:400 12.5px/1 var(--mono); color:var(--txt); }
+  .pathpick .clone { margin-top:10px; }
+  /* The prompt is one long sentence, not a multi-line command, so line breaks carry no meaning in it
+     and it may WRAP rather than scroll out of view on a narrow screen. Visual only: the Copy button
+     reads textContent, which wrapping does not touch. The command block keeps white-space:pre, where
+     the line structure IS the instruction. */
+  .clone.wrapcode code { white-space:pre-wrap; overflow-wrap:anywhere; }
+  /* a block sitting directly at the panel's top needs no margin; the panel's own padding is the gap.
+     The assisted path's block is nested inside .pstep .t, so it keeps the 10px under "Paste this". */
+  .pathpick-panel > .clone { margin-top:0; }
+  .pathpick .note { margin-top:13px; }
+  .pathpick .note code { font:400 12px/1 var(--mono); color:var(--txt); }
+  .pathpick .req { margin-top:0; }
+  @media (max-width:420px){
+    .ptab { padding:11px 12px; }
+    .ptab .who { font-size:13.5px; }
+    .ptab .how { font-size:11.5px; }
+    .pathpick-panel { padding:16px 13px 14px; }
+    .pstep { gap:0 9px; }
+  }
 
   /* ── shared figure/panel language: --card + 1px --line + radius 10, like the dashboard's cards ── */
   .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
@@ -250,8 +308,10 @@
   .hero h1.in      { animation:lpRise 400ms ease-out backwards; }
   .hero .sub.in    { animation:lpRise 400ms ease-out 60ms backwards; }
   .hero .ctas.in   { animation:lpRise 400ms ease-out 120ms backwards; }
-  .hero .clone.in  { animation:lpFade 320ms ease-out 180ms backwards; }
-  .btn, .clone button, header.band nav a { transition:background-color 140ms ease-out; }
+  /* the picker replaced the hero's bare .clone as the last element in the load sequence; the reveal
+     targets the CONTAINER, so the panel swap inside it is never what animates */
+  .hero .pathpick.in { animation:lpFade 320ms ease-out 180ms backwards; }
+  .btn, .clone button, header.band nav a, .ptab { transition:background-color 140ms ease-out; }
   @media (prefers-reduced-motion: reduce){
     html { scroll-behavior:auto; }
     *,*::before,*::after { transition:none!important; animation:none!important; }
@@ -287,16 +347,57 @@
         <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
 
-      <!-- Three lines, not one `&&` chain: `&&` is a PARSE error in Windows PowerShell 5.1, so the
-           old one-liner ran NOTHING there — not even the clone. Separate lines paste and run on
-           every shell. The launcher differs by platform, so it is named below rather than guessed. -->
-      <div class="clone">
-        <code id="clone-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
+      <!-- ═══ the way in ═════════════════════════════════════════════════════════════════════════
+           Two paths, one shared selection, the assistant preselected. This ships the ordering decided
+           in wiki/decisions/assisted-entry-point-2026-07.md ("desktop app first, CLI second"), which
+           the page had inverted by giving its highest-intent position to the terminal and leaving the
+           assisted path a single paragraph at the bottom of #start.
+           The terminal block stays THREE SEPARATE LINES, never one `&&` chain: `&&` is a PARSE error
+           in Windows PowerShell 5.1, so a chained one-liner ran NOTHING there, not even the clone.
+           The launcher differs by platform, so it is named below the block rather than guessed. -->
+      <div class="pathpick" id="getin" data-pathpick="hero" data-label="How you want to install the kit">
+        <div class="pathpick-tabs">
+          <button type="button" class="ptab" data-path="ai">
+            <span class="who">I'd rather not use a terminal</span>
+            <span class="how">Your AI assistant installs it</span>
+          </button>
+          <button type="button" class="ptab" data-path="cli">
+            <span class="who">I'll use the terminal</span>
+            <span class="how">Three lines to paste</span>
+          </button>
+        </div>
+
+        <div class="pathpick-panel" data-path="ai">
+          <p class="panel-head">If you'd rather not use a terminal</p>
+          <div class="pstep">
+            <span class="n">1</span>
+            <div class="t"><p>Open your AI assistant on a folder where you keep projects. Make one if you need to; <code>~/Design Context</code> is fine.</p></div>
+          </div>
+          <div class="pstep">
+            <span class="n">2</span>
+            <div class="t">
+              <p>Paste this prompt.</p>
+              <div class="clone wrapcode">
+                <code id="ai-prompt">Read https://raw.githubusercontent.com/20prateeksingh/design-context-for-ai/main/INSTALL.md and follow it.</code>
+                <button type="button" data-for="ai-prompt" aria-label="Copy the setup prompt">Copy</button>
+              </div>
+            </div>
+          </div>
+          <p class="note">Your assistant needs to read files on your machine and run commands, so a browser chat window will not do. Claude Code on the web will not either: it runs in a remote sandbox, with no local browser and no reachable <code>localhost</code>. Whatever you use, the assistant that installs the kit is then the AI that reads your library: same window, no second tool.</p>
+        </div>
+
+        <div class="pathpick-panel" data-path="cli">
+          <p class="panel-head">If you'll use the terminal</p>
+          <div class="clone">
+            <code id="cli-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
 cd my-product
 tools/start.sh</code>
-        <button type="button" id="clone-copy" data-for="clone-cmd" aria-label="Copy the clone command">Copy</button>
+            <button type="button" data-for="cli-cmd" aria-label="Copy the setup commands">Copy</button>
+          </div>
+          <p class="note-win">On Windows, the last line is <code>tools\start.cmd</code>.</p>
+          <p class="note">It installs what it needs the first time, then opens the dashboard and hands you to the onboarding wizard.</p>
+        </div>
       </div>
-      <p class="note-win">On Windows, the last line is <code>tools\start.cmd</code>.</p>
 
     </div>
 
@@ -594,37 +695,52 @@ tools/start.sh</code>
   <section id="start">
     <div class="wrap">
       <p class="eyebrow">Get started</p>
-      <h2>Copy the repo into a folder named after your product.</h2>
-      <p class="lede">One workspace, one product. Then run the script and follow the dashboard.</p>
+      <h2>One workspace, one product.</h2>
+      <p class="lede">Name the folder after the product you are capturing. The steps are <a href="#getin">at the top of the page</a>; what each way in needs is here.</p>
 
-      <!-- Two labelled blocks rather than one chain with both launchers in it: a single block a
-           designer pastes wholesale must not contain a line that fails on their machine. Only the
-           third line differs; the clone and cd are identical. -->
-      <p class="plat-label">macOS / Linux</p>
-      <div class="clone" style="margin-top:8px">
-        <code id="start-cmd">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
-cd my-product
-tools/start.sh</code>
-        <button type="button" id="start-copy" data-for="start-cmd" aria-label="Copy the macOS or Linux setup commands">Copy</button>
+      <!-- #start no longer repeats the commands. The hero's picker is the ONE place the payload lives,
+           so the same clone line no longer sits in three places on one page; this section reflects the
+           same selection (shared state, second instance) and answers the different question: what does
+           the way in you picked actually require. The two lists genuinely differ, which is the reason
+           this instance is worth rendering at all: git is required to clone, and NOT required on the
+           assisted path, because INSTALL.md §3 carries a no-git route. -->
+      <div class="pathpick" data-pathpick="start" data-label="What your way in needs">
+        <div class="pathpick-tabs">
+          <button type="button" class="ptab" data-path="ai">
+            <span class="who">I'd rather not use a terminal</span>
+            <span class="how">Your AI assistant installs it</span>
+          </button>
+          <button type="button" class="ptab" data-path="cli">
+            <span class="who">I'll use the terminal</span>
+            <span class="how">Three lines to paste</span>
+          </button>
+        </div>
+
+        <div class="pathpick-panel" data-path="ai">
+          <p class="panel-head">What the assisted way in needs</p>
+          <div class="req">
+            <span>an AI assistant with file access</span>
+            <span>Node 18 or newer</span>
+            <span>macOS, Linux or Windows</span>
+            <span>no account, no key, no signup</span>
+          </div>
+          <p class="note">Cold-tested with Claude's desktop app and its terminal CLI, which is what <code>INSTALL.md</code> was written for. Assistants that read <code>AGENTS.md</code> are expected to work and have not been verified here, so if yours stalls, read that as unsupported rather than broken.</p>
+          <p class="note">Whichever assistant you use is its own product, on its own plan. The kit itself is free and needs no account.</p>
+        </div>
+
+        <div class="pathpick-panel" data-path="cli">
+          <p class="panel-head">What the terminal way in needs</p>
+          <div class="req">
+            <span>Node 18 or newer</span>
+            <span>git</span>
+            <span>macOS, Linux or Windows</span>
+            <span>no account, no key, no signup</span>
+          </div>
+          <p class="note">git is only for the clone. Without it, download the repo as a zip from GitHub instead.</p>
+        </div>
       </div>
 
-      <p class="plat-label" style="margin-top:18px">Windows</p>
-      <div class="clone" style="margin-top:8px">
-        <code id="start-cmd-win">git clone https://github.com/20prateeksingh/design-context-for-ai.git my-product
-cd my-product
-tools\start.cmd</code>
-        <button type="button" id="start-copy-win" data-for="start-cmd-win" aria-label="Copy the Windows setup commands">Copy</button>
-      </div>
-
-      <div class="req">
-        <span>Node 18 or newer</span>
-        <span>macOS, Linux or Windows</span>
-        <span>no account, no key, no signup</span>
-      </div>
-
-      <p class="lede" style="margin-top:26px">Don't want to touch a terminal at all? Use the <a href="https://code.claude.com/docs/en/desktop-quickstart">Claude desktop app</a>. Open it on a folder where you keep projects (make one, <code>~/Design Context</code> is fine), and paste: <em style="overflow-wrap:anywhere">“Read https://raw.githubusercontent.com/20prateeksingh/design-context-for-ai/main/INSTALL.md and follow it.”</em> It sets the kit up, opens the dashboard, and is then the AI that reads your library: same window, no second tool. The terminal CLI takes the same prompt. Either one needs a Claude subscription; the kit itself needs no account.</p>
-
-      <p class="note" style="margin-top:14px">The setup steps an assistant follows are in <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/INSTALL.md">INSTALL.md</a>; what the kit does once it's installed is in the <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/README.md">README</a>. Claude Code on the web won't work: the kit needs a browser and a local server on your own machine.</p>
+      <p class="note" style="margin-top:18px">The setup steps an assistant follows are in <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/INSTALL.md">INSTALL.md</a>; what the kit does once it's installed is in the <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/README.md">README</a>.</p>
 
       <p class="note" style="margin-top:22px">This page has no analytics. Like the kit: local-only.</p>
     </div>
@@ -641,6 +757,80 @@ tools\start.cmd</code>
 </footer>
 
 <script>
+/* ── the way in (F1). Plain markup in, tab widget out: every role/aria attribute is applied HERE
+   rather than shipped in the HTML, so with JS off the page never describes a control it isn't
+   rendering — the strip stays display:none and both panels are simply open under their own heading.
+   ONE selection drives every instance on the page, so the hero and #start cannot disagree.
+   Automatic activation (an arrow key moves focus AND selects) is the standard tabs contract, and it
+   is the right one here because the panels are inert markup that is free to swap. ───────────────── */
+(function(){
+  var groups = document.querySelectorAll('[data-pathpick]');
+  if (!groups.length) return;
+  var all = [], DEFAULT_PATH = 'ai';
+
+  function apply(path){
+    for (var i = 0; i < all.length; i++) {
+      var tabs = all[i].tabs, panels = all[i].panels, j, on;
+      for (j = 0; j < tabs.length; j++) {
+        on = tabs[j].getAttribute('data-path') === path;
+        tabs[j].setAttribute('aria-selected', on ? 'true' : 'false');
+        tabs[j].tabIndex = on ? 0 : -1;
+      }
+      for (j = 0; j < panels.length; j++) {
+        if (panels[j].getAttribute('data-path') === path) panels[j].removeAttribute('hidden');
+        else panels[j].setAttribute('hidden', '');
+      }
+    }
+  }
+
+  function bind(group){
+    for (var i = 0; i < group.tabs.length; i++) {
+      group.tabs[i].addEventListener('click', function(){
+        apply(this.getAttribute('data-path'));
+      });
+      group.tabs[i].addEventListener('keydown', function(e){
+        var list = group.tabs, at = -1, to = -1, k = e.key, z;
+        for (z = 0; z < list.length; z++) if (list[z] === this) at = z;
+        if (k === 'ArrowRight' || k === 'ArrowDown') to = (at + 1) % list.length;
+        else if (k === 'ArrowLeft' || k === 'ArrowUp') to = (at - 1 + list.length) % list.length;
+        else if (k === 'Home') to = 0;
+        else if (k === 'End') to = list.length - 1;
+        if (to < 0) return;
+        e.preventDefault();
+        apply(list[to].getAttribute('data-path'));
+        list[to].focus();
+      });
+    }
+  }
+
+  for (var n = 0; n < groups.length; n++) {
+    var root = groups[n];
+    var key = root.getAttribute('data-pathpick');
+    var strip = root.querySelector('.pathpick-tabs');
+    var tabs = root.querySelectorAll('.ptab');
+    var panels = root.querySelectorAll('.pathpick-panel');
+    /* one tab per panel or the widget is malformed — leave the markup alone and stay readable */
+    if (!strip || !tabs.length || tabs.length !== panels.length) continue;
+    strip.setAttribute('role', 'tablist');
+    strip.setAttribute('aria-label', root.getAttribute('data-label') || 'How you want to install the kit');
+    for (var t = 0; t < tabs.length; t++) {
+      tabs[t].setAttribute('role', 'tab');
+      tabs[t].id = 'ptab-' + key + '-' + tabs[t].getAttribute('data-path');
+      tabs[t].setAttribute('aria-controls', 'ppanel-' + key + '-' + tabs[t].getAttribute('data-path'));
+    }
+    for (var p = 0; p < panels.length; p++) {
+      panels[p].setAttribute('role', 'tabpanel');
+      panels[p].id = 'ppanel-' + key + '-' + panels[p].getAttribute('data-path');
+      panels[p].setAttribute('aria-labelledby', 'ptab-' + key + '-' + panels[p].getAttribute('data-path'));
+    }
+    var group = { tabs: tabs, panels: panels };
+    all.push(group);
+    bind(group);
+    root.setAttribute('data-ready', '');
+  }
+  apply(DEFAULT_PATH);
+})();
+
 /* ── copy the one-liner. Two paths, because this page must also work from file:// with the network off:
    the async Clipboard API where it is allowed, and a selected-textarea execCommand fallback where it is
    not. Every failure path is caught — nothing reaches the console. ─────────────────────────────────── */
@@ -707,7 +897,7 @@ tools\start.cmd</code>
     el.classList.add('in');
   }
 
-  var hero = document.querySelectorAll('.hero h1, .hero .sub, .hero .ctas, .hero .clone');
+  var hero = document.querySelectorAll('.hero h1, .hero .sub, .hero .ctas, .hero .pathpick');
   for (var h = 0; h < hero.length; h++) play(hero[h]);
 
   var io = new IntersectionObserver(function(entries){
