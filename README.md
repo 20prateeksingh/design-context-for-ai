@@ -13,7 +13,7 @@ It installs the kit, opens the dashboard, and is then the AI that reads your lib
 ## Start here
 
 1. **Copy this repo's contents** into a folder named after your product (e.g. `acme-dashboard/`). One workspace = one product.
-2. **Run `tools/start.sh`** (double-click it, or run it in a terminal). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand. Working with an AI assistant instead? Give it the prompt above and skip this step — it handles 1 and 2 for you.
+2. **Run `tools/start.sh`** — on Windows, **`tools\start.cmd`** (double-click it, or run it in a terminal). It installs what's needed the first time, then opens the **dashboard** in your browser. That's the only step you take by hand. Working with an AI assistant instead? Give it the prompt above and skip this step — it handles 1 and 2 for you.
 3. **Follow the dashboard.** It asks three things — your product's URL, whether you sign in to use it, and what kind of product it is — then captures. If you sign in, it opens a browser window for you to log in (**your password stays in that window, never in the AI or any file**) and continues on its own when you close it. You watch the capture happen live; you never touch the terminal.
 4. When it's done, the dashboard **Home** is your product as a **page atlas** — every captured page as a screenshot card — with a running **ledger** (the journal) down the side and a **context-readiness** score up top. Tabs: **Home · Map · Design language · Use it**, plus the **Journal**. The **Map** plots every page by real clicks-from-home, sized by how linked-to it is, with undownloaded pages as ghosts in the fog; click a ghost to download it, click a captured page for its full doc (screenshot, states, description, link graph, history). Prefer reading? `design-context/INDEX.md` is the same map as a document; AI tools start at `design-context/registry.json`.
 5. The ledger's top **"next"** slot tells you the one move that matters — first it's **"Give your AI this toolkit"** (copy one prompt; your AI describes every page and the captions light up), then **"Make your first thing"** (wireframe a real page, or design something new in the product's own language from the **Use it** tab).
@@ -29,7 +29,7 @@ node tools/capture.js --url https://app.example.com   # capture → design-conte
 node tools/capture.js --url https://example.com --logged-out   # a public site: no login, no profile
 ```
 
-_Windows: both `.sh` scripts are macOS/Linux only — `setup.sh` included. Run these three lines instead, **one at a time** (Windows PowerShell has no `&&`, and chaining them is a parse error that stops the line before anything in it runs):_
+_Windows: the easy path is **`tools\start.cmd`** — the twin of `start.sh`, so double-clicking works there too. The `.sh` scripts are macOS/Linux only, `setup.sh` included. To go step by step instead, run these lines **one at a time** (Windows PowerShell has no `&&`, and chaining them is a parse error that stops the line before anything in it runs):_
 
 ```
 npm install --prefix tools --no-fund --no-audit
