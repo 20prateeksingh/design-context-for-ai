@@ -176,6 +176,181 @@
   .heroshot { max-width:1180px; margin:44px auto 0; padding:0 16px; }
   .heroshot figure.shot { margin:0; }
 
+  /* ══ THE INTERACTIVE HERO MAP (prds/landing-page-interactive-hero.md) ════════════════════════════
+     The hero was a static .webp of the dashboard's Map tab. It is now the Map tab: hover a disc and it
+     lifts, and that page's REAL links appear as the same dashed whispers the product draws.
+
+     WHAT IS PORTED, AND WHAT IS NOT. Every rule below is copied from tools/dashboard-template.html at
+     the line noted, not re-derived — the disc, its hover lift, the two dash rhythms, the direction ramp,
+     the ring hairline, the ghost, the label pill. What is NOT here is computeLayout(): it keys off the
+     runtime size of #maparea, relaxes discs deterministically for zero overlap, and places labels with
+     a measured screen-space collision pass. Reimplementing it would mean reimplementing four subtle
+     rules and getting the honesty invariant wrong in a new place. So the real dashboard was run once at
+     a fixed reference viewport and its output dumped — see HERO below, and the build report for the
+     parity numbers. Positions here have parity with the product BY CONSTRUCTION.
+
+     THE HONESTY INVARIANT (dashboard-template.html:1679) still holds, and this is the most public place
+     it could break: ring = clicks-from-home, disc size = inbound links, bearing = the page's nav
+     section, all MEASURED. Only fog is decorative. Nothing below nudges a disc for looks.
+
+     TWO COORDINATE SPACES, and every number knows which it is in:
+       · WORLD  — what computeLayout() produced, home at (0,0). HERO.d / .g / .r and all link geometry.
+       · FRAME  — the 1100x848 reference pane at the camera the shipped hero-map.webp was shot at,
+                  which is one click of the dashboard's own zoom-out step (#zoutbtn = 0.83). Discs live
+                  in the world, so frame = world x 0.83. LABEL PILLS DO NOT: #maplabels is screen-space,
+                  so a pill's size is already frame-space and only its POSITION moved with the camera.
+     Zoom is a camera, not an encoding — measured: disc, ghost and ring geometry are byte-identical at
+     100% and 83%, so choosing the camera cannot touch what the map claims.
+
+     SCALING is one variable. --u is a single reference-frame pixel, expressed in cqw against .heromap,
+     so the whole composition scales with the hero's width and nothing needs a resize listener. */
+  .heromap { display:none; }
+  /* The static <img> is the BASELINE, not a fallback bolted on afterwards. It is what renders with no
+     JS, on touch, and if anything below fails; the layer only takes over once the script has built it
+     AND the pointer can actually hover. See the F3 gate in the script. */
+  figure.shot[data-hero="live"] > img { display:none; }
+  figure.shot[data-hero="live"] .heromap { display:block; }
+
+  .heromap { container-type:inline-size; position:relative; aspect-ratio:1100/848;
+             overflow:hidden; border-bottom:1px solid var(--line); background:#171A20;
+             --u:0.0909091cqw; }          /* 1 reference-frame px = 100cqw/1100 */
+  /* F2 (v2.4) the whitelabel accent: the dashboard wears the CAPTURED product's own colour, and this
+     map is en.wikipedia.org — #3366CC is the blue the kit measured off the real site, which is exactly
+     what the alt text describes. The page's own --accent is the Kit's indigo and must not leak in here,
+     or the hero would quietly restate someone else's brand as Wikipedia's. */
+  .heromap { --accent:#3366CC; --accent-strong:#547ED4; }
+
+  /* the luminous canvas (v2.5 §2.1 / v2.5.1 F1) is GROUND, never an overlay — nothing in the world is
+     dimmed by it; depth comes from the surface the world sits on. applyMapView() paints it from
+     layout-MEASURED radii (exploredR, ghostOuterR), so this is its computed value at the reference
+     camera with the px stops rewritten in --u's units, not a hand-tuned lookalike. Its own element
+     because cqw resolves against an ancestor container, and .heromap is the container. */
+  .heromap .hm-ground { position:absolute; inset:0; z-index:0;
+    background-image:radial-gradient(circle at 50% 50%, rgb(30, 39, 56) 0.000cqw, rgb(29, 37, 52) 4.135cqw, rgb(27, 33, 46) 9.060cqw, rgb(25, 30, 39) 14.012cqw, rgb(24, 28, 35) 18.555cqw, rgb(23, 27, 33) 23.071cqw, rgb(23, 26, 32) 27.206cqw, rgb(23, 26, 32) 32.008cqw, rgb(21, 24, 29) 33.939cqw, rgb(20, 22, 27) 35.871cqw, rgb(19, 21, 26) 37.803cqw, rgb(18, 20, 24) 39.735cqw, rgb(17, 19, 24) 43.551cqw, rgb(16, 18, 22) 47.144cqw, rgb(14, 16, 20) 50.960cqw, rgb(12, 13, 16) 54.777cqw, rgb(9, 10, 12) 58.369cqw, rgb(5, 5, 6) 62.185cqw); }
+
+  /* rings — dashboard-template.html:204. Dashed hairline, centred on the world origin. */
+  .heromap .hm-ring { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    border:calc(1.5 * var(--u)) dashed color-mix(in srgb, var(--txt) 11%, transparent);
+    border-radius:50%; z-index:1; pointer-events:none; }
+
+  /* the link layer. Its viewBox is in WORLD units and the element fills the frame, so the SVG's own
+     viewport mapping applies the camera — which means `vector-effect:non-scaling-stroke` genuinely
+     holds the stroke at its authored weight here. (:183 records that it could NOT do that job in the
+     dashboard, where the zoom is a CSS transform on an HTML ANCESTOR of the <svg>, outside the
+     vector-effect chain entirely. Inside a viewBox it is exactly the right tool.)
+     Under the discs and over the rings, by ordinary z-index — Prateek: "the dotted connectors should
+     not be on top of nodes, should be under." (:130) */
+  .heromap .hm-links { position:absolute; inset:0; width:100%; height:100%;
+                       overflow:visible; z-index:2; pointer-events:none; }
+  /* (M4) hover links are faint and DOTTED — two solid lines read as structure the map is asserting;
+     Prateek asked for a whisper (:152-161). OUT and IN stay distinguishable by TWO channels, not one:
+     colour AND a different dash rhythm — a long 5/4 stride leaving, a fine 2/4 stipple arriving —
+     because fading both toward the canvas compresses the colour difference exactly where the map is
+     darkest, so the pattern has to carry the distinction where the hue no longer can. (:195-196) */
+  .heromap .hm-links .eout { stroke-width:1.1px; stroke-dasharray:5px 4px; }
+  .heromap .hm-links .ein  { stroke-width:1.1px; stroke-dasharray:2px 4px; }
+  /* (P4) direction, at the faint end of the palette: each stroke starts at its M4 alpha at the SOURCE
+     and brightens toward the TARGET. Hue and dash are already spent, so the third channel is the ramp
+     ALONG the line. No arrowhead — at 1.1px a marker-end does not resolve (:170). No motion, so
+     prefers-reduced-motion has nothing to strip. (:197-200) */
+  .heromap .hm-links .g-out .s0 { stop-color:var(--accent-strong); stop-opacity:.46; }
+  .heromap .hm-links .g-out .s1 { stop-color:var(--accent-strong); stop-opacity:.82; }
+  .heromap .hm-links .g-in  .s0 { stop-color:var(--dim); stop-opacity:.40; }
+  .heromap .hm-links .g-in  .s1 { stop-color:var(--dim); stop-opacity:.76; }
+
+  /* discs — dashboard-template.html:235-237. They SIT ON the canvas instead of glaring against it
+     (v2.5 §2.3): a soft --canvas-tinted rim feathers the jump from a bright thumbnail to the ground,
+     and a real drop shadow works now that the ground is lighter than the shadow.
+     (P1) the framing is `center top`, not `center` — a disc showing the vertical MIDDLE of a full-page
+     capture was the odd one out, so the thumbnail IS the top square. */
+  .heromap .hm-node { position:absolute; transform:translate(-50%,-50%); border-radius:50%;
+    border:calc(2.075 * var(--u)) solid var(--accent);        /* 2.5 world px at the 0.83 camera */
+    background:var(--panel-2) center top/cover no-repeat; z-index:3; padding:0;
+    box-shadow:0 0 0 calc(2.49 * var(--u)) color-mix(in srgb, var(--canvas) 82%, transparent),
+               0 calc(4.15 * var(--u)) calc(13.28 * var(--u)) color-mix(in srgb, var(--bg-deep) 62%, transparent); }
+  /* (v2.5.1 F5·2) the rim swaps to accent AND the drop shadow deepens — the disc LIFTS off the canvas
+     rather than just changing colour. Ported from :240; the 1.04 scale that goes with it is in the
+     motion block, where prefers-reduced-motion can reach it. */
+  .heromap .hm-node:hover { box-shadow:0 0 0 calc(3.32 * var(--u)) color-mix(in srgb, var(--accent) 30%, transparent),
+                                      0 calc(6.64 * var(--u)) calc(18.26 * var(--u)) color-mix(in srgb, var(--bg-deep) 80%, transparent); }
+  /* the rim colour is load-bearing (:243-247): --accent = a described page, --tpl = a template's one
+     example, --dim = a dormant caption, --accent-strong = home. Nothing here swaps it on hover. */
+  .heromap .hm-node.tpl  { border-color:var(--tpl); }
+  .heromap .hm-node.dorm { border-color:var(--dim); }
+  .heromap .hm-node.home { border-width:calc(2.49 * var(--u)); border-color:var(--accent-strong); }
+  .heromap .hm-node.mono { background-color:var(--panel-2); }
+  /* the captured-states dot (:254) and a template's shape count ON the disc (:255-260) — the count sits
+     below the disc so it never covers the screenshot the disc is showing. */
+  .heromap .hm-node .st { position:absolute; top:calc(-1.66 * var(--u)); right:calc(-1.66 * var(--u));
+    width:calc(8.3 * var(--u)); height:calc(8.3 * var(--u)); border-radius:50%;
+    background:var(--ok); border:calc(1.66 * var(--u)) solid var(--canvas); }
+  .heromap .hm-node .tplc { position:absolute; bottom:calc(-5.81 * var(--u)); left:50%;
+    transform:translateX(-50%); z-index:1; background:var(--tpl); color:#fff;
+    font:650 calc(7.5 * var(--u))/1 var(--sans); padding:calc(1.2 * var(--u)) calc(3.7 * var(--u));
+    border-radius:999px; white-space:nowrap; }
+
+  /* ghosts — pages the crawl FOUND but never downloaded. Dashed, and they sit visibly IN the fog. */
+  .heromap .hm-ghost { position:absolute; transform:translate(-50%,-50%); z-index:3; }
+  .heromap .hm-ghost .gc { display:block; border-radius:50%;
+    border:calc(1.66 * var(--u)) dashed #737880;
+    background:color-mix(in srgb, #171A20 55%, transparent); }
+
+  /* labels are PILLS (v2.5 §2.4) — each carries its own surface + hairline so it reads on the lit
+     centre, the mid canvas and the vignette alike, which is what lets the text-halo hack go. The
+     surface is OPAQUE and one step brighter than --panel-2 because the ground is a GRADIENT: a
+     translucent pill inherits whatever is under it and reads as a hole punched in the lamp at the
+     centre. The mix is 96/4 and not brighter for a MEASURED reason — the sub-line inside is --dim,
+     which needs 4.5:1, and --panel-2 lifted 4% toward --txt measures 4.70:1 (at 10% it drops to 3.93
+     and the pill would ship a failing caption). (:205-222)
+     These are SCREEN-space in the dashboard, so their type sizes are authored frame-space here and
+     only their positions came from the reference camera. */
+  .heromap .hm-lbl { position:absolute; z-index:4; pointer-events:none; white-space:nowrap;
+    background:color-mix(in srgb, var(--panel-2) 96%, var(--txt));
+    border:max(1px, calc(1 * var(--u))) solid var(--line-2); }
+  .heromap .hm-ring-lbl, .heromap .hm-arc-lbl {
+    transform:translate(-50%,-50%); font:calc(9.5 * var(--u))/1.55 var(--sans); color:var(--dim);
+    text-transform:uppercase; letter-spacing:calc(0.6 * var(--u));
+    border-radius:999px; padding:calc(2 * var(--u)) calc(9 * var(--u)); }
+  .heromap .hm-node-lbl { transform:translate(-50%,-50%);
+    font:650 calc(11 * var(--u))/1.35 var(--sans); color:var(--txt);
+    border-radius:calc(8 * var(--u)); padding:calc(2.5 * var(--u)) calc(8 * var(--u)); }
+  .heromap .hm-home-lbl { transform:translate(-50%,-50%); text-align:center;
+    font:650 calc(12 * var(--u))/1.55 var(--sans); color:var(--txt);
+    border-radius:calc(9 * var(--u)); padding:calc(3 * var(--u)) calc(9 * var(--u)) calc(4 * var(--u)); }
+  .heromap .hm-home-lbl small, .heromap .hm-arc-lbl small {
+    display:block; font-weight:400; font-size:calc(9.5 * var(--u)); color:var(--dim); }
+  .heromap .hm-arc-lbl small { display:inline; text-transform:none; }
+
+  /* ── the pane's own overlays (dashboard-template.html #mapnote / #maplegend / #mapstats) ──────────
+     These are in the shipped hero-map.webp, because that asset is a shot of the whole map pane — and
+     the alt text quotes the footer line verbatim, so dropping them here would leave the alt describing
+     something a sighted visitor no longer sees.
+     TWO ROWS ARE DELIBERATELY NOT PORTED, because on this hero they would be false:
+       · the note's "drag to pan, scroll to zoom" — there is no pan and no zoom (F1's non-goals)
+       · the legend's "hover a region for its district" — the district blobs are not rendered here
+     A hero that advertises an affordance it does not have is worse than one that says less. The zoom
+     control is likewise absent: it is a control for a camera this layer does not move. */
+  .heromap .hm-note { position:absolute; left:calc(16 * var(--u)); top:calc(14 * var(--u));
+    z-index:7; max-width:44%; color:var(--dim);
+    font:italic calc(10.5 * var(--u))/1.55 var(--sans); pointer-events:none; }
+  .heromap .hm-legend { position:absolute; right:calc(16 * var(--u)); top:calc(14 * var(--u));
+    z-index:7; display:grid; gap:calc(1 * var(--u));
+    background:var(--panel-2); border:max(1px, calc(1 * var(--u))) solid var(--line);
+    border-radius:calc(10 * var(--u)); padding:calc(10 * var(--u)) calc(12 * var(--u));
+    color:var(--dim); font:calc(10.5 * var(--u))/1.55 var(--sans); pointer-events:none; }
+  .heromap .hm-legend .lg { display:flex; align-items:center; gap:calc(7 * var(--u)); white-space:nowrap; }
+  .heromap .hm-legend i { flex:none; display:block; border-radius:50%; }
+  /* the legend's own swatch for the direction rule — the same two alphas as the strokes, as a 2px bar */
+  .heromap .hm-legend .lgdir { width:calc(24 * var(--u)); height:calc(2 * var(--u)); border-radius:calc(1 * var(--u));
+    background:linear-gradient(90deg, color-mix(in srgb, var(--accent-strong) 46%, transparent),
+                                      color-mix(in srgb, var(--accent-strong) 82%, transparent)); }
+  .heromap .hm-stats { position:absolute; left:calc(16 * var(--u)); bottom:calc(14 * var(--u));
+    z-index:7; max-width:62%; background:var(--panel-2);
+    border:max(1px, calc(1 * var(--u))) solid var(--line); border-radius:calc(10 * var(--u));
+    padding:calc(9 * var(--u)) calc(14 * var(--u));
+    color:var(--dim); font:calc(11 * var(--u))/1.55 var(--sans); pointer-events:none; }
+  .heromap .hm-stats b { color:var(--txt); font-weight:650; }
+
   /* ══ F2 · the cut edge ═══════════════════════════════════════════════════════════════════════════
      Every shipped image is a complete framed panel — the frame is a real component's own bounding box or
      a whole browser window (see prds/landing-page-v1.1-shots/assets.sh). ONE surface is genuinely taller
@@ -312,9 +487,18 @@
      targets the CONTAINER, so the panel swap inside it is never what animates */
   .hero .pathpick.in { animation:lpFade 320ms ease-out 180ms backwards; }
   .btn, .clone button, header.band nav a, .ptab { transition:background-color 140ms ease-out; }
+  /* the hero map's disc lift (dashboard-template.html:1018-1021). The transform lives on the element
+     and NOT inline, or :hover could never win it. Nothing here moves until a pointer asks it to —
+     the interaction is hover-driven and user-initiated, which is the opposite of ambient. */
+  .heromap .hm-node, .heromap .hm-ghost { transition:transform 140ms ease-out, box-shadow 140ms ease-out; }
+  .heromap .hm-node:hover, .heromap .hm-ghost:hover { transform:translate(-50%,-50%) scale(1.04); }
   @media (prefers-reduced-motion: reduce){
     html { scroll-behavior:auto; }
     *,*::before,*::after { transition:none!important; animation:none!important; }
+    /* the blanket rule above kills the TRANSITION but not the end state, so the scale would still
+       snap. The dashboard's own precedent for exactly this is `transform:none` on the hover rule
+       (:403, :446); the centring translate stays because it is layout, not motion. */
+    .heromap .hm-node:hover, .heromap .hm-ghost:hover { transform:translate(-50%,-50%); }
   }
 </style>
 </head>
@@ -413,6 +597,23 @@ tools/start.sh</code>
       <figure class="shot">
         <img src="assets/hero-map.webp" width="2200" height="1696"
              alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <!-- The interactive layer mounts HERE, and only when a pointer can hover (F3). It is
+             aria-hidden because the <img> above already carries the whole description in its alt: this
+             is a decorative enhancement over an accessible baseline, not a second thing to read. A
+             half-navigable map of 36 tab stops with no way to act on any of them would be worse than
+             none. Empty in the markup — the script fills it, so with JS off there is nothing here and
+             the image simply stays. -->
+        <div class="heromap" aria-hidden="true">
+          <p class="hm-note">rings = how many clicks from home · hover a page for its real links</p>
+          <div class="hm-legend">
+            <span class="lg"><i style="width:calc(14 * var(--u));height:calc(14 * var(--u));border:calc(2.5 * var(--u)) solid var(--accent)"></i>explored · size = how linked-to</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--dim)"></i>explored, dormant caption</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) dashed var(--dim);opacity:.6"></i>ghost in the fog · locked</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--tpl)"></i>×N · one example, stands for N</span>
+            <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>
+          </div>
+          <p class="hm-stats"><b>0.9% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back</p>
+        </div>
         <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
       </figure>
     </div>
@@ -909,6 +1110,224 @@ tools/start.sh</code>
 
   var targets = document.querySelectorAll('.reveal');
   for (var t = 0; t < targets.length; t++) io.observe(targets[t]);
+})();
+
+/* ── THE INTERACTIVE HERO MAP ─────────────────────────────────────────────────────────────────────
+   HERO is what the REAL dashboard computed, dumped once at a fixed reference viewport. It is not a
+   layout engine's input and there is no layout engine here — see the CSS block for why porting
+   computeLayout() was the wrong move. Injected exactly the way tools/map.js injects the dashboard's
+   own data, so the placeholder reads the same in both files.
+
+     z    the camera: one click of the dashboard's own zoom-out step. frame = world x z.
+     fw/fh the reference pane, 1100x848.
+     ids  slug per disc, index-addressed — every link below is an integer into this array, which is
+          what took the payload from 31.5 KB of repeated slugs to 5.4 KB.
+     d    discs, WORLD units: [x, y, diameter, flags, badge?]
+          flags: 1 template · 2 dormant caption · 4 no screenshot · 8 home · 16 has captured states
+     g    ghosts, WORLD units: [x, y, diameter]
+     r    ring radii, WORLD units
+     l    per disc, parallel to ids: [[outbound idx…], [inbound idx…]]
+     lb   label pills, already in FRAME units (they are screen-space in the dashboard)
+   ─────────────────────────────────────────────────────────────────────────────────────────────── */
+var HERO = /*__HERODATA__*/{"z":0.83,"fw":1100,"fh":848,"ids":["wiki-main-page","wiki-wikipedia-contents","wiki-portal-current-events","wiki-special-random","wiki-wikipedia-about","wiki-wikipedia-contact-us","wiki-help-contents","wiki-help-introduction","wiki-wikipedia-community-portal","wiki-special-recentchanges","wiki-special-specialpages","wiki-special-search","w-index-php-326bc2","wiki-talk-main-page","wiki-special-whatlinkshere-main-page","wiki-wikipedia-file-upload-wizard-2","wiki-2026-kumamoto-earthquake","wiki-talk-main-page-archive-211","wiki-special-contributions-chri421stian","wiki-wikipedia-contents-portals","wiki-wikipedia-requests-for-comment-biographies","wiki-special-recentchangeslinked-wikipedia-contents","wiki-special-whatlinkshere-wikipedia-contents","wiki-wikipedia-wikiproject-women-in-red-meetup-376","wiki-wikipedia-vital-articles-level-1","wiki-special-editpage-template-wikipedia-directories","wiki-wikipedia-contact-us-readers","wiki-template-potd-2026-08-02","wiki-wikipedia-meetup-san-diego-august-2026-wiknic","wiki-wikipedia-help-desk-archives-2007-april-15","w-index-php-7a1227","wiki-grace-gerber-silverberg","wiki-list-of-sovereign-states","wiki-maxwell-27s-equations","wiki-mercury-disambiguation","wiki-rwanda"],"d":[[0,0,85,8],[101,-159,61,0],[166,-136,61,0],[168,-68,61,0],[214,-18,61,0],[161,24,61,0],[199,80,61,0],[132,94,61,0],[141,161,61,0],[76,144,61,0],[53,208,61,0],[3,162,61,16],[-112,-153,33,0],[-70,160,35,0],[-163,97,33,0],[-46,209,61,0],[-138,129,34,17,"×1.1k"],[193,-184,35,1,"×57"],[246,-92,33,1,"×50"],[-112,161,35,1,"×21"],[264,10,33,1,"×17"],[243,113,33,1,"×13"],[181,198,33,1,"×10"],[91,251,33,1,"×7"],[-13,263,33,1,"×5"],[-61,-256,33,1,"×5"],[-114,237,33,1,"×5"],[-179,60,33,1,"×3"],[-196,175,33,1,"×3"],[-249,85,33,1,"×3"],[-151,-115,62,1,"×1.1k"],[308,142,33,0],[401,75,32,0],[211,349,32,0],[-120,390,32,0],[-17,339,33,0]],"g":[[478,-22,30],[-110,-464,15],[477,35,15],[506,117,14],[434,198,14],[421,305,14],[323,351,14],[269,445,14],[-334,-340,14],[161,449,14],[74,514,14],[-27,476,14],[-132,503,14],[-211,428,14]],"r":[188.44,262.88,339.2],"l":[[[1,2,3,4,5,6,7,8,9,15,10,11,12,30,13,14,16,27,27,19],[16,31,6,7,32,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,2,3,4,5,6,7,8,9,15,10,11,30,22,21,19,24,24,25],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,19,15,29,28,20,24,23]],[[0,1,3,4,5,6,7,8,9,15,10,11,30,16],[16,31,6,7,32,0,33,34,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,4,5,6,7,8,9,15,10,11,30],[16,31,6,7,32,0,33,34,2,35,18,25,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,5,6,7,8,9,15,10,11,30],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,6,7,8,9,15,10,11,30,26],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,7,8,9,15,10,11,30],[16,31,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,8,9,15,10,11,30],[16,31,6,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,9,15,10,11,30,23,23,28,28,20],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,8,15,10,11,30,18],[16,31,6,7,32,0,33,34,2,35,18,25,3,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,8,9,15,11,30],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,8,9,15,10,30],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[],[0]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,17,17],[0,14,17]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,13,17,29,29],[0]],[[0,1,2,3,4,5,6,7,8,9,10,11,30],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[0,2]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,13],[14,22,13]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[9]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[0,1,24]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[8]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[1]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,17],[1]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,31,35],[8]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30,19],[1]],[[30,0,1,2,3,4,5,6,7,8,9,15,10,11],[1]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[5]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[0]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[8]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[14]],[[],[16,31,6,7,32,0,33,34,2,35,18,25,3,9,21,11,10,14,22,13,17,27,4,8,5,26,1,19,15,29,28,20,24,23]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[23]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[]],[[0,1,2,3,4,5,6,7,8,9,15,10,11,30],[23]]],"lb":{"ring":[{"h":"1 click","x":-156.36,"y":-0.14},{"h":"2 clicks","x":-218.21,"y":-0.14},{"h":"3 clicks","x":281.63,"y":-0.14}],"node":[{"h":"Index.php Details","x":-125.8,"y":-55.16},{"h":"Help","x":165.16,"y":106.7},{"h":"Current events","x":212.4,"y":-113.38},{"h":"Random article (l…","x":55.2,"y":-57},{"h":"Search","x":2.59,"y":94.23},{"h":"Special pages","x":44.5,"y":243.42}],"arc":[{"h":"not linked from home · 3 pages","x":-117.12,"y":255.44},{"h":"deep fog<small>…4007 more · templates stand for most</small>","x":391.9,"y":-240.41}],"home":[{"h":"Landing<small>35 in · 21 out</small>","x":0,"y":62.34}],"ghost":[]}};
+(function(){
+  if (!HERO) return;
+  var fig = document.querySelector('.heroshot figure.shot');
+  var map = fig && fig.querySelector('.heromap');
+  if (!map) return;
+
+  /* F3 — Prateek's decision: phones get the static image. Hover does not exist on touch, and a map
+     whose entire content is revealed by hovering is a dead surface without it. This is the ONLY gate;
+     it runs before anything is built, so a touch device never even requests the 36 thumbnails. */
+  if (!window.matchMedia || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  var Z = HERO.z, FW = HERO.fw, FH = HERO.fh;
+  var CX = FW / 2, CY = FH / 2;                      // the world origin sits at the frame's centre
+  // world -> percentage of the frame. Percentages rather than pixels so the composition scales with
+  // the hero's width on its own, with no resize listener and nothing for a reflow to get wrong.
+  function px(x){ return ((CX + x * Z) / FW * 100).toFixed(4) + '%'; }
+  function py(y){ return ((CY + y * Z) / FH * 100).toFixed(4) + '%'; }
+  function fx(x){ return ((CX + x) / FW * 100).toFixed(4) + '%'; }   // label coords are already frame
+  function fy(y){ return ((CY + y) / FH * 100).toFixed(4) + '%'; }
+  function u(n){ return 'calc(' + n.toFixed(4) + ' * var(--u))'; }
+
+  var frag = document.createDocumentFragment();
+
+  var ground = document.createElement('div');
+  ground.className = 'hm-ground';
+  frag.appendChild(ground);
+
+  // rings, outermost first so the pointer never meets one anyway (they are pointer-inert)
+  for (var ri = 0; ri < HERO.r.length; ri++) {
+    var ring = document.createElement('div');
+    ring.className = 'hm-ring';
+    ring.style.width = u(HERO.r[ri] * 2 * Z);
+    ring.style.height = ring.style.width;
+    frag.appendChild(ring);
+  }
+
+  /* the link layer. viewBox is in WORLD units and spans exactly the frame at this camera
+     (1100/0.83 x 848/0.83), so the SVG's own viewport mapping IS the camera and the geometry below
+     can be the dashboard's seg() verbatim, in world coordinates, with no scaling arithmetic. */
+  var VBW = FW / Z, VBH = FH / Z;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('class', 'hm-links');
+  svg.setAttribute('viewBox', (-VBW / 2).toFixed(2) + ' ' + (-VBH / 2).toFixed(2) + ' ' +
+                              VBW.toFixed(2) + ' ' + VBH.toFixed(2));
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('aria-hidden', 'true');
+  var defs = document.createElementNS(SVGNS, 'defs');
+  svg.appendChild(defs);
+  frag.appendChild(svg);
+
+  // ghosts — found by the crawl, never downloaded. No hover links: measured on the real dashboard,
+  // not one frontier group carries linksTo/linkedFrom, so there is nothing to draw.
+  for (var gi = 0; gi < HERO.g.length; gi++) {
+    var gh = HERO.g[gi], gel = document.createElement('span');
+    gel.className = 'hm-ghost';
+    gel.style.left = px(gh[0]); gel.style.top = py(gh[1]);
+    var gc = document.createElement('span');
+    gc.className = 'gc';
+    gc.style.width = u(gh[2] * Z); gc.style.height = gc.style.width;
+    gel.appendChild(gc);
+    frag.appendChild(gel);
+  }
+
+  // discs. <span>, not <button>: there is nothing to activate. F4's decision is that this layer is a
+  // decorative enhancement over an image that already carries the full description, so it stays out
+  // of the tab order entirely rather than offering 36 focus stops that lead nowhere.
+  var nodeEls = [];
+  for (var i = 0; i < HERO.d.length; i++) {
+    var d = HERO.d[i], f = d[3];
+    var el = document.createElement('span');
+    var cls = 'hm-node';
+    if (f & 1) cls += ' tpl';
+    if (f & 2) cls += ' dorm';
+    if (f & 4) cls += ' mono';
+    if (f & 8) cls += ' home';
+    el.className = cls;
+    el.style.left = px(d[0]); el.style.top = py(d[1]);
+    el.style.width = u(d[2] * Z); el.style.height = el.style.width;
+    if (!(f & 4)) {
+      // a real <img> child rather than a background, so `loading` and `decoding` apply. Sized to the
+      // disc by the parent; the thumbnail IS the page's top square (P1), so `center top` framing is
+      // already baked into the raster.
+      var im = document.createElement('img');
+      im.src = 'assets/hero-nodes/' + HERO.ids[i] + '.webp';
+      im.alt = '';
+      im.decoding = 'async';
+      // the hero is above the fold, so the big discs load eagerly and the rest defer — 36 requests
+      // must not be in front of first paint. d[2] is the world diameter; 40 is just past the floor.
+      im.loading = d[2] >= 40 ? 'eager' : 'lazy';
+      im.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:center top;display:block;border:0;';
+      el.appendChild(im);
+    }
+    if (f & 16) { var st = document.createElement('span'); st.className = 'st'; el.appendChild(st); }
+    if (d[4]) { var bd = document.createElement('span'); bd.className = 'tplc'; bd.textContent = '×' + d[4].replace(/^×/, ''); el.appendChild(bd); }
+    el.setAttribute('data-i', String(i));
+    frag.appendChild(el);
+    nodeEls.push(el);
+  }
+
+  // label pills. Positions come from the dashboard's own collision pass at this camera — nothing here
+  // re-solves placement, which is why a pill can never land on a disc it did not land on there.
+  function pill(kind, items, useFrame) {
+    for (var k = 0; k < items.length; k++) {
+      var L = items[k], p = document.createElement('span');
+      p.className = 'hm-lbl ' + kind;
+      p.style.left = useFrame ? fx(L.x) : px(L.x);
+      p.style.top = useFrame ? fy(L.y) : py(L.y);
+      p.innerHTML = L.h;
+      frag.appendChild(p);
+    }
+  }
+  pill('hm-ring-lbl', HERO.lb.ring, true);
+  pill('hm-arc-lbl', HERO.lb.arc, true);
+  pill('hm-node-lbl', HERO.lb.node, true);
+  pill('hm-home-lbl', HERO.lb.home, true);
+
+  map.appendChild(frag);
+
+  /* ── hover links ──────────────────────────────────────────────────────────────────────────────
+     drawLinks(), ported from dashboard-template.html:2317-2338. Runs on hover and on nothing else.
+     (P4) seg(a,b) is always source -> target, so one rule covers both sets: the stroke is at its M4
+     alpha at the SOURCE and brightens toward the TARGET. Hovering a page, brightness gathering ON the
+     disc means pages pointing at it; brightness gathering AWAY means pages it points at.
+     (:174) one-semantic-per-hover was rejected there — it removes real edges from the render to make
+     the rest unambiguous — so BOTH directions are drawn here too. */
+  var gseq = 0;
+  function drawLinks(i) {
+    var frag2 = document.createDocumentFragment(), dfrag = document.createDocumentFragment();
+    var e = HERO.l[i];
+    // (P4) THE EDGE IS TRIMMED TO THE TWO RIMS, and that is what makes the ramp readable rather than
+    // merely present: drawn centre-to-centre the first and last ~20% of every stroke is under an
+    // opaque disc, so the reader never sees either extreme of the gradient. +3 clears the disc's own
+    // 3px --canvas halo, so a line starts at the edge of the disc rather than inside its glow.
+    function seg(a, b, isOut) {
+      var A = HERO.d[a], B = HERO.d[b];
+      if (!A || !B) return;                                  // an endpoint that is not on the map
+      var ax = A[0], ay = A[1], ar = A[2] / 2;
+      var bx = B[0], by = B[1], br = B[2] / 2;
+      var dx = bx - ax, dy = by - ay, dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1) return;
+      var ux = dx / dist, uy = dy / dist;
+      var x1 = ax + ux * (ar + 3), y1 = ay + uy * (ar + 3);
+      var x2 = bx - ux * (br + 3), y2 = by - uy * (br + 3);
+      if ((x2 - x1) * ux + (y2 - y1) * uy < 2) return;        // the two discs touch: no line to draw
+      var gid = 'hmg' + (gseq++);
+      var lg = document.createElementNS(SVGNS, 'linearGradient');
+      lg.setAttribute('id', gid);
+      lg.setAttribute('class', isOut ? 'g-out' : 'g-in');
+      // userSpaceOnUse over the same trimmed endpoints: the ramp IS the visible line, so it needs no
+      // size of its own and cannot stretch or thin out.
+      lg.setAttribute('gradientUnits', 'userSpaceOnUse');
+      lg.setAttribute('x1', x1); lg.setAttribute('y1', y1);
+      lg.setAttribute('x2', x2); lg.setAttribute('y2', y2);
+      var s0 = document.createElementNS(SVGNS, 'stop'); s0.setAttribute('class', 's0'); s0.setAttribute('offset', '0');
+      var s1 = document.createElementNS(SVGNS, 'stop'); s1.setAttribute('class', 's1'); s1.setAttribute('offset', '1');
+      lg.appendChild(s0); lg.appendChild(s1);
+      dfrag.appendChild(lg);
+      var ln = document.createElementNS(SVGNS, 'line');
+      ln.setAttribute('class', isOut ? 'eout' : 'ein');
+      ln.setAttribute('stroke', 'url(#' + gid + ')');
+      ln.setAttribute('vector-effect', 'non-scaling-stroke');
+      ln.setAttribute('x1', x1); ln.setAttribute('y1', y1);
+      ln.setAttribute('x2', x2); ln.setAttribute('y2', y2);
+      frag2.appendChild(ln);
+    }
+    for (var a = 0; a < e[0].length; a++) seg(i, e[0][a], true);
+    for (var b = 0; b < e[1].length; b++) seg(e[1][b], i, false);
+    clearLinks();
+    defs.appendChild(dfrag);
+    svg.appendChild(frag2);
+  }
+  function clearLinks() {
+    while (defs.firstChild) defs.removeChild(defs.firstChild);
+    var ln = svg.querySelectorAll('line');
+    for (var i = 0; i < ln.length; i++) svg.removeChild(ln[i]);
+  }
+
+  // delegated, exactly as the dashboard does it — one listener on the world, not 36
+  map.addEventListener('mouseover', function(ev){
+    var t = ev.target.closest ? ev.target.closest('.hm-node') : null;
+    if (!t) return;
+    drawLinks(+t.getAttribute('data-i'));
+  });
+  map.addEventListener('mouseout', function(ev){
+    var t = ev.target.closest ? ev.target.closest('.hm-node') : null;
+    if (!t) return;
+    // a disc owns children (the thumbnail, the states dot, the ×N badge), so crossing onto one of its
+    // own fires mouseout on the disc. Clearing then would drop the edges and redraw them a frame
+    // later — a visible flicker on the exact gesture this feature exists for.
+    var to = ev.relatedTarget;
+    if (to && to.closest && to.closest('.hm-node') === t) return;
+    clearLinks();
+  });
+
+  // Only now does the layer take over from the image. Setting this last means a throw anywhere above
+  // leaves the static hero exactly as it was, which is the whole point of building it first.
+  fig.setAttribute('data-hero', 'live');
 })();
 </script>
 </body>
