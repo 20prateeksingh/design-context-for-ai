@@ -1,5 +1,66 @@
 # UX copy canon
 
+## 2026-08-04 — em dashes swept out of the landing page's user-facing text (46 replacements, `docs/index.html` only)
+
+**This supersedes every string quoted in the dated sections below wherever an em dash appears in
+landing-page copy. Those sections are not edited** — each records what its own round shipped, and
+rewriting them would make a past round claim copy it never shipped. Read them as history; read this
+section for what ships now.
+
+**Why.** `wiki/concepts/blog-writing-voice.md` records *"No em dashes. Ever."* as Prateek's standing
+instruction (2026-08-03). The landing page carried **93**. Either the rule was blog-scoped or the page
+was 93 violations behind it; Prateek's ruling on 2026-08-04 was to sweep the page.
+
+**What changed, by kind.** Every em dash in visible prose, `<title>`, the meta description, alt text,
+`figcaption` and `aria-label` was replaced with a colon, a comma, parentheses, a period, or a small
+rewrite, chosen per sentence rather than mechanically. **93 → 39.**
+
+**What deliberately did not change, and why the number is not zero:**
+
+1. **Source comments (25).** HTML, CSS and JS notes in `docs/index.html`. Engineering prose, invisible
+   to users, and this repo's own wiki and briefs use em dashes throughout.
+2. **Quoted product strings inside alt text (14).** Five `alt` attributes *transcribe* what the
+   dashboard actually renders — `'DEEP FOG…4205 MORE — TEMPLATES STAND FOR MOST'`, `'Locked — not
+   downloaded yet'`, `'Everything below is method: heuristic — …'`, `'Library check — all clean — …'`,
+   `'not linked from home — 2 pages'`. Rewriting them would make the alt text describe text that does
+   not exist. **The em dashes are in the product's UI, not on this page.**
+
+> **Open question:** `tools/dashboard-template.html` therefore still generates em-dashed UI strings,
+> which is why the alt text above cannot be cleaned. Sweeping the dashboard is a larger job and it
+> invalidates all 15 screenshots in `docs/assets/`, so it was not folded into a copy sweep. Prateek's
+> call whether the rule reaches the product UI at all.
+
+### The locked lines that had to be re-worded
+
+Six lines carried a `locked` marker and an em dash. The lock was honoured by recording the change
+here rather than by leaving the page inconsistent. **Reversible on Prateek's word.**
+
+| Was (locked) | Now |
+|---|---|
+| `Local-only — captures never leave your machine.` | `Local-only:` + `captures never leave your machine.` |
+| `Read-only — it follows links, never clicks your product's buttons.` | `Read-only:` + `it follows links, never clicks your product's buttons.` |
+| `Never touches credentials — you log in, in your own browser window.` | `Never touches credentials:` + `you log in, in your own browser window.` |
+| `Measured or absent — nothing on the dashboard is invented.` | `Measured or absent:` + `nothing on the dashboard is invented.` |
+| `Any AI — Claude Code, Cursor, or a chat window; the prompts ship in the box.` | `Any AI:` + `Claude Code, Cursor, or a chat window; the prompts ship in the box.` |
+| **Sub** `…into a local library — so your AI designs…` | `…into a local library, so your AI designs…` |
+
+On the five principles the em dash was a **key/value separator in markup**, not prose punctuation:
+`<span class="k">` + `<span class="v">— text</span>`. The colon moved onto the label, where it belongs
+semantically, so no CSS changed and the rendered meaning is identical.
+
+**The no-tracking line was unaffected** — `This page has no analytics. Like the kit: local-only.` has
+no em dash and still ships verbatim.
+
+### Other notable strings now shipping without em dashes
+
+- **Title:** `Design Context Kit: your product, as design context any AI can read`
+- **Figma H2:** `Click ⧉ Copy for Figma. Paste. Editable auto-layout layers. No plugin, no Dev Mode, no paid seat.`
+- **Ledger quote line:** `It borrows your product's own colour: observed, never guessed.`
+- **Network disclosure** (the F2 string below, its one em dash only): `Neither uploads your page: the
+  conversion happens in your own browser, and no data of yours is sent to either host.` Substance
+  untouched. `README.md` was checked and carries **none** of the swept strings, so nothing diverged.
+- **Footer:** `built in public: 20prateeksingh/design-context-for-ai`
+
 ## 2026-08-02 — the network disclosure is rewritten: it described a converter that is no longer the one that runs (`prds/pre-ship-fixes.md`, F2)
 
 **This supersedes the `2026-07-30 — README discloses the one outbound request` entry below.** That
