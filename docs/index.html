@@ -952,43 +952,15 @@
 
     </div>
 
-    <!-- The hero map is en.wikipedia.org, reshot for prds/landing-page-wikipedia-assets.md so every
-         full-size dashboard view on this page now comes from the same library instead of two different
-         products. Same winning tier v1.3 established (83%, via the dashboard's own − control) reproduced
-         against the freshly re-captured 38-page library: 38/38 described, readiness 86. 21 of 36 discs in
-         frame wear the measured Wikipedia blue (accent or accent-strong), the other 15 are the purple ×N
-         covering discs shipped in 779ffbb, not undescribed pages. Numbers re-read at build time with
-         hero-probe2.js and badge-probe.js against the live dashboard; see
-         prds/landing-page-wikipedia-assets-BUILD-REPORT.md. -->
-    <div class="heroshot">
-      <figure class="shot">
-        <img src="assets/hero-map.webp" width="2200" height="1696"
-             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
-        <!-- The interactive layer mounts HERE, and only when a pointer can hover (F3). It is
-             aria-hidden because the <img> above already carries the whole description in its alt: this
-             is a decorative enhancement over an accessible baseline, not a second thing to read. A
-             half-navigable map of 36 tab stops with no way to act on any of them would be worse than
-             none. Empty in the markup — the script fills it, so with JS off there is nothing here and
-             the image simply stays. -->
-        <!-- .heroview is the WINDOW, .heromap is the FRAME (see the camera-pan block in the CSS). The
-             script still mounts into .heromap and does not know this wrapper exists. -->
-        <div class="heroview">
-        <div class="heromap" aria-hidden="true">
-          <p class="hm-note">rings = how many clicks from home · hover a page for its real links</p>
-          <div class="hm-legend">
-            <span class="lg"><i style="width:calc(14 * var(--u));height:calc(14 * var(--u));border:calc(2.5 * var(--u)) solid var(--accent)"></i>explored · size = how linked-to</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--dim)"></i>explored, dormant caption</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) dashed var(--dim);opacity:.6"></i>ghost in the fog · locked</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--tpl)"></i>×N · one example, stands for N</span>
-            <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>
-          </div>
-          <p class="hm-stats"><b>0.9% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back</p>
-        </div>
-        </div>
-        <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
-      </figure>
-    </div>
-
+    <!-- ORDER: the picker sits ABOVE the map, restored 2026-08-04 on Prateek's ruling.
+         The gauntlet round (prds/landing-page-gauntlet-BUILD-REPORT.md, G2) moved it below the map
+         for a claim -> proof -> way-in narrative, and raised the map's top from 867 to 561 so discs
+         finally cleared the fold. Measured cost: the picker fell to y=1514, below the fold at EVERY
+         viewport tested (1440x900 by 614px, 1920x1080 by 434px, 1280x800 by 633px, 375x667 by 207px),
+         and that report's own START verdict had assumed it was above. That inverts
+         wiki/decisions/assisted-entry-point-2026-07.md, whose whole finding is that P1 arrives cold
+         from a social post and must meet the assistant path first. The map is the signature surface
+         but it is not the way in. Do not reorder these two again without re-reading that decision. -->
     <div class="wrap getin-wrap">
       <!-- ═══ the way in ═════════════════════════════════════════════════════════════════════════
            Two paths, one shared selection, the assistant preselected. This ships the ordering decided
@@ -1055,6 +1027,44 @@ tools/start.sh</code>
         </div>
       </div>
     </div>
+
+    <!-- The hero map is en.wikipedia.org, reshot for prds/landing-page-wikipedia-assets.md so every
+         full-size dashboard view on this page now comes from the same library instead of two different
+         products. Same winning tier v1.3 established (83%, via the dashboard's own − control) reproduced
+         against the freshly re-captured 38-page library: 38/38 described, readiness 86. 21 of 36 discs in
+         frame wear the measured Wikipedia blue (accent or accent-strong), the other 15 are the purple ×N
+         covering discs shipped in 779ffbb, not undescribed pages. Numbers re-read at build time with
+         hero-probe2.js and badge-probe.js against the live dashboard; see
+         prds/landing-page-wikipedia-assets-BUILD-REPORT.md. -->
+    <div class="heroshot">
+      <figure class="shot">
+        <img src="assets/hero-map.webp" width="2200" height="1696"
+             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <!-- The interactive layer mounts HERE, and only when a pointer can hover (F3). It is
+             aria-hidden because the <img> above already carries the whole description in its alt: this
+             is a decorative enhancement over an accessible baseline, not a second thing to read. A
+             half-navigable map of 36 tab stops with no way to act on any of them would be worse than
+             none. Empty in the markup — the script fills it, so with JS off there is nothing here and
+             the image simply stays. -->
+        <!-- .heroview is the WINDOW, .heromap is the FRAME (see the camera-pan block in the CSS). The
+             script still mounts into .heromap and does not know this wrapper exists. -->
+        <div class="heroview">
+        <div class="heromap" aria-hidden="true">
+          <p class="hm-note">rings = how many clicks from home · hover a page for its real links</p>
+          <div class="hm-legend">
+            <span class="lg"><i style="width:calc(14 * var(--u));height:calc(14 * var(--u));border:calc(2.5 * var(--u)) solid var(--accent)"></i>explored · size = how linked-to</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--dim)"></i>explored, dormant caption</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) dashed var(--dim);opacity:.6"></i>ghost in the fog · locked</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--tpl)"></i>×N · one example, stands for N</span>
+            <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>
+          </div>
+          <p class="hm-stats"><b>0.9% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back</p>
+        </div>
+        </div>
+        <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+      </figure>
+    </div>
+
   </section>
 
   <!-- ═══ 2 · HOW IT WORKS ══════════════════════════════════════════════════════════════════════ -->
