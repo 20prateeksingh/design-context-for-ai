@@ -89,16 +89,19 @@
    its imagery rewards the scroll; ours is screenshots of a dashboard, so this sits nearer the 96px
    its own teardown recommends for a page with weaker visuals.
 
-   ── MEASURE, the container ── --measure is overridden here (1040 -> 1100) rather than edited in
-   :root, so :root stays a straight diff. The masthead splits the content column in two, and at 1040
-   neither half was wide enough to hold 40+ characters at the raised sizes.
+   ── MEASURE ── deliberately NOT overridden. An earlier draft of this block set --measure:1100px here
+   and a critic proved it never applied: `:root` has specificity (0,1,0) and `html` has (0,0,1), so the
+   later rule loses regardless of source order. Computed --measure is 1040px and .wrap measures 1040px.
+   The dead declaration and its claim have been removed rather than made to work, for two reasons:
+   --measure lives inside the :root block that hard constraint 3 requires to stay verbatim, and its
+   value is the page-wide grid every section below the hero is aligned to, so widening it is a
+   page-grid decision rather than a typographic one. The masthead columns are therefore 476/425px.
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
   /* MERGE FIX, same defect again: 17.5/0.0155 = 1129px, so the lede step sat on its floor almost to
      desktop. Interpolated: 17.5px at 375, 22px at 1440. */
   html { --fs-lede:clamp(17.5px,15.92px + 0.42vw,22px); --fs-body:17px; --fs-sm:15.5px; --fs-xs:13.5px;
          --sec-top:clamp(58px,7vw,100px); --sec-bot:clamp(44px,3.8vw,56px);
          --head-gap:clamp(26px,2.6vw,36px);
-         --measure:1100px;
          --r-lg:14px; --r-md:10px; }
 
 /* ══ THE SECONDARY TEXT STEP — A JUDGMENT CALL, FLAGGED FOR REVIEW ═══════════════════════════════
@@ -187,8 +190,13 @@
        · RHYTHM. Every section now opens with the same wide, two-part masthead, so a boundary is
          recognisable as a SHAPE from across the page rather than as a font-size change.
        · HEIGHT. A lede beside its heading instead of below it gives back 3-5 lines a section, seven
-         times over. That is the budget the 32→48 h2 is bought with; the page ends up SHORTER than it
-         started while carrying a heading half again as large.
+         times over. That part of the budget is real. CORRECTED (a critic measured it): it does NOT
+         make the page shorter. Final height against the shipped page is +195 / +1121 / +878 / +887 at
+         375 / 768 / 1440 / 1920. What the same critic then measured is the number that actually
+         justifies the trade: cumulative words delivered above each scroll depth are IDENTICAL through
+         the first four screens (900px: 126 vs 141; 1800/2700/3600: 165/260/420 on both). The added
+         height accrues past screen eight, to a reader already committed, while the cold visitor pays
+         15 words at the fold and gets a 22px lede at 42 CPL where there was a 17px lede at 89 CPL.
        · MEASURE. A half-column lede is ~45 real characters wide with no max-width fighting it.
      No new elements: `section > .wrap` becomes the grid and the existing children are placed into it.
      `.hero` is excluded — its h1 owns the full width. Below 900px it is one column again, in source
@@ -243,12 +251,16 @@
 
   /* ── hero ── */
   .hero { padding:clamp(48px,7.6vw,96px) 0 clamp(40px,4vw,54px); }
-  /* MERGE FIX. Was clamp(34px,4.3vw,58px). A bare vw term does not leave its floor until
-     34/0.043 = 790px, so h1 was pinned at 34px across the WHOLE phone and tablet range — at 768 it
-     rendered 34px against the shipped page's 47.6px, a regression at the width it was meant to help.
-     A calc() term with an intercept interpolates properly: 34px at 375 and 58px at 1440, both ends
-     landing on the intended value, and the clamp still holds the floor and ceiling. */
-  .hero h1 { font-size:clamp(34px,25.55px + 2.25vw,58px); line-height:1.06; letter-spacing:-.028em;
+  /* MERGE FIX, in two passes, and the second pass is the one that matters.
+     A draft changed the slope 6.2vw -> 4.3vw. A bare vw term does not leave its floor until
+     34/0.043 = 790px, so h1 sat pinned at 34px across the whole phone and tablet range. An
+     interpolated calc() fixed the flat spot but NOT the underlying regression: a critic measured the
+     h1 still smaller than the SHIPPED page everywhere from 640px to 1439px (768: 42.8 vs 47.6;
+     900: 45.8 vs 55.8), matching only at 1440+, which is exactly the width a reviewer looks at.
+     The honest fix is to keep the shipped slope and change only what this piece actually wanted:
+     the 600 weight, the -.028em tracking, the 1.00 leading at >=1200, and a floor RAISED 32 -> 34.
+     With 6.2vw the h1 is now >= the shipped size at every width, and identical from 936px up. */
+  .hero h1 { font-size:clamp(34px,6.2vw,58px); line-height:1.06; letter-spacing:-.028em;
              font-weight:600; max-width:17ch; }
   @media (min-width:1200px){ .hero h1 { line-height:1.0; } }
   /* the hero's sub IS a lede — the same step, so the page has ONE opening-paragraph size instead of

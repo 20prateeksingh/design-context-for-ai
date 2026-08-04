@@ -1,5 +1,80 @@
 # UX copy canon
 
+## 2026-08-04 (latest) — the gauntlet pass: the scannable layer is rewritten, and the evidence is disclosed rather than deleted (`prds/landing-page-gauntlet-BUILD-REPORT.md`)
+
+`docs/index.html`, branch `gauntlet-pass` @ `185213a`. Two copy pieces ran: **L-B** rewrote the
+scannable layer (section headings and first lines), **L-A** moved evidence prose behind seven native
+`<details>`. No number, hex or count was altered anywhere on the page.
+
+**The measured problem.** Reading only headings and first lines, a cold visitor learned what the kit
+*is* but not what it *produces* nor how to *start*. Four section H2s chose clever over specific. Cutting
+words from paragraphs does not move that test; rewriting four headings does, at roughly zero net words.
+
+### Headings and ledes, was → now
+
+| | Was | Now |
+|---|---|---|
+| **#library** H2 | `A folder of facts, with an entry point for machines.` | `Every captured page becomes six files.` |
+| **#dashboard** H2 | `The part that refuses to guess.` | `See what was captured, and what wasn't.` |
+| **#figma** H2 | `Click ⧉ Copy for Figma. Paste. Editable auto-layout layers. No plugin, no Dev Mode, no paid seat.` | `Take any captured page into Figma.` |
+| **#start** H2 | `One workspace, one product.` | `Paste one prompt, or run three lines.` |
+
+`#library`'s lede now names all six per-page files. `#figma`'s three denials (`no plugin, no Dev Mode,
+no paid seat`) were **moved verbatim** into its lede's first sentence, not deleted: the heading was doing
+three jobs and now does one. `#start`'s lede link text became position-free (`Both ways in`, still
+targeting `#getin`) so it stays true now that the picker sits below the hero map.
+
+> **Two corrections made after a critic re-ran the test.** The first draft shipped
+> `Every page: screenshot, HTML, copy, tokens.` — an overclaim twice over: the page's own file tree
+> nine rows below lists **six** files, and the four-noun list dropped `page.md`, the one file written
+> *for* the AI, under an eyebrow reading "WHAT YOUR AI ACTUALLY GETS"; and "every page" is false in the
+> page's own vocabulary, which had just said 4,188 pages are still ghosts. Corrected to
+> `Every captured page becomes six files.`
+> The same draft cut **`Nothing here is a summary of a summary.`** from `#library`'s lede. That is the
+> anti-lossy-compression claim, the specific objection an AI-suspicious reader arrives with, and nothing
+> else on the page makes it. **Restored.**
+
+> **One out-of-scope change, reverted.** A draft changed `#rules`' H2 to
+> `Boring on purpose: local-only, read-only.`, arguing the five invariant lines were invisible to a
+> scanner. They are not; that was a blind spot in the gate-2 harness, which extracts only headings and
+> ledes. **`Boring on purpose.` stands unchanged**, and the five locked `<li>` lines are byte-identical.
+
+### Progressive disclosure — MOVED and REMOVED, stated separately
+
+Seven native `<details>`, no JavaScript, so every collapsed passage opens with scripting disabled
+(verified by clicking each one with JS off). **492 words MOVED verbatim. 22 words REMOVED**, all quoted:
+
+- `Where the button lives: any page doc, any state, the Home atlas panel, the Map panel.` (16, the
+  `#figma` figcaption: it restated the section lede in smaller type, and the shot says it a third time)
+- `Nor does every page yield.` (5, replaced by the `<h3>` `Not every page comes home.` doing the same job)
+- one `where`, from a sentence split across the visible claim and its `<details>`
+
+The seven summary lines name the evidence rather than saying "learn more", so opening one is a decision
+and not a gamble:
+`What the rail says about the 131 pages it did not download` · `What the counts say, and what the tab
+leaves out` · `What it asked for in this shot, and where the accent came from` · `Why six of the seven
+hexes are blue, and why amazon.in's paints lighter` · `What the accent rim means: all 256 pages have
+been read` · `What the crawl could not reach: amazon.in's seven named failures` ·
+`The two network moments, named`
+
+The honest-failure block was **promoted, not hidden** — it gained its own `<h3>` and a visible claim,
+with the seven named failures one click away. It is the strongest argument on the page for a suspicious
+audience and was previously buried as the last of three identical grey notes.
+
+**Net effect: a cold visitor who expands nothing reads 1,688 words, down from 2,080 (−19%).**
+Everything removed from that view is one click away; the expanded page carries 2,178.
+
+### Locked lines: all honoured
+
+H1, the hero sub, the bootstrap prompt, `This page has no analytics. Like the kit: local-only.`, and
+`#rules`' five invariant `<li>`s are all **byte-identical**, verified by `grep -F` count.
+
+> **Proposed and deliberately NOT applied — the hero sub.** It is locked, and it is now the weakest
+> link in the scannable sequence: one 30-word sentence at the entry point to everything, the longest
+> first line on the page. The proposal keeps every word and splits at the comma before "so":
+> `…into a local library. Your AI then designs in your product's language, not from generic memory.`
+> That makes the scannable first line 17 words. **Awaiting Prateek's ruling; not shipped.**
+
 ## 2026-08-04 (even later) — the landing page stops showing two different products (`prds/landing-page-wikipedia-assets.md`, F1–F3)
 
 `docs/index.html`, `docs/assets/*`. Five real dashboard views (`hero-map`, `tour-map`, `tour-tokens`,
