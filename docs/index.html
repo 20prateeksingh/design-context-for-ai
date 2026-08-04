@@ -32,6 +32,92 @@
           --pad:clamp(16px,4vw,44px);
           --measure:1040px; }
 
+/* ══ THE SCALE ═══════════════════════════════════════════════════════════════════════════════════
+   DELIBERATELY OUTSIDE :root. Every custom property below is a SIZE or a SPACE — no colour is
+   defined, redefined or shadowed here — so the :root block above stays a straight diff against
+   tools/dashboard-template.html the next time it is re-copied.
+
+   ── THE DISPLAY RAMP ──────────────────────────────────────────────────────────────────────────
+     h1 58 · h2 44 · h3 20   (at 1440; all three fluid down to 375)
+     h1:h2 = 1.32   h2:h3 = 2.20   h2:lede = 2.00   h2:body = 2.59
+
+   THE RATIO THAT MATTERS IS h2:LEDE, AND IT IS 2.00. The reference bar's 48px h2 sits beside 24px
+   copy — 2.00 — and its h2 is NOT three times its body; both pages were already running 2.0 against
+   their own body text. So the defect was never the ratio. It was that this page was set SMALL AND
+   WIDE where the reference is set LARGE AND NARROW, and the fix is in the PROSE block below, not
+   here. h2 rises 32→44 only enough to hold 2.00 against a lede that rose 17→22; h1 keeps its 58 and
+   changes weight, tracking and leading instead. Measured, at 1440: reference body 24px runs 43
+   characters a line at 23.6em; this page's 13px notes ran 55 characters at 36.5em.
+
+   LINE-HEIGHT COLLAPSES AS SIZE RISES — 1.00 at the top of the h1 and h2 clamps, relaxing to ~1.10
+   as they shrink toward mobile, where a wrapping heading needs the air back. Measured on the
+   reference: exactly 1.00 at >=48px.
+
+   ONE WEIGHT ACROSS THE DISPLAY REGISTER — 600 — and TRACKING carries the ramp instead:
+   -.028em at 58 · -.023em at 44 · -.011em at 20. Big type needs less air between letters, not more.
+   Why not the reference's own 510, or a falling 640/620/600? MEASURED: system-ui resolves to SF Pro
+   here and IS variable — 400/450/500/510/550/590/600/650/700 each render a different width, so 510
+   is real on this machine. It is a fiction on two of the four fonts in the stack: Segoe UI ships
+   300/400/600/700 and Roboto 400/500/700, so a 510 ramp collapses to Regular on Windows and a
+   640/620/600 ramp collapses to one weight anyway. A single 600 exists verbatim in every font here,
+   so the ramp renders as authored on all of them. The old page ran 680 at 58px — heavier as it got
+   bigger, the inverse of the rule. 600 is the correction.
+
+   ── THE PROSE STEPS ── four, one per job, down from seven doing about four, AND EVERY ONE OF THEM
+   RAISED. This is the real correction. The reference is not calm because its headings are big; it is
+   calm because its BODY COPY IS 24px HELD AT 43 CHARACTERS A LINE. This page was 16px held at 55-95.
+   A 13px footnote at 95 characters is a wall no heading size can rescue.
+     --fs-lede  22   a section's opening paragraph, and the hero's sub   (was 17 / 19.5)
+     --fs-body  17   the page default, and any line carrying a panel's argument  (was 16)
+     --fs-sm    15.5 copy inside a card, a row, or a control             (was 14.5 and 14)
+     --fs-xs    13.5 fine print, footnotes, captions, chrome             (was 13 and 13.5)
+   Steps are 1.29 / 1.10 / 1.15 apart. Retired: 19.5, 17, 15.5, 15, 14 and 13. Mono utility sizes
+   (.eyebrow, code, .req, .gal .cap, .tree .f, .layers) are a SEPARATE register, untouched here.
+
+   ── MEASURE ── the discipline the reference actually keeps, and the one this page did not. Every
+   prose block is capped so it runs 40-50 real characters a line AT EVERY BREAKPOINT, which means
+   capping in ch (a font-relative unit) rather than px. Verified by counting line boxes, not by
+   trusting the number in the CSS: `ch` is the width of `0`, and this stack's average glyph is much
+   narrower, so a nominal 58ch note was really running 55 characters and a nominal 70ch one 95.
+
+   ── COLOUR: A THIRD PROSE STEP ── flagged for review, see the SECONDARY block further down.
+
+   ── SPACE ── the section rhythm, named so it is one decision rather than eight:
+     --sec-top / --sec-bot   asymmetric, so the gap BETWEEN sections is ~4x the gap inside one
+     --head-gap              a section's heading block to its content
+   Total clearance between two sections is 156px. The reference runs 266px and can afford it because
+   its imagery rewards the scroll; ours is screenshots of a dashboard, so this sits nearer the 96px
+   its own teardown recommends for a page with weaker visuals.
+
+   ── MEASURE, the container ── --measure is overridden here (1040 -> 1100) rather than edited in
+   :root, so :root stays a straight diff. The masthead splits the content column in two, and at 1040
+   neither half was wide enough to hold 40+ characters at the raised sizes.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  /* MERGE FIX, same defect again: 17.5/0.0155 = 1129px, so the lede step sat on its floor almost to
+     desktop. Interpolated: 17.5px at 375, 22px at 1440. */
+  html { --fs-lede:clamp(17.5px,15.92px + 0.42vw,22px); --fs-body:17px; --fs-sm:15.5px; --fs-xs:13.5px;
+         --sec-top:clamp(58px,7vw,100px); --sec-bot:clamp(44px,3.8vw,56px);
+         --head-gap:clamp(26px,2.6vw,36px);
+         --measure:1100px;
+         --r-lg:14px; --r-md:10px; }
+
+/* ══ THE SECONDARY TEXT STEP — A JUDGMENT CALL, FLAGGED FOR REVIEW ═══════════════════════════════
+   The reference's text ramp has FOUR steps: primary #F7F8F8, secondary #D0D6E0, tertiary #8A8F98,
+   quaternary #62666D — and its BODY COPY IS SET IN THE SECONDARY. This page has only two: --txt
+   #F5F6F7 and --dim #8A8F98, so every paragraph on it was set in what the reference uses for
+   captions. That is a real part of why the prose read flat and grey, and no size change fixes it.
+
+   --prose is DERIVED, not invented: 62% of --txt mixed into --dim, which resolves to about #CCCFD3
+   against the reference's #D0D6E0. No hex is added anywhere, the same way :root already derives
+   --line-2 by color-mix. It is outside :root, so it cannot affect a re-copy.
+
+   WHERE IT APPLIES: prose that carries an argument — the ledes, the hero sub, the card copy, the
+   tree descriptions, the rule definitions. --dim STAYS for what is genuinely secondary: footnotes,
+   captions, the eyebrows, chrome. That keeps three live steps instead of two.
+   REVIEW THIS: it is the one change here that touches colour at all. Reverting it is one line —
+   delete --prose and the seven rules that use it, and every affected block falls back to --dim. */
+  html { --prose:color-mix(in srgb, var(--txt) 62%, var(--dim)); }
+
   * { box-sizing:border-box; margin:0; }
   html { scroll-behavior:smooth; }
   body { background:var(--bg); color:var(--txt); font:16px/1.6 var(--sans);
@@ -57,52 +143,149 @@
                border-radius:999px; height:20px; padding:0 8px; display:inline-flex; align-items:center;
                white-space:nowrap; }
   header.band nav { margin-left:auto; display:flex; align-items:center; gap:6px; }
-  header.band nav a { color:var(--dim); font-size:13.5px; padding:6px 10px; border-radius:8px;
+  header.band nav a { color:var(--dim); font-size:var(--fs-xs); padding:6px 10px; border-radius:8px;
                       text-decoration:none; }
   header.band nav a:hover { color:var(--txt); background:var(--panel-2); text-decoration:none; }
   header.band nav a.ghcta { color:var(--txt); border:1px solid var(--line-2); }
   @media (max-width:640px){ header.band nav a.hidesm { display:none; } }
 
-  /* ── section rhythm ── */
-  section { padding:76px 0; border-top:1px solid var(--line); }
-  section:first-of-type { border-top:0; }
+  /* ══ SECTION RHYTHM ══════════════════════════════════════════════════════════════════════════════
+     Was a flat `padding:76px 0` plus a 1px top border on EVERY section. Two problems in one line:
+     the gap between two sections (152px) was made of the same undifferentiated air as the gap inside
+     one, and the hairline said "new section" so faintly that the page had to be read to be navigated.
+
+     Both hairline and flat padding are gone. Separation is now carried by two things the eye reads
+     before it reads any word:
+       · ASYMMETRIC AIR — 110px above a section, 46px below it, so a boundary is a 156px gap while the
+         gap from a heading to its own content is --head-gap (38px). 4:1, not 1:1.
+       · A GROUND CHANGE at the two chapter boundaries (see CHAPTER GROUNDS below), which is a
+         full-bleed edge rather than a hairline inside the text column.
+     Where two sections share a ground the air alone divides them, which is what the reference bar
+     does and is the single biggest reason it does not read as one column. */
+  section { padding:var(--sec-top) 0 var(--sec-bot); }
   .eyebrow { font:400 11.5px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
-             color:var(--dim); margin-bottom:14px; }
-  h2 { font-size:clamp(24px,3.4vw,32px); line-height:1.2; letter-spacing:-.02em; font-weight:650; }
-  h3 { font-size:17px; line-height:1.35; font-weight:600; letter-spacing:-.01em; }
-  .lede { color:var(--dim); font-size:17px; max-width:64ch; margin-top:12px; }
-  .note { color:var(--dim); font-size:13.5px; max-width:70ch; }
+             color:var(--dim); margin-bottom:12px; }
+  /* the display ramp — sizes, ratios and the weight decision are documented in THE SCALE, above */
+  /* MERGE FIX, same defect as .hero h1: 28/0.032 = 875px, so h2 sat on its floor to well past tablet.
+     Interpolated instead: 28px at 375, 44px at 1440. */
+  h2 { font-size:clamp(28px,22.37px + 1.5vw,44px); line-height:1.1; letter-spacing:-.023em; font-weight:600;
+       text-wrap:balance; }
+  h3 { font-size:20px; line-height:1.3; letter-spacing:-.011em; font-weight:600; }
+  /* leading collapses to 1.00 where the type is big enough not to need the air (measured on the
+     reference: exactly 1.00 at >=48px), and relaxes below, where headings wrap to three lines */
+  @media (min-width:1200px){ h2 { line-height:1.0; } }
+  .lede { color:var(--prose); font-size:var(--fs-lede); line-height:1.45; max-width:34ch;
+          margin-top:14px; }
+  /* 70ch at 13.5px was a wall: `ch` is measured on the `0` glyph and this stack's average letter is
+     far narrower, so a nominal 70ch note ran ~88 real characters a line. 58 nominal ≈ 72 actual. */
+  .note { color:var(--dim); font-size:var(--fs-xs); line-height:1.6; max-width:46ch; }
+
+  /* ══ THE SECTION HEADING BLOCK ═══════════════════════════════════════════════════════════════════
+     THE ONE PLACE THIS PAGE SPENDS BOLDNESS. From 900px up, a section's heading and its lede stop
+     being stacked and become two columns: eyebrow + h2 on the left, lede on the right, content full
+     width beneath. It is the move that pays for everything else —
+       · RHYTHM. Every section now opens with the same wide, two-part masthead, so a boundary is
+         recognisable as a SHAPE from across the page rather than as a font-size change.
+       · HEIGHT. A lede beside its heading instead of below it gives back 3-5 lines a section, seven
+         times over. That is the budget the 32→48 h2 is bought with; the page ends up SHORTER than it
+         started while carrying a heading half again as large.
+       · MEASURE. A half-column lede is ~45 real characters wide with no max-width fighting it.
+     No new elements: `section > .wrap` becomes the grid and the existing children are placed into it.
+     `.hero` is excluded — its h1 owns the full width. Below 900px it is one column again, in source
+     order, and every rule here is inside the media query. */
+  @media (min-width:900px) {
+    section:not(.hero) > .wrap { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);
+                                 column-gap:clamp(30px,3.6vw,52px); align-items:start; }
+    /* everything that is not part of the masthead spans both columns, in source order, from row 3 */
+    section:not(.hero) > .wrap > * { grid-column:1 / -1; }
+    section:not(.hero) > .wrap > .eyebrow { grid-column:1; grid-row:1; }
+    section:not(.hero) > .wrap > h2       { grid-column:1; grid-row:2; }
+    /* The lede sits in the H2's ROW, not spanning both. Spanning rows 1-2 looked right and rendered
+       wrong: a grid item taller than the tracks it spans has its surplus distributed ACROSS those
+       tracks, so a nine-line lede inflated row 1 and left the eyebrow floating 150px above its own
+       heading. In the h2's row it simply grows that row, and align-items:start holds the h2 at the
+       top of it. The small margin is optical — a 19px line and a 48px line do not share a cap. */
+    section:not(.hero) > .wrap > .lede    { grid-column:2; grid-row:2; margin-top:9px;
+                                            max-width:none; }
+    /* #rules has no lede. Column 2 is simply empty there, and a two-word heading alone in a wide
+       masthead is the right amount of quiet before a list of five rules. */
+
+    /* FOOTNOTES FLOW ACROSS BOTH COLUMNS. A section's trailing notes were spanning full width at a
+       46ch cap, which left 60% of the row empty and ran #anyproduct's three of them down the page in
+       one narrow ribbon. `grid-column:auto` drops them back into normal auto-placement, so two sit
+       side by side and the third starts the next row — the same two-column field the masthead uses,
+       and the measure is unchanged, because the cap and not the column is what sets it. */
+    section:not(.hero) > .wrap > .note { grid-column:auto; }
+  }
+  /* was ten inline `style="margin-top:..."` attributes in the markup, at 12/14/16/18/22px — five
+     values for one relationship, accumulated one at a time. One rule, one value. */
+  section:not(.hero) > .wrap > .note { margin-top:20px; }
+
+  /* ══ CHAPTER GROUNDS ═════════════════════════════════════════════════════════════════════════════
+     The page has three movements, and the ground says so — full bleed, so the edge is a horizontal
+     rule across the whole viewport rather than a hairline inside the measure:
+       1 · the claim        hero, #how, #library            --bg
+       2 · the evidence     #dashboard, #anyproduct, #figma  --bg-deep   ← every screenshot lives here
+       3 · the contract     #rules, #start                   --bg
+     Two edges on a 10,000px page, not eight. The evidence chapter going DARKER also does real work
+     for the images: a captured dashboard is itself a dark panel, and it separates from #050506 in a
+     way it never did from #08090A. Selectors are by id, so no markup changed. */
+  :is(#dashboard, #anyproduct, #figma) { background:var(--bg-deep); }
+  /* --bg-deep is #050506 against --bg's #08090A: three RGB units, which is honest depth for the
+     cards sitting on it but is NOT on its own a readable edge — rendered and looked at, the chapter
+     change did not announce itself. So the hairline comes back, at the TWO chapter boundaries only.
+     Eight identical rules were the reason the page read as one column; two are a rhythm. */
+  /* ENGRAVED, not a plain border: a dark groove then a lit edge, the way the reference separates
+     its sections — 1px of --bg-deep with a 1px inset highlight sitting on top of it. Full bleed,
+     never inset into the measure. Two lines of CSS, no asset. */
+  #dashboard, #rules { border-top:1px solid var(--bg-deep);
+                       box-shadow:inset 0 1px 0 color-mix(in srgb, var(--txt) 8%, transparent); }
 
   /* ── hero ── */
-  .hero { padding:clamp(56px,9vw,104px) 0 68px; }
-  .hero h1 { font-size:clamp(32px,6.2vw,58px); line-height:1.06; letter-spacing:-.035em;
-             font-weight:680; max-width:19ch; }
-  .hero .sub { color:var(--dim); font-size:clamp(16px,2.1vw,19.5px); line-height:1.55;
-               max-width:62ch; margin-top:20px; }
+  .hero { padding:clamp(48px,7.6vw,96px) 0 clamp(40px,4vw,54px); }
+  /* MERGE FIX. Was clamp(34px,4.3vw,58px). A bare vw term does not leave its floor until
+     34/0.043 = 790px, so h1 was pinned at 34px across the WHOLE phone and tablet range — at 768 it
+     rendered 34px against the shipped page's 47.6px, a regression at the width it was meant to help.
+     A calc() term with an intercept interpolates properly: 34px at 375 and 58px at 1440, both ends
+     landing on the intended value, and the clamp still holds the floor and ceiling. */
+  .hero h1 { font-size:clamp(34px,25.55px + 2.25vw,58px); line-height:1.06; letter-spacing:-.028em;
+             font-weight:600; max-width:17ch; }
+  @media (min-width:1200px){ .hero h1 { line-height:1.0; } }
+  /* the hero's sub IS a lede — the same step, so the page has ONE opening-paragraph size instead of
+     a 19.5px one here and a 17px one in every section below */
+  .hero .sub { color:var(--prose); font-size:var(--fs-lede); line-height:1.45;
+               max-width:34ch; margin-top:22px; }
   .ctas { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:32px; }
-  .btn { display:inline-flex; align-items:center; gap:9px; border-radius:10px; padding:12px 18px;
-         font-size:15px; font-weight:600; text-decoration:none; border:1px solid transparent; }
+  .btn { display:inline-flex; align-items:center; gap:9px; border-radius:var(--r-md); padding:12px 20px;
+         font-size:var(--fs-body); font-weight:600; text-decoration:none; border:1px solid transparent; }
   .btn:hover { text-decoration:none; }
   .btn-primary { background:var(--txt); color:var(--bg); }
   .btn-primary:hover { background:#fff; }
   .btn-ghost { background:var(--panel); color:var(--txt); border-color:var(--line-2); }
   .btn-ghost:hover { background:var(--panel-2); }
 
-  /* the copyable one-liner — the kit's own "copy a prompt" affordance, same shape */
-  .clone { margin-top:22px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
-           display:flex; align-items:stretch; overflow:hidden; max-width:100%; }
-  .clone code { font:400 12.5px/1.5 var(--mono); color:var(--txt); padding:12px 14px; flex:1;
-                overflow-x:auto; white-space:pre; scrollbar-width:thin; }
+  /* the copyable one-liner — INSET: it is a command, not something the page is saying. --bg-deep
+     inside a --panel card reads as a terminal set into the control, which is what it is. */
+  .clone { margin-top:22px; background:var(--bg-deep); border:1px solid var(--line);
+           border-radius:var(--r-md); display:flex; align-items:stretch; max-width:100%; }
+  .clone code { font:400 12.5px/1.5 var(--mono); color:var(--txt); padding:13px 14px; flex:1;
+                overflow-x:auto; white-space:pre; scrollbar-width:thin;
+                border-radius:9px 0 0 9px; }
+  /* NO `overflow:hidden` on .clone — this is the same bug already fixed once on .pathpick, and it
+     was still live here: the Copy button's border box is flush with .clone's inner edge, so the
+     global :focus-visible ring, which sits 2px OUTSIDE its element, was being clipped away on three
+     sides. Measured on the baseline before this change, and it is the only focus clip on the page.
+     The two children carry the corner radii themselves, so the rounded shape survives intact. */
   .clone button { flex:none; border:0; border-left:1px solid var(--line); background:var(--panel-2);
                   color:var(--txt); font:600 12.5px/1 var(--sans); padding:0 15px; cursor:pointer;
-                  min-width:84px; }
+                  min-width:84px; border-radius:0 9px 9px 0; }
   .clone button:hover { background:#24242A; }
   .clone button[data-done="1"] { color:var(--ok); }
   /* The Windows pointer (N2). Deliberately quiet: it orients without competing with the command.
      `.plat-label` used to sit here for #start's two labelled blocks. Those blocks are gone (the
      platform difference now lives inside the terminal option as this one line), so the class went
      with them rather than staying behind as dead CSS. */
-  .note-win { margin:10px 0 0; font:400 12.5px/1.5 var(--sans); color:var(--dim); }
+  .note-win { margin:10px 0 0; font:400 var(--fs-xs)/1.5 var(--sans); color:var(--dim); }
   .note-win code { font:400 12px/1 var(--mono); color:var(--txt); }
 
   /* ══ the way in (F1) ═════════════════════════════════════════════════════════════════════════════
@@ -115,13 +298,18 @@
      no dead control and BOTH panels stay open, each under its own .panel-head.
      No `overflow:hidden` here, deliberately: it would CLIP the global :focus-visible ring, which sits
      2px outside a tab whose border box is flush with this container's inner edge. The tabs carry the
-     corner radii themselves instead, so the rounded corners survive and the focus ring stays whole. */
-  .pathpick { margin-top:22px; background:var(--panel); border:1px solid var(--line);
-              border-radius:10px; }
+     corner radii themselves instead, so the rounded corners survive and the focus ring stays whole.
+     LIFTED: this is the one thing on the page a visitor is meant to act on, so it is the one thing
+     in the hero that carries --elev and sits above the surface rather than in it. */
+  .pathpick { margin-top:26px; background:var(--panel); border:1px solid var(--line);
+              border-radius:var(--r-lg);
+              box-shadow:inset 0 1px 0 color-mix(in srgb, var(--txt) 7%, transparent), var(--elev); }
+  /* in #start the picker is section content, so it takes the masthead gap like every other block */
+  section:not(.hero) > .wrap > .pathpick { margin-top:var(--head-gap); }
   .pathpick-tabs { display:none; }
   .pathpick[data-ready] .pathpick-tabs { display:grid; grid-template-columns:1fr 1fr; }
-  .ptab:first-child { border-top-left-radius:9px; }
-  .ptab:last-child { border-top-right-radius:9px; }
+  .ptab:first-child { border-top-left-radius:13px; }
+  .ptab:last-child { border-top-right-radius:13px; }
   /* flex column, not block: a <button> centres its own content, so when one label wraps to two lines
      and the other doesn't, the two labels stop sharing a baseline. Top-aligned keeps them scannable. */
   .ptab { appearance:none; -webkit-appearance:none; background:var(--bg-deep); border:0;
@@ -129,19 +317,21 @@
           font:inherit; color:var(--dim); display:flex; flex-direction:column;
           justify-content:flex-start; min-width:0; }
   .ptab + .ptab { border-left:1px solid var(--line); }
-  .ptab .who { display:block; font:600 14.5px/1.3 var(--sans); letter-spacing:-.01em; }
-  .ptab .how { display:block; margin-top:3px; font:400 12px/1.35 var(--sans); }
+  .ptab .who { display:block; font:600 var(--fs-sm)/1.3 var(--sans); letter-spacing:-.01em; }
+  .ptab .how { display:block; margin-top:3px; font:400 var(--fs-xs)/1.35 var(--sans); }
   .ptab:hover { color:var(--txt); }
   .ptab[aria-selected="true"] { background:var(--panel); border-bottom-color:transparent;
                                 color:var(--txt); cursor:default; }
   .pathpick-panel { padding:18px 16px 16px; }
-  .panel-head { font:600 15px/1.35 var(--sans); letter-spacing:-.01em; margin-bottom:12px; }
+  /* the JS-off stand-in for a tab label. It does an h3's job, so it takes h3's weight and tracking
+     on the body step, rather than owning a 15px step of its own. */
+  .panel-head { font:600 var(--fs-body)/1.35 var(--sans); letter-spacing:-.011em; margin-bottom:12px; }
   .pathpick[data-ready] .panel-head { display:none; }
   /* the assistant path is a real two-step sequence, so it is numbered; the mono index is .step's own */
   .pstep { display:grid; grid-template-columns:auto minmax(0,1fr); gap:0 12px; }
   .pstep + .pstep { margin-top:16px; }
   .pstep .n { font:400 11.5px/1.85 var(--mono); color:var(--dim); letter-spacing:.1em; }
-  .pstep .t p { font-size:14.5px; }
+  .pstep .t p { font-size:var(--fs-sm); max-width:52ch; }
   .pstep .t code { font:400 12.5px/1 var(--mono); color:var(--txt); }
   .pathpick .clone { margin-top:10px; }
   /* The prompt is one long sentence, not a multi-line command, so line breaks carry no meaning in it
@@ -157,23 +347,101 @@
   .pathpick .req { margin-top:0; }
   @media (max-width:420px){
     .ptab { padding:11px 12px; }
-    .ptab .who { font-size:13.5px; }
+    .ptab .who { font-size:var(--fs-xs); }
     .ptab .how { font-size:11.5px; }
     .pathpick-panel { padding:16px 13px 14px; }
     .pstep { gap:0 9px; }
   }
 
-  /* ── shared figure/panel language: --card + 1px --line + radius 10, like the dashboard's cards ── */
-  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  figure.shot { background:var(--card); border:1px solid var(--line); border-radius:10px;
-                overflow:hidden; }
-  figure.shot img { border-bottom:1px solid var(--line); }
-  figure.shot figcaption { padding:11px 14px; color:var(--dim); font-size:13px; }
+  /* ══ SURFACE HIERARCHY ═══════════════════════════════════════════════════════════════════════════
+     Every panel on this page was the SAME card — `--card` + 1px `--line` + radius 10 — so a hero
+     install control, a screenshot frame, a file listing, a terminal command and a list of five
+     principles all had identical visual weight and the eye had nothing to rank. Four tiers now, and
+     the rule for which tier a thing takes is about what the thing IS, not how important it looks:
+
+       LIFTED   --panel + hairline + var(--elev) + a 1px top edge + radius 14
+                the page's own assertions — the install control, and each evidence card.
+                MEASURED PROBLEM, and why the top edge is there: --elev is a BLACK shadow, and the
+                page background is #08090A. Rendered and looked at, a lifted card was indis-
+                tinguishable from a flat one. What actually reads as height on a near-black
+                surface is the lit top edge, so LIFTED carries `inset 0 1px 0` at 7% of --txt —
+                the light catching the near edge. --elev stays, because it does show where a card
+                overlaps the deep ground. No new colour: the highlight is --txt, mixed.
+       PANEL    --panel + hairline + radius 14, NO shadow
+                a surface that holds content but is not itself claiming anything.
+       INSET    --bg-deep + hairline + radius 10, never a shadow
+                THE MACHINE'S OWN OUTPUT: a command you paste, a file listing, a screenshot well,
+                a requirement chip, the tab you did not choose. Recessed because the page did not
+                write it. This is not a new idiom — .imgwrap and the unselected .ptab already did
+                exactly this; it is now the stated rule rather than two coincidences.
+       BARE     no fill at all, hairline separators only
+                a list. .rules is a list, and a list does not need a box.
+
+     --elev is the token that already existed in :root and was never used. It is used HERE and only
+     here, so a shadow on this page means one specific thing. Radius carries a third channel: 14 for
+     an object, 10 for something set INTO one, 999 for a chip.
+     No colour value is introduced — every surface below is one of --panel / --panel-2 / --bg-deep. */
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg);
+           padding:18px; }
+  /* ══ G3 · HOW A SCREENSHOT IS FRAMED — ONE DECISION, EVERY PANEL ═════════════════════════════════
+     ONE FRAME PER SCREENSHOT, ON THE SCREENSHOT. Nothing gets a second border, a fill it does not
+     need, a field to float in, or a caption plate.
+
+     THE EDGE STAYS, AND IT IS NOT A PREFERENCE — IT IS MEASURED. This page's :root is copied verbatim
+     from tools/dashboard-template.html, so the captured product's background token and this page's are
+     the SAME VALUE (--bg #08090A). Sampled at all four edges of the shipped assets:
+        step-onboard  #080A0B on every edge      tour-tokens  #07090A / #080A0B / #08080A
+        step-capture  #080A0B on every edge      figma-before #08080A / #080A0B
+        hero-map + all seven tiles  #050505 corners        tour-map  #080A0B along the top
+     Six of the eleven full-size assets sit within 1-3/255 of the page behind them; the map assets sit
+     3/255 the OTHER side of it. Linear can show a screenshot borderless because Linear's shots are
+     LIGHTER than Linear's page and that luminance step does the containing for free. We have no step to
+     find, by construction. Borderless here would not read as restraint, it would read as the product
+     dissolving into the page — on a page whose entire claim is that the product and the page are two
+     different things, one of them measured.
+
+     WHAT COMES OFF is everything that was framing a second time: the --card plate behind the figure
+     (it only ever showed behind a caption band), the border under the image (the ring is now the
+     whole edge), and the caption strip that turned every panel into a plate in a paper.
+
+     THE RING IS A box-shadow, NOT A border, everywhere it touches the hero. A real border would move
+     .heromap's padding-box origin by 1px and shrink its container-query width by 2px, which moves
+     every disc. box-shadow costs zero layout, so disc geometry is byte-identical (verified). */
+  figure.shot { background:none; border:0; border-radius:0; overflow:visible; }
+  figure.shot > img, figure.shot > .heromap,
+  .step .imgwrap img, .tour .feat:not(.side) .imgwrap img, .tour .feat.side .imgwrap .fadeb {
+    border-radius:var(--r-md); box-shadow:0 0 0 1px var(--line); }
+  /* the credit sits UNDER the frame, on the page, in the page's voice — not inside a band that closes
+     the box. Optically flush with the frame's left edge (1px ring + 10px radius reads as ~2px in). */
+  figure.shot figcaption { padding:11px 2px 0; color:var(--dim); font-size:var(--fs-xs);
+                           max-width:46ch; }
 
   /* The hero map breaks out past the text measure — the map IS the product's signature surface, and at
      the measure's width it read as a diagram rather than as territory (v1.1 F1). Its own container, so
      the breakout needs no negative margins or 100vw: it simply has a wider max-width than .wrap. */
-  .heroshot { max-width:1180px; margin:44px auto 0; padding:0 16px; }
+  /* ══ G2 · THE HERO WIDTH — GO PROPERLY WIDE ══════════════════════════════════════════════════════
+     The old .heroshot was the awkward middle: max-width 1180 against .wrap's 1040, but the two carry
+     DIFFERENT padding (--pad clamp(16,4vw,44) vs a flat 16), so the real content widths at 1440 were
+     952px of text against 1148px of figure — a 196px / 20.6% breakout, not the 140px / 13.5% that
+     comparing the two max-widths suggests. Enough to read as misalignment, not enough to read as
+     emphasis. It had to go properly wide or align, never split the difference. It goes wide.
+
+     THE INVARIANT IS THE WIDTH RATIO, NOT THE GUTTER RATIO. Measured, per width:
+       width   text    figure   overhang/side   width ratio   fig gutter : text gutter
+       375     343     343      0               1.000         identical containers
+       768     706.56  706.56   0               1.000         identical containers
+       1440    952     1312     180px           1.3782        64 : 244  = 3.81 : 1
+       1920    952     1312     180px           1.3782        304 : 484 = 1.59 : 1
+     The width ratio holds at every width >= 1400; the gutter ratio cannot, because both containers cap
+     and the margin past 1400 is dominated by the TEXT's own cap. The old build fails the width-ratio
+     test at both widths (1.206); this one passes at both. Below 1040 the two containers are
+     edge-for-edge identical, so the old 14.7px/side wobble at tablet is gone entirely.
+     Same --pad token as .wrap, a wider cap. Its own container: no negative margins, no 100vw. */
+  .heroshot { max-width:1400px; margin:clamp(34px,4.4vw,58px) auto 0; padding:0 var(--pad); }
+  /* the picker now sits BELOW the map: claim -> proof -> the way in. It stays on the text measure;
+     the map is the only element licensed to leave it. */
+  .hero .getin-wrap { margin-top:clamp(40px,5.2vw,68px); }
+  .hero .getin-wrap .pathpick { margin-top:0; }
   .heroshot figure.shot { margin:0; }
 
   /* ══ THE INTERACTIVE HERO MAP (prds/landing-page-interactive-hero.md) ════════════════════════════
@@ -211,8 +479,46 @@
   figure.shot[data-hero="live"] > img { display:none; }
   figure.shot[data-hero="live"] .heromap { display:block; }
 
+  /* ══ G2 · THE CAMERA PAN ═════════════════════════════════════════════════════════════════════════
+     At 1440x900 the map began at y=870, so none of the page's only evidence was on the first screen.
+     Moving the picker below it fixed the geometry but not the evidence: the disc cluster's centre
+     still sat 131px below the fold and the first 235px of the figure was border, note and legend.
+     So the camera pans down 170 frame rows. This is a CAMERA MOVE, not a nudge — the same category as
+     the 83% zoom tier the shipped asset was already shot at. Every disc keeps its exact position and
+     every relative distance is preserved; disc-position md5 is unchanged.
+     WHY 170, bounded on both sides by pixels measured off the shipped webp (2200x1696, exactly 2x):
+       row 169    bottom border of the legend BAKED INTO the static image. Anything shallower leaves
+                  an orphaned panel edge with no content, which reads as a bug.        FLOOR.
+       row 173.2  top of the "deep fog...4007 more" chip, quoted verbatim by the img alt.  CEILING.
+       row 197.6  topmost disc edge. Past this the camera would crop evidence.        NEVER.
+     170 is the shallowest crop that does the job. Above-fold disc area 12.3% -> 48.3%.
+     WHAT IS LOST: two of the fourteen ghosts fall outside the window. Fog is the one thing this map
+     calls decorative; both ghosts stay in the DOM, so the 14-ghost invariant holds, they are out of
+     shot. No offset number is written anywhere: the pan is expressed entirely by the two
+     aspect-ratios below, which is why it cannot drift out of sync. */
+  .heroview { display:none; }
+  figure.shot[data-hero="live"] .heroview { display:block; }
+  /* the WINDOW: 678 of 848 frame rows. 848 - 170 = 678. */
+  .heroview { position:relative; overflow:hidden; aspect-ratio:1100/678;
+              background:#050506; border-radius:var(--r-md); box-shadow:0 0 0 1px var(--line); }
+  /* the FRAME, unchanged at its full 1100x848 and pinned to the window's bottom edge, so its top
+     170 rows overflow upward and are clipped. */
+  .heroview > .heromap { position:absolute; left:0; right:0; bottom:0; }
+  /* the same 170-row crop on the no-JS baseline. object-position 50% 100% anchors the source's
+     BOTTOM, which is what removes rows from the top. Framing only: the asset is untouched. */
+  .heroshot figure.shot > img { width:100%; height:auto; aspect-ratio:1100/678;
+                                object-fit:cover; object-position:50% 100%; }
+
+  /* G3: the border-bottom that used to tie the map to its caption band no longer PAINTS — the band is
+     gone and the map's edge is now the shared ring, which closes all four sides and lets the credit sit
+     below it on the page. But the 1px still has to EXIST. The discs are placed in percent of this
+     element's padding box; dropping the border outright made that box 1px taller and scaled every
+     disc's Y by 0.113% (measured: disc 1 moved 404.469 → 404.969). So it stays as a transparent
+     1px: same padding box, same origin, same cqw, disc geometry byte-identical. This is the one place
+     on the page where an invisible border is the correct answer, and it is why the ring above is a
+     box-shadow and not a border. */
   .heromap { container-type:inline-size; position:relative; aspect-ratio:1100/848;
-             overflow:hidden; border-bottom:1px solid var(--line); background:#171A20;
+             overflow:hidden; border-bottom:1px solid transparent; background:#171A20;
              --u:0.0909091cqw; }          /* 1 reference-frame px = 100cqw/1100 */
   /* F2 (v2.4) the whitelabel accent: the dashboard wears the CAPTURED product's own colour, and this
      map is en.wikipedia.org — #3366CC is the blue the kit measured off the real site, which is exactly
@@ -330,10 +636,16 @@
        · the legend's "hover a region for its district" — the district blobs are not rendered here
      A hero that advertises an affordance it does not have is worse than one that says less. The zoom
      control is likewise absent: it is a control for a camera this layer does not move. */
-  .heromap .hm-note { position:absolute; left:calc(16 * var(--u)); top:calc(14 * var(--u));
+  /* G2 camera pan: the window starts at frame row 170, so a 14-row inset from the VISIBLE top edge is
+     170 + 14 = 184. The note is pane chrome and is placed independently rather than dragged up to
+     match the DEEP FOG chip, which is a world label and cannot move without nudging. */
+  .heromap .hm-note { position:absolute; left:calc(16 * var(--u)); top:calc(184 * var(--u));
     z-index:7; max-width:44%; color:var(--dim);
     font:italic calc(10.5 * var(--u))/1.55 var(--sans); pointer-events:none; }
-  .heromap .hm-legend { position:absolute; right:calc(16 * var(--u)); top:calc(14 * var(--u));
+  /* G2: moved top-right -> bottom-right. In the panned window the legend was the loudest thing on the
+     first screen: a key competing with the thing it is a key to. It clears .hm-stats at bottom-left
+     (measured: stats end at column 698, legend starts at 840). */
+  .heromap .hm-legend { position:absolute; right:calc(16 * var(--u)); bottom:calc(14 * var(--u));
     z-index:7; display:grid; gap:calc(1 * var(--u));
     background:var(--panel-2); border:max(1px, calc(1 * var(--u))) solid var(--line);
     border-radius:calc(10 * var(--u)); padding:calc(10 * var(--u)) calc(12 * var(--u));
@@ -359,36 +671,56 @@
      last 22px to the page background so the edge reads as designed rather than as a guillotine.
      This is presentation, not evidence: nothing inside the frame is altered, added or retouched.
      The mask wraps the IMAGE, not the panel, so it sits exactly on the asset's cut edge. */
-  .fadeb { display:block; position:relative; width:100%; }
+  /* MERGE NOTE. Two pieces found this same defect independently and fixed it differently, each
+     correctly for its own change: the mask used to end on --bg while sitting in a darker well, so the
+     "invisible" fade finished as a faint pale bar across the cut. G1 re-grounded it on --bg-deep (the
+     well it sat in); G3 then REMOVED that well and re-grounded it on --card. After the merge neither
+     answer is right: the ledger shot now sits directly on .tour .feat, whose surface is --panel.
+     A mask has to end on whatever is actually behind it or it stops being a fade and becomes a bar.
+     .fadeb is also the framed element now, so it clips to the frame's radius. */
+  .fadeb { display:block; position:relative; width:100%; overflow:hidden; }
   .fadeb::after { content:""; position:absolute; left:0; right:0; bottom:0; height:22px; pointer-events:none;
-                  background:linear-gradient(to bottom, rgba(8,9,10,0), var(--bg)); }
+                  background:linear-gradient(to bottom, rgba(19,19,22,0), var(--panel)); }
 
   /* ── how it works: three steps ── */
-  .steps { display:grid; gap:18px; margin-top:36px; }
-  .step { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  .steps { display:grid; gap:14px; margin-top:var(--head-gap); }
+  /* LIFTED. Three cards carrying the page's own account of the mechanism. overflow:hidden is safe
+     here: nothing inside is focusable, so there is no focus ring for the clip to eat. */
+  .step { background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg);
+          overflow:hidden;
+          box-shadow:inset 0 1px 0 color-mix(in srgb, var(--txt) 7%, transparent), var(--elev);
           display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:stretch; }
-  .step .body { padding:26px 26px 28px; align-self:center; }
+  .step .body { padding:26px 28px 28px; align-self:center; }
   .step .n { font:400 11.5px/1 var(--mono); color:var(--dim); letter-spacing:.1em; }
-  .step h3 { margin:10px 0 8px; font-size:19px; }
-  .step p { color:var(--dim); font-size:14.5px; }
-  .step .imgwrap { border-left:1px solid var(--line); background:var(--bg-deep);
-                   display:flex; align-items:center; overflow:hidden; }
-  .step:nth-child(even) .imgwrap { border-left:0; border-right:1px solid var(--line); order:-1; }
+  /* ONE h3 size on the page. This was 19px while .tour's and .panel's were 17px — two sizes doing
+     one job, accumulated rather than chosen. Both are now the single 20px h3 step. */
+  .step h3 { margin:11px 0 9px; }
+  .step p { color:var(--prose); font-size:var(--fs-sm); max-width:40ch; }
+  /* G3: was a --bg-deep cell with its own hairline seam — a SECOND frame around an image that already
+     sits inside the step's card, plus a third surface for the image to float in. Step 3's asset is
+     1500x421, so 83px of that cell was empty --bg-deep: a letterbox the page invented. The cell is now
+     just the card's own surface with an inset, and the image carries the one ring. The inset does what
+     the seam did (separates copy from picture) without drawing a line to do it. */
+  .step .imgwrap { display:flex; align-items:center; overflow:hidden; padding:24px 24px 24px 0; }
+  .step:nth-child(even) .imgwrap { order:-1; padding:24px 0 24px 24px; }
   @media (max-width:800px){
     .step, .step:nth-child(even) { grid-template-columns:minmax(0,1fr); }
-    .step .imgwrap, .step:nth-child(even) .imgwrap { border:0; border-top:1px solid var(--line); order:0; }
+    .step .imgwrap, .step:nth-child(even) .imgwrap { order:0; padding:0 22px 22px; }
   }
 
-  /* ── the library anatomy: a file tree that reads like the kit's own INDEX ── */
-  .tree { margin-top:32px; background:var(--card); border:1px solid var(--line); border-radius:10px;
-          overflow:hidden; }
+  /* ── the library anatomy: a file tree that reads like the kit's own INDEX ──
+     INSET. This is a listing the kit emitted, not a claim the page is making, so it is recessed on
+     --bg-deep with no shadow — the same relationship the terminal block has to the control it sits
+     in, one level up. The head row keeps --panel-2 and now reads as the one raised row in a well. */
+  .tree { margin-top:var(--head-gap); background:var(--bg-deep); border:1px solid var(--line);
+          border-radius:var(--r-md); overflow:hidden; }
   .tree .row { display:grid; grid-template-columns:minmax(0,26ch) minmax(0,1fr); gap:6px 24px;
                padding:11px 18px; border-top:1px solid var(--line); align-items:baseline; }
   .tree .row:first-child { border-top:0; }
   .tree .row.head { background:var(--panel-2); }
   .tree .f { font:400 12.5px/1.5 var(--mono); color:var(--txt); white-space:pre; overflow-x:auto; }
   .tree .row.dir .f { color:var(--accent-strong); }
-  .tree .d { color:var(--dim); font-size:14px; }
+  .tree .d { color:var(--prose); font-size:var(--fs-sm); max-width:52ch; }
   @media (max-width:700px){ .tree .row { grid-template-columns:minmax(0,1fr); gap:2px; } }
 
   /* ── the tour: three feature panels ────────────────────────────────────────────────────────────
@@ -396,15 +728,37 @@
      a 1440px dashboard; squeezed into a half-width column the treemap's hex labels and the map's ghost
      ring stop being legible, and an illegible screenshot proves nothing. `.side` is the exception for
      the portrait ledger crop, which suits a column. */
-  .tour { display:grid; gap:18px; margin-top:36px; }
-  .tour .feat { background:var(--card); border:1px solid var(--line); border-radius:10px;
-                overflow:hidden; }
-  .tour .feat .body { padding:26px; }
-  .tour .feat h3 { margin-bottom:9px; }
-  .tour .feat p { color:var(--dim); font-size:14.5px; max-width:76ch; }
-  .tour .feat .quote { color:var(--txt); font-size:15.5px; line-height:1.5; margin-bottom:10px;
-                       max-width:60ch; }
-  .tour .feat .imgwrap { border-top:1px solid var(--line); background:var(--bg-deep); overflow:hidden;
+  .tour { display:grid; gap:14px; margin-top:var(--head-gap); }
+  /* LIFTED, on the deep evidence ground — where --panel against --bg-deep is a wider step than
+     --panel against --bg ever was, so these read as objects without needing a heavier border. */
+  .tour .feat { background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg);
+                overflow:hidden;
+                box-shadow:inset 0 1px 0 color-mix(in srgb, var(--txt) 7%, transparent), var(--elev); }
+  .tour .feat .body { padding:26px 28px 28px; }
+  /* The masthead shape again, one level down: the h3 and the panel's one asserted line on the left,
+     the explanation on the right. Three 90-to-110-word paragraphs stacked full width under a
+     one-line quote was the single tallest run of prose on the page, and it left 40% of each card
+     empty. Same device as the section masthead, so the page has one idea about how a heading and
+     its body relate, not two. .side keeps its stack — its body is already a narrow column. */
+  @media (min-width:900px){
+    .tour .feat:not(.side) .body { display:grid; column-gap:clamp(32px,4.4vw,60px);
+      grid-template-columns:minmax(0,1fr) minmax(0,1.18fr); align-items:start; }
+    /* the h3 spans, and the two prose blocks share ONE row. Spanning the paragraph across both rows
+       instead put its surplus height into row 1 and left a hole under the heading. */
+    .tour .feat:not(.side) .body > h3           { grid-column:1 / -1; grid-row:1; }
+    .tour .feat:not(.side) .body > .quote       { grid-column:1; grid-row:2; }
+    .tour .feat:not(.side) .body > p:not(.quote){ grid-column:2; grid-row:2; }
+  }
+  .tour .feat h3 { margin-bottom:10px; }
+  .tour .feat p { color:var(--prose); font-size:var(--fs-sm); max-width:42ch; }
+  /* the panel's one asserted line. It takes the BODY step, a clear step above the copy under it
+     rather than the half-step 15.5px was; --txt against --dim carries the rest. */
+  .tour .feat .quote { color:var(--txt); font-size:var(--fs-body); line-height:1.45;
+                       margin-bottom:12px; max-width:48ch; }
+  /* G3: same call as .step — the seam and the --bg-deep field are gone, the image is inset on the
+     panel's own surface and carries the one ring. These two shots ran the full 950px interior, so the
+     panel's border was doubling as their frame on three sides and nothing framed the fourth. */
+  .tour .feat .imgwrap { overflow:hidden; padding:0 26px 26px;
                          display:flex; align-items:flex-start; justify-content:center; }
 
   /* The ledger rail is portrait, so it takes a column. v1 capped the column at 430px and let overflow
@@ -412,23 +766,33 @@
      is now cut at a measured card boundary instead, and the column simply shows all of it. */
   .tour .feat.side { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
   .tour .feat.side .body { align-self:center; }
-  .tour .feat.side .imgwrap { border-top:0; border-left:1px solid var(--line); align-items:center;
-                              justify-content:center; padding:26px; }
+  .tour .feat.side .imgwrap { align-items:center;
+                              justify-content:center; padding:26px 26px 26px 0; }
   /* the rail asset is 340 CSS px wide in the product; shown at 400 it stays crisp on a 2× screen and
      keeps the panel's two columns in proportion */
   .tour .feat.side .imgwrap .fadeb { max-width:400px; }
   @media (max-width:800px){
     .tour .feat.side { grid-template-columns:minmax(0,1fr); }
-    .tour .feat.side .imgwrap { border-left:0; border-top:1px solid var(--line); }
+    /* G3: stacked, so the inset closes on all four sides and the seam does not come back as a border. */
+    .tour .feat.side .imgwrap { padding:0 26px 26px; }
   }
 
   /* ── the map gallery (v1.1 F3): one real capture per product, at a size where a map is its shape ──
      Wraps, never scrolls sideways — the gate checks that at 360 / 768 / 1440. */
-  .gal { display:grid; gap:14px; margin-top:34px; padding:0;
+  .gal { display:grid; gap:12px; margin-top:var(--head-gap); padding:0;
          grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); }
-  .gal li { list-style:none; background:var(--card); border:1px solid var(--line); border-radius:10px;
-            overflow:hidden; }
-  .gal li img { border-bottom:1px solid var(--line); }
+  /* PANEL, not LIFTED: seven specimens laid out for comparison. Shadowing each one would turn a
+     contact sheet into seven competing objects. */
+  .gal li { list-style:none; background:var(--panel); border:1px solid var(--line);
+            border-radius:var(--r-md); overflow:hidden; }
+  /* MERGE FIX (G3 critic's single biggest gap). G3's rule is "nothing gets a second border, a fill it
+     does not need, a field to float in, or a caption plate", and it named this seam as the error it was
+     removing. The gallery exception was argued for the .cap ROW — a measured reading, not a caption —
+     and that argument is sound, but it was then silently extended to the FRAME. The row is kept
+     verbatim; the seam goes, and the tile is inset and ringed like every other shot on the page. */
+  .gal li { padding:10px 10px 0; }
+  .gal li img { border-bottom:0; border-radius:calc(var(--r-md) - 4px);
+                box-shadow:0 0 0 1px var(--line); }
   .gal .cap { display:flex; align-items:center; gap:8px; padding:9px 11px; font:400 12px/1.35 var(--mono);
               color:var(--dim); }
   .gal .cap .sw { flex:none; width:9px; height:9px; border-radius:3px; }
@@ -437,34 +801,77 @@
   @media (max-width:420px){ .gal { grid-template-columns:minmax(0,1fr); } }
 
   /* ── Figma ── */
-  .figma { display:grid; gap:18px; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
-           margin-top:34px; align-items:start; }
+  .figma { display:grid; gap:16px; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
+           margin-top:var(--head-gap); align-items:start; }
   @media (max-width:800px){ .figma { grid-template-columns:minmax(0,1fr); } }
-  .layers { font:400 12.5px/1.85 var(--mono); color:var(--dim); }
+  /* INSET: this is read back out of a real Figma file, so it takes the same recessed well as the
+     terminal block and the file tree. */
+  .panel > h3 { margin-bottom:6px; }
+  .panel > .note { margin:0 0 12px; }
+  .panel > .layers + .note { margin:14px 0 0; }
+  .layers { font:400 12.5px/1.8 var(--mono); color:var(--dim); background:var(--bg-deep);
+            border:1px solid var(--line); border-radius:var(--r-md); padding:12px 14px; }
   .layers b { color:var(--txt); font-weight:400; }
 
   /* ── principles ── */
-  .rules { display:grid; gap:1px; margin-top:34px; background:var(--line);
-           border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  .rules li { list-style:none; background:var(--bg); padding:18px 20px; }
-  .rules .k { font-weight:650; font-size:15px; }
-  .rules .v { color:var(--dim); font-size:14.5px; }
+  /* BARE. Five short rules are a LIST, and a list does not need a box: the outer border and the
+     1px-gap grid that faked cell dividers are both gone. What is left is a hairline between rows,
+     which is all the structure five lines of six words need. Nothing here has a fill, so the tier
+     reads the same on --bg here as it would on --bg-deep. */
+  .rules { display:grid; margin-top:var(--head-gap); }
+  .rules li { list-style:none; padding:17px 0; border-top:1px solid var(--line); }
+  .rules li:first-child { border-top:0; }
+  /* term and definition on ONE size — 15 against 14.5 was a difference too small to read AS a
+     difference, so it spent a step of the ramp on nothing. Weight and colour separate them. */
+  .rules .k { font-weight:600; font-size:var(--fs-body); }
+  .rules .v { color:var(--prose); font-size:var(--fs-body); }
   /* five rules into two columns leaves a hole; the fifth takes the whole row instead */
   @media (min-width:760px){
-    .rules { grid-template-columns:1fr 1fr; }
+    .rules { grid-template-columns:1fr 1fr; column-gap:clamp(32px,4.4vw,60px); }
     .rules li:last-child { grid-column:1 / -1; }
+    /* with the box gone the divider IS the border-top, so the top row must not carry one */
+    .rules li:nth-child(-n+2) { border-top:0; }
   }
 
   /* ── get started ── */
   .req { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
-  .req span { font:400 12.5px/1 var(--mono); color:var(--dim); background:var(--panel);
+  /* INSET chips: each names something your machine must already have, so they are recessed into
+     the panel rather than raised off it. */
+  .req span { font:400 12.5px/1 var(--mono); color:var(--dim); background:var(--bg-deep);
               border:1px solid var(--line); border-radius:999px; padding:8px 13px; }
 
-  footer { border-top:1px solid var(--line); padding:34px 0 60px; color:var(--dim); font-size:13.5px; }
+  footer { border-top:1px solid var(--line); padding:34px 0 60px; color:var(--dim);
+           font-size:var(--fs-xs); }
   footer .wrap { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; }
   footer .lic { font:400 12px/1 var(--mono); color:var(--txt); background:var(--panel);
                 border:1px solid var(--line-2); border-radius:999px; padding:7px 12px; }
   footer .sep { margin-left:auto; }
+
+  /* ══ PROGRESSIVE DISCLOSURE (piece L-A) ══════════════════════════════════════════════════════════
+     Native <details>, no JS anywhere near it. Every collapsed passage opens on click with scripting
+     off, which is the whole reason this is not an accordion. Six heavy evidence notes across
+     #dashboard, #anyproduct and #figma now split the same way: a claim that is true and sufficient on
+     its own stays visible, and the prose that exists to DEFEND that claim against a skeptic moves
+     inside, verbatim. Nothing was deleted to make the page shorter.
+
+     STYLING IS DELIBERATELY MINIMAL AND LIVES ONLY IN THIS BLOCK so the visual-system pass can merge
+     on top of it. Two things are load-bearing, not cosmetic:
+       · the UA disclosure triangle is KEPT (list-style untouched) — it is the affordance, every
+         browser draws it, and it needs no replacement glyph;
+       · no `overflow` is introduced on anything here, so the global :focus-visible ring — which sits
+         2px OUTSIDE the summary — is never clipped. That bug has been fixed on this page once. */
+  details.pd { margin-top:11px; }
+  details.pd > summary { color:var(--txt); font:600 var(--fs-xs)/1.6 var(--sans); cursor:pointer;
+                         max-width:60ch; width:fit-content; padding:3px 5px 3px 1px; border-radius:6px; }
+  details.pd > summary:hover { color:var(--accent-strong); }
+  details.pd > summary::marker { color:var(--dim); }
+  details.pd[open] > summary { margin-bottom:9px; }
+  details.pd > p + p { margin-top:10px; }
+  /* inside a tour card the body copy sits a step up, on --fs-sm; keep the summary on the same step */
+  .tour .feat details.pd > summary { font-size:var(--fs-sm); }
+  /* the honest-failure note is promoted out of the run of three identical grey paragraphs and given a
+     heading of its own — it is the strongest thing on the page for a suspicious reader */
+  .pd-h { margin-top:30px; }
 
   /* ══ MOTION (dashboard v2.5.1 §F5 rules, applied here) ═══════════════════════════════════════════
      Every keyframe declares only `from`; every animation uses fill-mode BACKWARDS. The implicit 100%
@@ -531,6 +938,46 @@
         <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
 
+    </div>
+
+    <!-- The hero map is en.wikipedia.org, reshot for prds/landing-page-wikipedia-assets.md so every
+         full-size dashboard view on this page now comes from the same library instead of two different
+         products. Same winning tier v1.3 established (83%, via the dashboard's own − control) reproduced
+         against the freshly re-captured 38-page library: 38/38 described, readiness 86. 21 of 36 discs in
+         frame wear the measured Wikipedia blue (accent or accent-strong), the other 15 are the purple ×N
+         covering discs shipped in 779ffbb, not undescribed pages. Numbers re-read at build time with
+         hero-probe2.js and badge-probe.js against the live dashboard; see
+         prds/landing-page-wikipedia-assets-BUILD-REPORT.md. -->
+    <div class="heroshot">
+      <figure class="shot">
+        <img src="assets/hero-map.webp" width="2200" height="1696"
+             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
+        <!-- The interactive layer mounts HERE, and only when a pointer can hover (F3). It is
+             aria-hidden because the <img> above already carries the whole description in its alt: this
+             is a decorative enhancement over an accessible baseline, not a second thing to read. A
+             half-navigable map of 36 tab stops with no way to act on any of them would be worse than
+             none. Empty in the markup — the script fills it, so with JS off there is nothing here and
+             the image simply stays. -->
+        <!-- .heroview is the WINDOW, .heromap is the FRAME (see the camera-pan block in the CSS). The
+             script still mounts into .heromap and does not know this wrapper exists. -->
+        <div class="heroview">
+        <div class="heromap" aria-hidden="true">
+          <p class="hm-note">rings = how many clicks from home · hover a page for its real links</p>
+          <div class="hm-legend">
+            <span class="lg"><i style="width:calc(14 * var(--u));height:calc(14 * var(--u));border:calc(2.5 * var(--u)) solid var(--accent)"></i>explored · size = how linked-to</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--dim)"></i>explored, dormant caption</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) dashed var(--dim);opacity:.6"></i>ghost in the fog · locked</span>
+            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--tpl)"></i>×N · one example, stands for N</span>
+            <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>
+          </div>
+          <p class="hm-stats"><b>0.9% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back</p>
+        </div>
+        </div>
+        <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
+      </figure>
+    </div>
+
+    <div class="wrap getin-wrap">
       <!-- ═══ the way in ═════════════════════════════════════════════════════════════════════════
            Two paths, one shared selection, the assistant preselected. This ships the ordering decided
            in wiki/decisions/assisted-entry-point-2026-07.md ("desktop app first, CLI second"), which
@@ -538,7 +985,20 @@
            assisted path a single paragraph at the bottom of #start.
            The terminal block stays THREE SEPARATE LINES, never one `&&` chain: `&&` is a PARSE error
            in Windows PowerShell 5.1, so a chained one-liner ran NOTHING there, not even the clone.
-           The launcher differs by platform, so it is named below the block rather than guessed. -->
+           The launcher differs by platform, so it is named below the block rather than guessed.
+
+           IT NOW SITS BELOW THE MAP, and that is the second half of this piece. It used to stand
+           between the CTAs and the product, which cost the hero its point twice over. Measured, old,
+           at 1440x900: the map began at y=870 — the page's single boldest moment, its only piece of
+           evidence, and NOT ONE PIXEL OF IT WAS ON THE FIRST SCREEN. What occupied the fold instead
+           was a 340px install panel: a tab strip, a bordered code block and a 64-word note about
+           remote sandboxes and localhost. That is a great deal of machinery to hand someone who
+           arrived from a Reddit link nine seconds ago and has not yet been given a reason to want it.
+           These readers are suspicious of AI tooling by trade; suspicion is answered with evidence,
+           and only then with a command to paste. So the order is now claim → proof → the way in.
+           Nothing here is deleted and nothing changes behaviour: same markup, same #getin anchor,
+           same shared selection (the script binds every [data-pathpick] wherever it sits), still
+           inside .hero and still ahead of every other section on the page. -->
       <div class="pathpick" id="getin" data-pathpick="hero" data-label="How you want to install the kit">
         <div class="pathpick-tabs">
           <button type="button" class="ptab" data-path="ai">
@@ -582,40 +1042,6 @@ tools/start.sh</code>
           <p class="note">It installs what it needs the first time, then opens the dashboard and hands you to the onboarding wizard.</p>
         </div>
       </div>
-
-    </div>
-
-    <!-- The hero map is en.wikipedia.org, reshot for prds/landing-page-wikipedia-assets.md so every
-         full-size dashboard view on this page now comes from the same library instead of two different
-         products. Same winning tier v1.3 established (83%, via the dashboard's own − control) reproduced
-         against the freshly re-captured 38-page library: 38/38 described, readiness 86. 21 of 36 discs in
-         frame wear the measured Wikipedia blue (accent or accent-strong), the other 15 are the purple ×N
-         covering discs shipped in 779ffbb, not undescribed pages. Numbers re-read at build time with
-         hero-probe2.js and badge-probe.js against the live dashboard; see
-         prds/landing-page-wikipedia-assets-BUILD-REPORT.md. -->
-    <div class="heroshot">
-      <figure class="shot">
-        <img src="assets/hero-map.webp" width="2200" height="1696"
-             alt="The kit's dashboard on the Map tab: a real capture of en.wikipedia.org, with the landing page lit at the centre reading '35 in · 21 out', and thirty-five further captured pages ringed across three rings labelled one click, two clicks and three clicks, each drawn as a disc of its own screenshot and rimmed in the Wikipedia blue the kit measured. Fifteen discs instead carry a purple ×N badge: one downloaded example standing for a whole template shape, the largest reading ×1.1k. Fourteen dashed ghost pages sit in the fog beyond, beside a chip reading 'DEEP FOG…4007 MORE — TEMPLATES STAND FOR MOST'. The footer reads '0.9% of the known world explored · rings are honest clicks-from-home · every unlock pushes the fog back'.">
-        <!-- The interactive layer mounts HERE, and only when a pointer can hover (F3). It is
-             aria-hidden because the <img> above already carries the whole description in its alt: this
-             is a decorative enhancement over an accessible baseline, not a second thing to read. A
-             half-navigable map of 36 tab stops with no way to act on any of them would be worse than
-             none. Empty in the markup — the script fills it, so with JS off there is nothing here and
-             the image simply stays. -->
-        <div class="heromap" aria-hidden="true">
-          <p class="hm-note">rings = how many clicks from home · hover a page for its real links</p>
-          <div class="hm-legend">
-            <span class="lg"><i style="width:calc(14 * var(--u));height:calc(14 * var(--u));border:calc(2.5 * var(--u)) solid var(--accent)"></i>explored · size = how linked-to</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--dim)"></i>explored, dormant caption</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) dashed var(--dim);opacity:.6"></i>ghost in the fog · locked</span>
-            <span class="lg"><i style="width:calc(11 * var(--u));height:calc(11 * var(--u));border:calc(2 * var(--u)) solid var(--tpl)"></i>×N · one example, stands for N</span>
-            <span class="lg"><i class="lgdir"></i>a link brightens toward where it points</span>
-          </div>
-          <p class="hm-stats"><b>0.9% of the known world explored</b> · rings are honest clicks-from-home, as far as this capture went · every unlock pushes the fog back</p>
-        </div>
-        <figcaption>The Map, on a real capture of en.wikipedia.org: thirty-eight pages downloaded, 4,188 still ghosts in the fog. Rings are measured clicks from home.</figcaption>
-      </figure>
     </div>
   </section>
 
@@ -672,8 +1098,8 @@ tools/start.sh</code>
   <section id="library">
     <div class="wrap">
       <p class="eyebrow">What your AI actually gets</p>
-      <h2>A folder of facts, with an entry point for machines.</h2>
-      <p class="lede">Everything under <code>design-context/</code> was extracted from the real product. AI tools start at <code>registry.json</code>; you start at <code>INDEX.md</code>. Nothing here is a summary of a summary.</p>
+      <h2>Every captured page becomes six files.</h2>
+      <p class="lede">A screenshot, the real HTML, every word of copy, the styles it uses, a digest your AI writes, and the metadata. All of it extracted from the real product, and nothing here is a summary of a summary. Your AI starts at <code>registry.json</code>; you start at <code>INDEX.md</code>.</p>
 
       <div class="tree">
         <div class="row head dir">
@@ -726,7 +1152,7 @@ tools/start.sh</code>
         </div>
       </div>
 
-      <p class="note" style="margin-top:16px">Captured a product you sign in to? The library then holds your real account data. It stays in your folder, and the browser profile the login created is gitignored and never leaves your machine.</p>
+      <p class="note">Captured a product you sign in to? The library then holds your real account data. It stays in your folder, and the browser profile the login created is gitignored and never leaves your machine.</p>
     </div>
   </section>
 
@@ -734,8 +1160,8 @@ tools/start.sh</code>
   <section id="dashboard">
     <div class="wrap">
       <p class="eyebrow">The dashboard</p>
-      <h2>The part that refuses to guess.</h2>
-      <p class="lede">The dashboard is one self-contained HTML file the kit generates beside the library. It shows what was captured, what wasn't, and where every number came from.</p>
+      <h2>See what was captured, and what wasn't.</h2>
+      <p class="lede">One self-contained HTML file beside the library: a map of every page, the design language measured across them, and a ledger of what changed. Every number on it says where it came from.</p>
 
       <div class="tour">
 
@@ -743,7 +1169,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>The Map</h3>
             <p class="quote">Rings are honest clicks-from-home; the fog is what you haven't captured yet.</p>
-            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog. Click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering 131 assorted one-off pages is selected: the kit offers one example of the shape rather than all 131, because 131 near-duplicates teach your AI nothing new. 0.9 per cent of this product is explored, and the kit says so instead of rounding up.</p>
+            <p>Every captured page sits at its measured distance from the home page, sized by how linked-to it is. Pages the kit found but never downloaded stay as dashed ghosts in the fog.</p>
+            <details class="pd">
+              <summary>What the rail says about the 131 pages it did not download</summary>
+              <p>Click one, and the rail tells you what it is and what unlocking it would cost. Here a ghost covering 131 assorted one-off pages is selected: the kit offers one example of the shape rather than all 131, because 131 near-duplicates teach your AI nothing new. 0.9 per cent of this product is explored, and the kit says so instead of rounding up.</p>
+            </details>
           </div>
           <div class="imgwrap">
             <img src="assets/tour-map.webp" width="1900" height="1188"
@@ -755,7 +1185,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>Design language</h3>
             <p class="quote">Measured from your product, or absent.</p>
-            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages, every value carrying the count and page-spread behind it, as here, where the product's darkest tone is <code>×42,696</code> across all thirty-eight pages and the accent is <code>×24,479</code>, also across all thirty-eight. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out: values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
+            <p>Colours, type ramp, spacing ladder and radii, aggregated from the captured pages, every value carrying the count and page-spread behind it.</p>
+            <details class="pd">
+              <summary>What the counts say, and what the tab leaves out</summary>
+              <p>As here: the product's darkest tone is <code>×42,696</code> across all thirty-eight pages and the accent is <code>×24,479</code>, also across all thirty-eight. One toggle re-reads the same colours as a treemap of how often each appears. The tab opens with <code>method: heuristic</code> in its own words: evidence of how the product is styled today, not a claim about its authored tokens. It even names what it left out: values seen on a single page stay in <code>tokens.json</code> instead of being promoted into the ramp.</p>
+            </details>
           </div>
           <div class="imgwrap">
             <img src="assets/tour-tokens.webp" width="1900" height="885"
@@ -767,7 +1201,11 @@ tools/start.sh</code>
           <div class="body reveal">
             <h3>The working ledger</h3>
             <p class="quote">It borrows your product's own colour: observed, never guessed.</p>
-            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next, and it changes as the work lands: when pages are waiting to be read it asks for that, with the describe prompt ready to copy; here every page has been read, so it has moved on to a hygiene note instead, a page nothing links to, with a fix prompt ready to copy. And the accent the dashboard wears is lifted from the product you captured: observed, never guessed.</p>
+            <p>A journal down the side of the dashboard: what was captured, what your AI read, what it wrote, what changed. The top slot holds the one move worth making next, and it changes as the work lands.</p>
+            <details class="pd">
+              <summary>What it asked for in this shot, and where the accent came from</summary>
+              <p>When pages are waiting to be read it asks for that, with the describe prompt ready to copy; here every page has been read, so it has moved on to a hygiene note instead, a page nothing links to, with a fix prompt ready to copy. And the accent the dashboard wears is lifted from the product you captured: observed, never guessed.</p>
+            </details>
           </div>
           <div class="imgwrap">
             <span class="fadeb"><img src="assets/tour-ledger.webp" width="680" height="918"
@@ -835,11 +1273,24 @@ tools/start.sh</code>
         </li>
       </ul>
 
-      <p class="note" style="margin-top:18px">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't. A palette someone picked would be prettier than this, and that is rather the point. Nothing was configured per product. Where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo: absent rather than invented.</p>
+      <p class="note">Every hex above was <b>measured</b>, not chosen: it is the most-used colour in that product's own captured pages that a UI accent could plausibly be, and the dashboard then wears it. Nothing was configured per product.</p>
+      <details class="pd">
+        <summary>Why six of the seven hexes are blue, and why amazon.in's paints lighter</summary>
+        <p class="note">Which is also why six of these seven hexes sit inside a twenty-degree band of blue and only airbnb's crimson doesn't. A palette someone picked would be prettier than this, and that is rather the point. Where a product's colour can't clear the dashboard's contrast floor, the kit lightens it just enough and records that it did, which is why amazon.in's measured <code>#2162A1</code> paints as <code>#2367A9</code>. Where no colour qualifies, no accent is recorded at all and the dashboard keeps its own indigo: absent rather than invented.</p>
+      </details>
 
-      <p class="note" style="margin-top:12px">These maps are shown small on purpose. At this size a captured product is only its shape (how many pages, how far from home, how much fog), which is all this section claims. Every map here has also been <b>read</b>: all 256 pages across the seven libraries carry a description, written by an AI and labelled <code>method: ai</code> in the library so it is never mistaken for a captured fact. That is what the accent rim marks: a page whose description exists. That is why these maps are warm where earlier versions of this page were pale. A purple <code>×N</code> disc is described too; it simply also stands for a template shape, so it wears that badge instead. The hero at the top of this page, and every other full-size dashboard view below it, is the same product: <code>en.wikipedia.org</code>.</p>
+      <p class="note">These maps are shown small on purpose. At this size a captured product is only its shape (how many pages, how far from home, how much fog), which is all this section claims.</p>
+      <details class="pd">
+        <summary>What the accent rim means: all 256 pages have been read</summary>
+        <p class="note">Every map here has also been <b>read</b>: all 256 pages across the seven libraries carry a description, written by an AI and labelled <code>method: ai</code> in the library so it is never mistaken for a captured fact. That is what the accent rim marks: a page whose description exists. That is why these maps are warm where earlier versions of this page were pale. A purple <code>×N</code> disc is described too; it simply also stands for a template shape, so it wears that badge instead. The hero at the top of this page, and every other full-size dashboard view below it, is the same product: <code>en.wikipedia.org</code>.</p>
+      </details>
 
-      <p class="note" style="margin-top:12px">Nor does every page yield. Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home: amazon.in's run recorded seven of those (six <code>auth-redirect</code>, one <code>soft-404</code>), each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
+      <h3 class="pd-h">Not every page comes home.</h3>
+      <p class="note">Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
+      <details class="pd">
+        <summary>What the crawl could not reach: amazon.in's seven named failures</summary>
+        <p class="note">amazon.in's run recorded seven of those (six <code>auth-redirect</code>, one <code>soft-404</code>), each with its reason, in the same file that lists what did come home.</p>
+      </details>
     </div>
   </section>
 
@@ -847,19 +1298,23 @@ tools/start.sh</code>
   <section id="figma">
     <div class="wrap">
       <p class="eyebrow">Straight into Figma</p>
-      <h2>Click ⧉ Copy for Figma. Paste. Editable auto-layout layers. No plugin, no Dev Mode, no paid seat.</h2>
-      <p class="lede">The button sits on every captured page and every captured state. The conversion happens locally, in your browser, from the snapshot's real DOM, so what lands in Figma is the product's own structure as nested auto-layout frames and real text layers, not a flat image.</p>
+      <h2>Take any captured page into Figma.</h2>
+      <p class="lede">Click ⧉ Copy for Figma on any page or state in the dashboard: no plugin, no Dev Mode, no paid seat. The conversion happens locally, in your browser, from the snapshot's real DOM, so what lands in Figma is the product's own structure as nested auto-layout frames and real text layers, not a flat image.</p>
 
       <div class="figma">
         <figure class="shot">
           <img src="assets/figma-before.webp" width="1600" height="1639"
                alt="A page doc in the dashboard for the Landing page: an actions row reading 'Wireframe on this page', '⧉ Copy for Figma', 'Ask about this page' and 'Open real HTML', the captured page's screenshot below it, and a rail listing what the page is, its link counts, and its capture history.">
-          <figcaption>Where the button lives: any page doc, any state, the Home atlas panel, the Map panel.</figcaption>
+          <!-- G3: figcaption REMOVED (16 words). It was doing this section's lede a second time in
+               smaller type — the lede already says "The button sits on every captured page and every
+               captured state", and the shot shows the actions row saying it a third time. Three
+               elements, one job. The lede is the one with the room to say it, so it keeps the job.
+               (The hero's caption is kept: see there.) -->
         </figure>
 
         <div class="panel">
-          <h3 style="margin-bottom:4px">Layer names from a real paste</h3>
-          <p class="note" style="margin:0 0 12px">Read back out of the Figma file a pasted page landed in: frames and text, nested, editable.</p>
+          <h3>Layer names from a real paste</h3>
+          <p class="note">Read back out of the Figma file a pasted page landed in: frames and text, nested, editable.</p>
           <p class="layers"><b>Html → Body</b> &nbsp;1718 × 2137<br>
             &nbsp;└ <b>Section</b><br>
             &nbsp; &nbsp;└ <b>Container</b><br>
@@ -867,7 +1322,11 @@ tools/start.sh</code>
             &nbsp; &nbsp; &nbsp;│ &nbsp;└ <b>Text</b><br>
             &nbsp; &nbsp; &nbsp;├ <b>Container</b> → <b>Text</b><br>
             &nbsp; &nbsp; &nbsp;└ <b>Margin</b> → <b>Container</b> → <b>Text</b></p>
-          <p class="note" style="margin-top:14px">Arrange or restyle freely; your Figma library stays untouched. Two network moments, stated plainly: a copy loads Figma's own converter from <code>mcp.figma.com</code> at the moment you click, and if that host can't be reached it falls back to the converter bundled with the kit, which fetches public font files from a CDN so your pasted text stays text. Neither uploads your page: the conversion happens in your own browser, and no data of yours is sent to either host.</p>
+          <p class="note">Arrange or restyle freely; your Figma library stays untouched. There are two network moments, stated plainly below, and neither uploads your page.</p>
+          <details class="pd">
+            <summary>The two network moments, named</summary>
+            <p class="note">A copy loads Figma's own converter from <code>mcp.figma.com</code> at the moment you click, and if that host can't be reached it falls back to the converter bundled with the kit, which fetches public font files from a CDN so your pasted text stays text. Neither uploads your page: the conversion happens in your own browser, and no data of yours is sent to either host.</p>
+          </details>
         </div>
       </div>
     </div>
@@ -887,7 +1346,7 @@ tools/start.sh</code>
         <li><span class="k">Any AI:</span> <span class="v">Claude Code, Cursor, or a chat window; the prompts ship in the box.</span></li>
       </ul>
 
-      <p class="note" style="margin-top:18px">Two disclosures those lines earn: capture dismisses a cookie banner when one blocks the page, and it logs that it did: the single exception to never clicking. And each page's one-line description is written by your AI, which is why the dashboard labels it <code>method: ai</code> everywhere it appears. Everything else was extracted deterministically.</p>
+      <p class="note">Two disclosures those lines earn: capture dismisses a cookie banner when one blocks the page, and it logs that it did: the single exception to never clicking. And each page's one-line description is written by your AI, which is why the dashboard labels it <code>method: ai</code> everywhere it appears. Everything else was extracted deterministically.</p>
     </div>
   </section>
 
@@ -895,8 +1354,8 @@ tools/start.sh</code>
   <section id="start">
     <div class="wrap">
       <p class="eyebrow">Get started</p>
-      <h2>One workspace, one product.</h2>
-      <p class="lede">Name the folder after the product you are capturing. The steps are <a href="#getin">at the top of the page</a>; what each way in needs is here.</p>
+      <h2>Paste one prompt, or run three lines.</h2>
+      <p class="lede"><a href="#getin">Both ways in</a> are on this page: an AI assistant that reads files, or a terminal. What each one needs is below. Name the folder after the product you are capturing.</p>
 
       <!-- #start no longer repeats the commands. The hero's picker is the ONE place the payload lives,
            so the same clone line no longer sits in three places on one page; this section reflects the
@@ -940,9 +1399,9 @@ tools/start.sh</code>
         </div>
       </div>
 
-      <p class="note" style="margin-top:18px">The setup steps an assistant follows are in <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/INSTALL.md">INSTALL.md</a>; what the kit does once it's installed is in the <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/README.md">README</a>.</p>
+      <p class="note">The setup steps an assistant follows are in <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/INSTALL.md">INSTALL.md</a>; what the kit does once it's installed is in the <a href="https://github.com/20prateeksingh/design-context-for-ai/blob/main/README.md">README</a>.</p>
 
-      <p class="note" style="margin-top:22px">This page has no analytics. Like the kit: local-only.</p>
+      <p class="note">This page has no analytics. Like the kit: local-only.</p>
     </div>
   </section>
 
