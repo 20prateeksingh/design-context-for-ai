@@ -66,14 +66,40 @@ Everything removed from that view is one click away; the expanded page carries 2
 
 ### Locked lines: all honoured
 
-H1, the hero sub, the bootstrap prompt, `This page has no analytics. Like the kit: local-only.`, and
-`#rules`' five invariant `<li>`s are all **byte-identical**, verified by `grep -F` count.
+H1, the bootstrap prompt, `This page has no analytics. Like the kit: local-only.`, and `#rules`' five
+invariant `<li>`s are all **byte-identical**, verified by `grep -F` count.
 
-> **Proposed and deliberately NOT applied — the hero sub.** It is locked, and it is now the weakest
-> link in the scannable sequence: one 30-word sentence at the entry point to everything, the longest
-> first line on the page. The proposal keeps every word and splits at the comma before "so":
-> `…into a local library. Your AI then designs in your product's language, not from generic memory.`
-> That makes the scannable first line 17 words. **Awaiting Prateek's ruling; not shipped.**
+**The hero sub was deliberately unlocked** on Prateek's ruling later the same day, and is the one
+locked string this round changed. Recorded in full below rather than folded in silently.
+
+### The hero sub — UNLOCKED and split, on Prateek's ruling 2026-08-04
+
+It was the weakest link in the scannable sequence: one 30-word sentence at the entry point to
+everything, and the longest first line on the page. The gate-2 harness reads the first *sentence*, so
+the entry point to the whole scan was a clause a scanner would not finish.
+
+| Was (locked) | Now |
+|---|---|
+| `A free, open-source kit that captures your product's real screens, tokens, and patterns into a local library, so your AI designs in your product's language, not from generic memory.` | `A free, open-source kit that captures your product's real screens, tokens, and patterns into a local library. Your AI then designs in your product's language, not from generic memory.` |
+
+**Every word, every claim and the length are unchanged** — the comma before "so" became a period and
+"so your AI designs" became "Your AI then designs". The scannable first line goes 30 words → **17**
+(Linear's median is 14). Applied to **both** instances, the `<p class="sub">` and the `<meta
+name="description">`, which were synchronised before and remain so.
+
+### Hard constraint 3 amended, on Prateek's ruling 2026-08-04
+
+The landing page may define **derived** colour steps outside the `:root` block, using `color-mix()`
+over tokens that already exist. It may still not introduce a literal hex, and the `:root` block itself
+stays byte-identical to `tools/dashboard-template.html` (762 bytes, verified both sides).
+
+This ships `--prose: color-mix(in srgb, var(--txt) 62%, var(--dim))` → **#CCCFD3**, a third text step
+between `--txt` and `--dim`. Before it, all body copy sat on `--dim`, the same grey the page uses for
+captions, which is most of why the prose read flat. The reference bar runs a **four**-step text ramp
+(#F7F8F8 / #D0D6E0 / #8A8F98 / #62666D) and our equivalent second step is within 4/255 of Linear's.
+
+The constraint exists so a future re-copy of `:root` stays a straight diff. That property is intact,
+which is why the amendment is narrow: **derived, outside `:root`, from existing tokens only.**
 
 ## 2026-08-04 (even later) — the landing page stops showing two different products (`prds/landing-page-wikipedia-assets.md`, F1–F3)
 
