@@ -1308,11 +1308,16 @@ tools/start.sh</code>
       </details>
 
       <h3 class="pd-h">Not every page comes home.</h3>
-      <p class="note">Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
-      <details class="pd">
-        <summary>What the crawl could not reach: amazon.in's seven named failures</summary>
-        <p class="note">amazon.in's run recorded seven of those (six <code>auth-redirect</code>, one <code>soft-404</code>), each with its reason, in the same file that lists what did come home.</p>
-      </details>
+      <!-- NOT a <details>, deliberately, and this is the one disclosure L-A's critic reversed
+           (2026-08-04). The <h3> above promotes this block precisely because it is the strongest
+           argument on the page for a suspicious reader; hiding its only hard numbers behind a click
+           left the principle visible and the proof one interaction away, which inverts the point.
+           It was also the worst trade of the seven: a 10-word summary plus a click to conceal 25
+           words, and the summary already gave away the punchline ("seven named failures") while the
+           click held the part that earns belief (six auth-redirect, one soft-404). Inlined: +17
+           visible words, one fewer interaction, every fact intact, and the counts now scannable.
+           The other six disclosures each hide 62-106 words and keep theirs. -->
+      <p class="note">Following links is all the kit does, so a page that only opens behind a sign-in, or that answers a link with a soft 404, doesn't come home. amazon.in's run recorded seven of those (six <code>auth-redirect</code>, one <code>soft-404</code>), each with its reason, in the same file that lists what did come home. The maps above are what one read-only crawl reached, not a claim that every page type is reachable.</p>
     </div>
   </section>
 
