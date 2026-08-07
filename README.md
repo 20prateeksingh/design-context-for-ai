@@ -90,6 +90,10 @@ Repeating pages collapse to one representative: 300 product pages that share a l
 
 macOS, Linux or Windows, with [Node.js](https://nodejs.org) (LTS). On macOS/Linux `tools/setup.sh` handles the rest; on Windows use the three commands in the note above, since the `.sh` scripts need Git Bash.
 
+## Where the public page lives
+
+The kit's public landing page is **no longer in this repo**. On 2026-08-07 it moved to Prateek's personal site and now lives at **<https://prateeksingh.in/tools/design-context-kit>** (source: `public/tools/design-context-kit/` in the Portfolio-2025 repo). `docs/index.html` here is only a redirect stub, and `docs/assets/` was deleted with the move. The old GitHub Pages URL still resolves and redirects.
+
 ## Credits
 
 Figma paste is powered by Figma's own `capture.js`, loaded at copy time from `mcp.figma.com` — Figma's code, hotlinked and never redistributed here. The offline fallback is [@figit/dom-to-figma](https://www.npmjs.com/package/@figit/dom-to-figma) (MIT), vendored under `tools/vendor/`.
