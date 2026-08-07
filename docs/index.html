@@ -4,20 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Design Context Kit has moved</title>
-<meta http-equiv="refresh" content="0; url=https://prateeksingh.in/tools/design-context-kit">
-<link rel="canonical" href="https://prateeksingh.in/tools/design-context-kit">
+<meta http-equiv="refresh" content="0; url=https://prateeksingh.in/tools/design-context-kit/">
+<link rel="canonical" href="https://prateeksingh.in/tools/design-context-kit/">
 <meta name="robots" content="noindex, follow">
 <!--
   This page moved out of this repo on 2026-08-07 and now lives in Prateek's personal site
   (Portfolio-2025) at public/tools/design-context-kit/index.html, served from
-  https://prateeksingh.in/tools/design-context-kit .
+  https://prateeksingh.in/tools/design-context-kit/ .
 
   This file is a redirect stub and nothing else. docs/assets/ was deleted in the same change: it was
   1.6 MB of images serving nothing once the page moved, and a second copy of 51 files is exactly the
   kind of duplicate that has cost this project real time. The stub deliberately references no assets.
 
+  The trailing slash on that URL is load-bearing -- do not "tidy" it away. Portfolio-2025 sets
+  trailingSlash: true, so the slashed form IS the canonical URL and the bare form 308s to it.
+  Without the slash this stub would send every visitor through an extra redirect hop, and the
+  rel=canonical above would name a URL that immediately redirects. Changed 2026-08-07.
+
   GitHub Pages stays enabled so this URL keeps resolving.
-  Brief: prds/landing-page-move-to-personal-site.md
+  Briefs: prds/landing-page-move-to-personal-site.md, then prds/portfolio-tools-index-page.md
 -->
 <style>
   html { color-scheme: dark; }
@@ -31,6 +36,6 @@
 </head>
 <body>
   <p>The Design Context Kit page has moved to
-     <a href="https://prateeksingh.in/tools/design-context-kit">prateeksingh.in/tools/design-context-kit</a>.</p>
+     <a href="https://prateeksingh.in/tools/design-context-kit/">prateeksingh.in/tools/design-context-kit/</a>.</p>
 </body>
 </html>
