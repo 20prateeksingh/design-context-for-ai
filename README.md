@@ -92,7 +92,7 @@ macOS, Linux or Windows, with [Node.js](https://nodejs.org) (LTS). On macOS/Linu
 
 ## Where the public page lives
 
-The kit's public landing page is **no longer in this repo**. On 2026-08-07 it moved to Prateek's personal site and now lives at **<https://prateeksingh.in/tools/design-context-kit>** (source: `public/tools/design-context-kit/` in the Portfolio-2025 repo). `docs/index.html` here is only a redirect stub, and `docs/assets/` was deleted with the move. The old GitHub Pages URL still resolves and redirects.
+The kit's public landing page is **no longer in this repo**. On 2026-08-07 it moved to Prateek's personal site and now lives at **<https://www.prateeksingh.in/tools/design-context-kit/>** (source: `public/tools/design-context-kit/` in the Portfolio-2025 repo). `docs/index.html` here is only a redirect stub, and `docs/assets/` was deleted with the move. The old GitHub Pages URL still resolves and redirects.
 
 ## Credits
 
