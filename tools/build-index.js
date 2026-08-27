@@ -380,6 +380,258 @@ function deriveSkips(libDir, manifest) {
   return [...byKey.values()].sort((a, b) => (a.at < b.at ? 1 : (a.at > b.at ? -1 : 0)));
 }
 
+// ── wireframes/ — the design work built ON the library, never inside it ───────
+// ONE read-only walk of the SIBLING wireframes/ dir, feeding BOTH the journal's wireframe events and
+// the dashboard's "Your designs" band. Two readers, one walk: a round can never show up in one
+// surface and be missing from the other.
+//
+// Determinism (the run-twice-identical property tools/test-all.js leans on): every value below is
+// READ from the filesystem — dir and file names, mtimes, sizes, notes.md bytes. build-index never
+// writes anything inside wireframes/, so nothing it emits can change what the next run sees. A
+// missing preview PNG is rendered by tools/map.js on demand (the half of the kit that already spawns
+// subprocesses); rendering one from here would make the build Playwright-dependent and slow.
+//
+// Layout it reads (skills/wireframe-on-snapshot/SKILL.md §3 and §7):
+//   wireframes/<page-slug>/round-N/NN-<approach>.html        ← a change on a captured page
+//   wireframes/new/<concept-slug>/round-N/NN-<approach>.html  ← a page the product doesn't have yet
+// Preview naming is NOT uniform on disk: `NN-name.preview.png` is what shot.js writes and what we
+// treat as canonical, a bare `NN-name.png` is accepted as an alias (older rounds have it), and any
+// OTHER `NN-name.<word>.png` (`.mobile.png`, `.typeahead.png`, `.fold.png`) is an extra VIEW of the
+// same approach — surfaced in its panel, never as a second card.
+const WF_SKIP = /^(\.|node_modules$)/;   // .DS_Store, .gitkeep, dotdirs
+
+// `02-attention-first` → `Attention first`. The leading index is the sort key, not part of the name.
+function wfApproachName(base) {
+  const s = base.replace(/^(\d+)[-_.]?\s*/, '').replace(/[-_]+/g, ' ').trim();
+  if (!s) return base;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function wfIndexOf(base) { const m = /^(\d+)/.exec(base); return m ? parseInt(m[1], 10) : 999; }
+
+// Markdown → one clean line. Strips emphasis, code ticks, links and leading separators, collapses
+// whitespace, then truncates — preferring a sentence end, falling back to a word boundary, so a
+// caption never breaks mid-word or mid-clause ("…Filed as round-3/ because"). Returns null rather
+// than '' so a caller can tell "nothing said about this" from "said, and it was blank".
+function wfCleanLine(s, max = 200) {
+  let t = String(s || '')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\*\*([^*]*)\*\*/g, '$1')
+    .replace(/\*([^*]*)\*/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^[\s|>*_-]*[—–:-]?\s*/, '')
+    .replace(/\s*\|\s*$/, '')
+    .replace(/\s*\|\s*/g, ' · ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return null;
+  if (t.length > max) {
+    const cut = t.slice(0, max);
+    const dot = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; '));
+    if (dot > max * 0.45) return cut.slice(0, dot + 1);
+    const sp = cut.lastIndexOf(' ');
+    t = (sp > max * 0.6 ? cut.slice(0, sp) : cut) + '…';
+  }
+  return t;
+}
+
+// notes.md is prose written by an AI for a human, so both readers below are best-effort BY DESIGN —
+// they read what rounds on disk actually look like rather than asking the skill to emit a machine
+// format. Every one of them can return null, and the UI is built for null.
+
+// notes.md is prose hard-wrapped at ~110 columns, so a raw line is half a sentence — reading it
+// line-by-line captions a card with "…reduce visual" and drops "noise from promotional modules."
+// Unwrap first: join a line with what follows until a blank line or a new BLOCK (heading, bullet,
+// table row, quote, rule). Bullets keep their own continuation lines, tables and headings stay whole,
+// and every reader below then works on one logical line per thought.
+const WF_BLOCK_START = /^\s*(#{1,6}\s|[-*+]\s|\||>|-{3,}\s*$|\d+\.\s)/;
+function wfUnwrap(lines) {
+  const out = [];
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (!t) { out.push(''); continue; }
+    const prev = out.length ? out[out.length - 1] : '';
+    const contin = prev && !WF_BLOCK_START.test(raw) && !/^\s*#{1,6}\s/.test(prev) && !/^\s*\|/.test(prev);
+    if (contin) out[out.length - 1] = prev + ' ' + t; else out.push(raw.replace(/\s+$/, ''));
+  }
+  return out;
+}
+
+// A line that states the round's purpose under an explicit label. Covers "Goal:", "**Brief:**",
+// "intent: more scannable", "**Design goal (as given):**", "Direction (designer, 2026-07-21):".
+const WF_INTENT_LABEL = /^\s*\**\s*(?:design\s+)?(goal|brief|intent|direction|objective)\b[^:]{0,40}:\**\s*(.+)$/i;
+// …and it is not always at the start of a line: rounds routinely open with the baseline and put the
+// purpose after it — `Baseline: …/page.html (untouched). Intent: surface "return to …"`. Second pass,
+// so a line that BEGINS with the label still wins over one that merely contains it.
+const WF_INTENT_MIDLINE = /(?:^|[.;·—]\s+)\**\s*(?:design\s+)?(goal|brief|intent|direction|objective)\s*:\**\s*(.+)$/i;
+// Bookkeeping about round NUMBERING is never the round's intent — it is the skill's filing rule being
+// obeyed out loud. Rejected as a fallback so the caption doesn't read as admin.
+const WF_META_LINE = /^\s*\**\s*(this (round|is)\b|filed as\b|baseline\s*:|fidelity\s*:|built from\b)/i;
+
+function wfRoundIntent(lines) {
+  const head = lines.slice(0, 16);
+  for (const ln of head) { const m = WF_INTENT_LABEL.exec(ln); if (m) { const v = wfCleanLine(m[2], 160); if (v) return v; } }
+  for (const ln of head) { const m = WF_INTENT_MIDLINE.exec(ln); if (m) { const v = wfCleanLine(m[2], 160); if (v) return v; } }
+  for (const ln of head) { const m = /new exploration\s*\(([^)]+)\)/i.exec(ln); if (m) { const v = wfCleanLine('a new exploration — ' + m[1], 160); if (v) return v; } }
+  for (const ln of head) {
+    const t = ln.trim();
+    if (!t || /^#/.test(t) || /^[|>-]/.test(t) || /^-{3,}$/.test(t) || WF_META_LINE.test(t)) continue;
+    const v = wfCleanLine(t, 160); if (v) return v;
+  }
+  return null;
+}
+
+// A line that only points at a rendered PNG ("→ 01-single-column.preview.png") mentions the approach
+// without saying anything about it. Taking it as the rationale is how a card ends up captioned with
+// its own filename — so these are skipped and the search continues.
+// A cleaned candidate that is nothing but filenames — `- `01-single-column.html` → `…preview.png``,
+// a render-output table — says nothing about the design. Strip the file tokens and require real words
+// to be left, so the check holds wherever in the line the mention sits.
+function wfIsProse(t) {
+  const words = String(t || '').replace(/\S+\.(png|jpe?g|webp|html?|md)\b/gi, ' ').replace(/[^\p{L}\p{N}\s]+/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.length >= 3;
+}
+function wfIsFileRef(line, at, base) {
+  const after = line.slice(at + base.length);
+  return /^\.(preview\.)?(png|jpe?g|webp)/i.test(after) || /^\s*[→>]/.test(line);
+}
+
+// Per-approach rationale, keyed on the approach itself. One pass covers every shape found on disk:
+//   bullet   `- **01-name** — month headers + one-line rows …`
+//   table    `| \`01-name.html\` | one article leads | dark ink field |`
+//   heading  `## 01 — Attention-first table (\`01-name.html\`)` + the paragraph under it
+//   heading  `## 01 — Single column, linear narrative` + paragraph   ← names the INDEX, not the file
+// The last shape is why the index is a second key: xflowpay's rounds head their sections `## 01 — …`
+// and mention the filename only in a render-output line further down.
+function wfApproachDesc(lines, base, idx) {
+  const needle = base.toLowerCase();
+  const idxHead = idx < 999 ? new RegExp('^\\s*#{1,6}\\s*0?' + idx + '\\b') : null;
+  const paraUnder = (i) => {
+    for (let j = i + 1; j < lines.length && j < i + 6; j++) {
+      const t = lines[j].trim();
+      if (!t) continue;
+      if (/^#{1,6}\s/.test(t)) break;
+      const v = wfCleanLine(t); if (v && v.length > 11 && wfIsProse(v)) return v;
+    }
+    return null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const at = lines[i].toLowerCase().indexOf(needle);
+    if (at < 0) continue;
+    if (wfIsFileRef(lines[i], at, needle)) continue;
+    if (/^\s*#{1,6}\s/.test(lines[i])) { const v = paraUnder(i); if (v) return v; continue; }
+    const rest = lines[i].slice(at + needle.length).replace(/^\.html/i, '').replace(/^[`*)\]\s]*/, '');
+    const v = wfCleanLine(rest);
+    if (v && v.length > 11 && wfIsProse(v)) return v;
+  }
+  if (idxHead) for (let i = 0; i < lines.length; i++) {
+    if (!idxHead.test(lines[i])) continue;
+    const v = paraUnder(i); if (v) return v;
+  }
+  return null;
+}
+
+// One round dir → its approaches. `rel` is the path the DASHBOARD will request, relative to the
+// library root: `../wireframes/…`. Over http that resolves to /wireframes/… (served by map.js);
+// over file:// it resolves to the real sibling folder. One string, both modes.
+function wfScanRound(roundDir, rel, ctx) {
+  let entries = [];
+  try { entries = fs.readdirSync(roundDir, { withFileTypes: true }); } catch { return null; }
+  const files = entries.filter(e => e.isFile() && !WF_SKIP.test(e.name)).map(e => e.name);
+  // `.baked.html` is lofi-bake.js's Figma-bound derivative of a sibling wireframe, not a design of
+  // its own — counting it would double every baked approach in the band and in the journal.
+  const htmls = files.filter(f => /\.html?$/i.test(f) && !/\.baked\.html?$/i.test(f)).sort();
+  if (!htmls.length) return null;
+
+  let notesLines = null, notesRel = null;
+  const notesName = files.find(f => /^notes\.md$/i.test(f));
+  if (notesName) {
+    notesRel = rel + '/' + notesName;
+    try { notesLines = wfUnwrap(fs.readFileSync(path.join(roundDir, notesName), 'utf8').split(/\r?\n/)); } catch { notesLines = null; }
+  }
+  const intent = notesLines ? wfRoundIntent(notesLines) : null;
+
+  const items = htmls.map(name => {
+    const base = name.replace(/\.html?$/i, '');
+    const lower = base.toLowerCase();
+    const exact = (suffix) => { const hit = files.find(f => f.toLowerCase() === lower + suffix); return hit ? rel + '/' + hit : null; };
+    const preview = exact('.preview.png') || exact('.png');
+    // every other raster that belongs to this approach, labeled by its own suffix
+    const views = files.filter(f => {
+      const l = f.toLowerCase();
+      return l.startsWith(lower + '.') && /\.(png|jpe?g|webp)$/i.test(l) && l !== lower + '.preview.png' && l !== lower + '.png';
+    }).sort().map(f => ({ label: f.slice(base.length + 1).replace(/\.(png|jpe?g|webp)$/i, '').replace(/[-_.]+/g, ' '), src: rel + '/' + f }));
+    let bytes = 0, at = null;
+    try { const st = fs.statSync(path.join(roundDir, name)); bytes = st.size; at = st.mtime.toISOString(); } catch {}
+    return {
+      id: `${ctx.key}/${ctx.roundDir}/${base}`, key: ctx.key,
+      page: ctx.page, concept: ctx.concept, pageLabel: ctx.label,
+      round: ctx.round, roundDir: ctx.roundDir,
+      approach: base, idx: wfIndexOf(base), name: wfApproachName(base),
+      file: rel + '/' + name, preview, views, notes: notesRel,
+      at, bytes, intent, desc: notesLines ? wfApproachDesc(notesLines, base, wfIndexOf(base)) : null,
+    };
+  }).sort((a, b) => a.idx - b.idx || (a.approach < b.approach ? -1 : 1));
+
+  let roundAt = null;
+  try { roundAt = fs.statSync(roundDir).mtime.toISOString(); } catch {}
+  return { key: ctx.key, page: ctx.page, concept: ctx.concept, label: ctx.label, round: ctx.round,
+           roundDir: ctx.roundDir, rel, at: roundAt, intent, notes: notesRel, items };
+}
+
+// The whole tree. `labelOf(slug)` maps a captured page slug to its display label; `isPage(slug)` says
+// whether a wireframe folder corresponds to a page still in the library (a re-capture can retire one,
+// and its design work must survive that as an orphan rather than vanish). Rounds come back
+// newest-first, with the flat items list in the same order — the band renders items, the journal
+// renders rounds.
+function scanWireframes(libDir, labelOf, isPage) {
+  const wfRoot = path.join(libDir, '..', 'wireframes');
+  const rounds = [];
+  const roundsOf = (base, rel, ctx) => {
+    let kids = [];
+    try { kids = fs.readdirSync(base, { withFileTypes: true }); } catch { return; }
+    for (const e of kids) {
+      if (!e.isDirectory() || WF_SKIP.test(e.name) || !/^round-/i.test(e.name)) continue;
+      const r = wfScanRound(path.join(base, e.name), rel + '/' + e.name,
+        Object.assign({}, ctx, { roundDir: e.name, round: e.name.replace(/^round-/i, '') }));
+      if (r) rounds.push(r);
+    }
+  };
+  let top = [];
+  try { top = fs.readdirSync(wfRoot, { withFileTypes: true }); } catch { return { rounds: [], items: [], byPage: {} }; }
+  for (const e of top) {
+    if (!e.isDirectory() || WF_SKIP.test(e.name)) continue;
+    if (e.name === 'new') {
+      let concepts = [];
+      try { concepts = fs.readdirSync(path.join(wfRoot, 'new'), { withFileTypes: true }); } catch { concepts = []; }
+      for (const c of concepts) {
+        if (!c.isDirectory() || WF_SKIP.test(c.name)) continue;
+        roundsOf(path.join(wfRoot, 'new', c.name), `../wireframes/new/${c.name}`,
+          { key: `new/${c.name}`, page: null, concept: c.name, label: wfApproachName(c.name.replace(/^\d+[-_]?/, '')) });
+      }
+    } else {
+      // Three cases, and the third is the one that bites: a folder matching a captured page (page set),
+      // a concept under new/ (concept set, handled above), and a folder matching NEITHER — design work
+      // on a page a re-capture has since retired. That one keeps both null on purpose: it is not a new
+      // page and it has no snapshot to link to, and the dashboard says so rather than guessing.
+      roundsOf(path.join(wfRoot, e.name), `../wireframes/${e.name}`,
+        { key: e.name, page: isPage(e.name) ? e.name : null, concept: null, label: labelOf(e.name) });
+    }
+  }
+  // newest-first, the way Figma's Recents reads. Ties broken on key + round dir so the order is TOTAL:
+  // two rounds written in the same second must not swap places between runs.
+  rounds.sort((a, b) => (b.at || '').localeCompare(a.at || '') || a.key.localeCompare(b.key) || b.roundDir.localeCompare(a.roundDir));
+  const items = [];
+  for (const r of rounds) for (const it of r.items) items.push(it);
+  const byPage = {};
+  for (const r of rounds) {
+    if (!r.page) continue;
+    const b = byPage[r.page] || (byPage[r.page] = { rounds: 0, items: 0, latestAt: null, latestRound: null });
+    b.rounds++; b.items += r.items.length;
+    if (!b.latestAt || (r.at || '') > b.latestAt) { b.latestAt = r.at; b.latestRound = r.round; }
+  }
+  return { rounds, items, byPage };
+}
+
 // D3: the zero-page branch — same public shape (registry.json + INDEX.md), honest content. Never
 // throws even if manifest fields are missing/unexpected (a hand-built or edge-case manifest.json).
 function buildEmptyIndex(libDir, manifest) {
@@ -825,6 +1077,9 @@ function buildIndex(libDir) {
   // events[] — the journal feed, assembled from EMBEDDED/stable metadata only (never page.md mtime,
   // which build-index itself rewrites every run; never Date.now). Deterministic ordering.
   const pageLabelOf = (s) => pages[s] ? displayLabelOf(s) : s;
+  // The design work, scanned once (see scanWireframes): the journal reads .rounds, the dashboard band
+  // reads .items, and a captured page's card reads .byPage for its round badge.
+  const wireframes = scanWireframes(libDir, pageLabelOf, (slug) => !!pages[slug]);
   const events = [];
   const capAt = manifest.capturedAt;
   const dudSkip = (manifest.skipped || []).length, failCount = (manifest.failed || []).length;
@@ -854,29 +1109,17 @@ function buildIndex(libDir) {
   for (const s of ordered) for (const st of pages[s].states) if (st.captured && st.capturedAt)
     events.push({ at: st.capturedAt, dateOnly: false, seq: 5, actor: 'you', kind: 'state',
       title: `State added — ${st.name}`, detail: `on ${pageLabelOf(s)}`, link: { page: s } });
-  // wireframe rounds — scan the sibling wireframes/ dir (build-index never writes there → dir mtime
-  // is stable across consecutive runs, so this stays deterministic for the run-twice check).
-  try {
-    const wfRoot = path.join(libDir, '..', 'wireframes');
-    const countHtml = (dir, depth = 0) => { let n = 0; try { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (e.isFile() && /\.html$/i.test(e.name)) n++; else if (e.isDirectory() && depth < 1) n += countHtml(path.join(dir, e.name), depth + 1); } } catch {} return n; };
-    const scanRounds = (base, label, isNew) => { try {
-      for (const e of fs.readdirSync(base, { withFileTypes: true })) {
-        if (!e.isDirectory() || !/^round-/i.test(e.name)) continue;
-        const rdir = path.join(base, e.name); const n = e.name.replace(/^round-/i, '');
-        const approaches = countHtml(rdir);
-        events.push({ at: fs.statSync(rdir).mtime.toISOString(), dateOnly: false, seq: 6, actor: 'your AI', kind: 'wireframe',
-          title: `Wireframes — ${label}, round ${n}${approaches ? ` · ${approaches} approach${approaches === 1 ? '' : 'es'}` : ''}`,
-          detail: `${isNew ? 'wireframes/new/' : 'wireframes/'}${isNew ? label : (pages[label] ? label : label)}/${e.name} · library untouched`,
-          link: (!isNew && pages[label]) ? { page: label } : null });
-      }
-    } catch {} };
-    if (fs.existsSync(wfRoot)) for (const e of fs.readdirSync(wfRoot, { withFileTypes: true })) {
-      if (!e.isDirectory()) continue;
-      if (e.name === 'new') { for (const c of fs.readdirSync(path.join(wfRoot, 'new'), { withFileTypes: true })) if (c.isDirectory()) scanRounds(path.join(wfRoot, 'new', c.name), c.name, true); }
-      else scanRounds(path.join(wfRoot, e.name), pageLabelOf(e.name), false);
-    }
-  } catch {}
+  // wireframe rounds — one event per round, from the SAME scan that feeds the dashboard band, so a
+  // round can never appear in the journal and be missing from Your designs (or the reverse). Dir
+  // mtime is the timestamp; build-index never writes inside wireframes/, so this stays deterministic
+  // for the run-twice check.
+  for (const r of wireframes.rounds) {
+    const n = r.items.length;
+    events.push({ at: r.at, dateOnly: false, seq: 6, actor: 'your AI', kind: 'wireframe',
+      title: `Wireframes — ${r.label}, round ${r.round}${n ? ` · ${n} approach${n === 1 ? '' : 'es'}` : ''}`,
+      detail: `wireframes/${r.key}/${r.roundDir} · library untouched`,
+      link: r.page ? { page: r.page } : { tab: 'home' } });
+  }
   // guided sessions → one ledger event per session (F4·2). Absent-safe. Capped to the last N so a
   // long-lived guided-sessions.json never floods the ledger — full history stays in the file (the
   // journal can show all). Derived from file CONTENTS (endedAt), never mtime → build-twice stable.
@@ -941,8 +1184,24 @@ function buildIndex(libDir) {
   try {
     const fc = JSON.parse(fs.readFileSync(path.join(libDir, 'figma-copies.json'), 'utf8'));
     const copies = (fc && Array.isArray(fc.copies)) ? fc.copies : [];
+    // The scan is the source of truth for wireframe ids: an entry whose wireframe no longer exists
+    // (a round deleted after it was copied) is DROPPED rather than rendered with a guessed label —
+    // same posture as the page branch's dead-link check below.
+    const wfById = {}; for (const it of wireframes.items) wfById[it.id] = it;
     for (const c of copies.slice(-FIGMA_LEDGER_CAP)) {
-      if (!c || !c.slug || !c.at) continue;
+      if (!c || !c.at) continue;
+      if (c.wireframe) {
+        const w = wfById[c.wireframe]; if (!w) continue;
+        const eng = (c.engine === 'capture' || c.engine === 'domToFigma') ? c.engine : null;
+        const ev = { at: c.at, dateOnly: false, seq: 5, actor: 'you', kind: 'figma',
+          title: `Sent ${w.name} to Figma`,
+          detail: `${w.pageLabel} · round ${w.round}${eng === 'domToFigma' ? ' · offline fallback — some effects simplified' : ''}`,
+          link: w.page ? { page: w.page } : { tab: 'home' } };
+        if (eng) ev.engine = eng;
+        events.push(ev);
+        continue;
+      }
+      if (!c.slug) continue;
       const label = pageLabelOf(c.slug);
       // `engine` is additive and absent-safe (F5): a ledger written by an older dashboard has no such
       // field and derives exactly as before. Only the fallback is worth a line in the journal — a
@@ -1100,6 +1359,12 @@ function buildIndex(libDir) {
         inboundCount: p.linkedFrom.length, clickDepth: depths[slug], section: sectionOf(m.route),
         linksTo: p.linksTo.map(t => t.replace(' (template)', '')), linkedFrom: p.linkedFrom,
         foldedInto: p.foldedInto || null, // F3: set only on a member folded into a representative
+        // Design work built on this page (dashboard-only, like `thumb`): wireframes are not library
+        // facts, so they stay out of registry.json — an agent reading the library must not mistake an
+        // invented sketch for something captured from the product.
+        wfRounds: (wireframes.byPage[slug] || {}).rounds || 0,
+        wfItems: (wireframes.byPage[slug] || {}).items || 0,
+        wfLatestRound: (wireframes.byPage[slug] || {}).latestRound || null,
       }; }),
       frontier: frontier.map(f => ({ ...f, section: f.pattern ? sectionOf(f.pattern) : sectionOfUrl(f.url) })),
       edges: [
@@ -1124,7 +1389,8 @@ function buildIndex(libDir) {
       workspaceName: path.basename(path.dirname(libDir)),
       pendingDescriptions: ordered.filter(s => !pages[s].description).length,
       // dashboard-v2 additions
-      identity, readiness, events, patternsPresent, productSummaryPresent };
+      identity, readiness, events, patternsPresent, productSummaryPresent,
+      wireframes: wireframes.items };
     if (brand) dash.brand = brand; // F2 (v2.4): same object as tokens.json.brand — boot applies it to :root
     const html = fs.readFileSync(tplPath, 'utf8')
       .replace('/*__DASHDATA__*/null', JSON.stringify(dash).replace(/</g, '\\u003c'));
@@ -1167,6 +1433,28 @@ function buildIndex(libDir) {
         banner + `window.__KIT_FALLBACK_FONT=${JSON.stringify(b64)};\n`, 'utf8');
     }
   } catch (e) { console.log(`⚠ fallback font: ${e.message.split('\n')[0]}`); }
+
+  // 4e. _color.js + _lofi-bake.js — FIRST-PARTY (tools/color.js, tools/lofi-bake.js), dropped beside
+  // dashboard.html as DERIVED assets so the ⧉ Copy for Figma exit can BAKE a lofi wireframe before it
+  // converts one. Why it has to: lofi mode is `filter: grayscale(1)` on <html>, a PAINT-TIME effect, so
+  // getComputedStyle still returns the product's real brand colors — and BOTH converters read computed
+  // styles, never pixels. Copying a lofi wireframe unbaked lands it in Figma in full brand color: the
+  // half-real hybrid skills/wireframe-on-snapshot/SKILL.md §4 exists to prevent, and a failure that has
+  // already shipped once (see tools/lofi-bake.js's header — a no-op that reported success).
+  // Both files are deliberately dual-mode: `require()`d by Node here, and inert as a <script src> except
+  // for defining `window.__dckColor` / `window.lofiBake`. That is what lets the SAME source serve the
+  // CLI, the devtools console and the dashboard's offscreen iframe, with no third copy of the maths.
+  // No licence banner (first-party), but a provenance banner, since these are derived copies a designer
+  // will find in their library and must not hand-edit.
+  for (const [srcName, outName] of [['color.js', '_color.js'], ['lofi-bake.js', '_lofi-bake.js']]) {
+    try {
+      const src = path.join(__dirname, srcName);
+      if (!fs.existsSync(src)) continue;
+      const banner = `/*! DERIVED — regenerated by tools/build-index.js on every build. Do not edit:`
+        + ` the source of truth is tools/${srcName}. */\n`;
+      fs.writeFileSync(path.join(libDir, outName), banner + fs.readFileSync(src, 'utf8'), 'utf8');
+    } catch (e) { console.log(`⚠ ${outName} copy: ${e.message.split('\n')[0]}`); }
+  }
 
   // 5. INDEX.md — the human front door
   const line = (slug) => { const p = pages[slug]; const m = p.meta;
@@ -1220,7 +1508,7 @@ function buildIndex(libDir) {
   return { pages: ordered.length, described: ordered.filter(s => pages[s].description).length, frontier: frontierTotal, hygiene, thumbs };
 }
 
-module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl, deriveSkips }; // routeKey for the mirror test; deriveBrand & helpers for test-brand.js; deriveSkips for test-capture-log.js
+module.exports = { buildIndex, routeKey, deriveBrand, contrastRatio, hexToHsl, deriveSkips, scanWireframes }; // scanWireframes: exercised directly by test-wireframes.js against real rounds // routeKey for the mirror test; deriveBrand & helpers for test-brand.js; deriveSkips for test-capture-log.js
 
 if (require.main === module) {
   const libDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'design-context');

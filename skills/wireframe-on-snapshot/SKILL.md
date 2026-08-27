@@ -119,11 +119,30 @@ have false positives — read them, don't obey them. It reports and recommends; 
 
 Open each screenshot and actually look at it: wrapped or colliding labels, clipped elements, overlapping tag chips, a region that rendered half-empty, anything that reads as broken rather than lo-fi. Fix and re-shoot before the designer ever sees it — presenting a render you haven't looked at is how clipped elements reach the designer.
 
+## 5b. notes.md is also the dashboard's caption source
+
+Everything you build under `wireframes/` appears in the dashboard's Home tab, in the **Your designs**
+band — one card per approach file, newest round first. Two lines of that card are read out of this
+round's `notes.md`, so write it for both readers:
+
+- **State the round's intent in the opening prose**, labeled: `Goal:`, `Brief:`, `Intent:`,
+  `Direction:` — or after the baseline sentence (`Baseline: … (untouched). Intent: …`). That line
+  becomes the round's caption everywhere it is shown.
+- **Give every approach one line that names its file**, in any of the shapes the parser reads: a
+  bullet (`- **02-attention-first** — …`), a heading (`## 02 — Attention first (`02-attention-first.html`)`),
+  or a table row. A render-output line (`- `01-x.html` → `01-x.preview.png``) is skipped on purpose —
+  it mentions the file without saying anything about the design.
+- **Render a preview** (`node tools/shot.js <file> --full`, §6) — that PNG is the card face. If one is
+  missing the dashboard renders it for you, but only when the designer has the server running.
+
+This is a nicety, not a contract: a round with no `notes.md` still shows up, just captioned by
+filename alone. Never write notes FOR the band — write them for the designer, and the band follows.
+
 ## 6. Show, then iterate
 
 Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
 
-A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance.
+A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance. The dashboard's copy reports what it measured (a bake residue it could not read is named in the toast), but a number is not a look.
 
 ## 7. Designing a page the product doesn't have yet
 
@@ -167,9 +186,13 @@ between a screen and a page.
 alone and every wireframe lands in Figma with the donor page's title, indistinguishable from the
 captured original. Set it to something a designer can find: `Track order · <product>`.
 
-Before converting: run `tools/lofi-bake.js` on a lofi wireframe (the CSS filter is paint-time;
-converters read computed styles and export full color otherwise) · pin the conversion width to the
-capture viewport (1440), never the operator's window.
+**Getting it into Figma.** Lofi mode is a CSS filter, which is *paint-time* — converters read computed
+styles, not pixels, so an unbaked lofi wireframe exports in full brand colour. The dashboard handles
+this for you: **⧉ Copy for Figma** on a wireframe's panel detects the filter at runtime and bakes it to
+real greys inside the conversion frame before either converter reads a style, and leaves a hi-fi
+wireframe in colour. Run `tools/lofi-bake.js` yourself only when you are converting *outside* the
+dashboard — pasting from your own browser tab, or handing someone a `.baked.html`. Either way, pin the
+conversion width to the capture viewport (1440), never the operator's window.
 
 **7.5 Assemble the vocabulary before you draw, and write down where each piece came from.** There is
 no single source page, so name the source of each pattern you reuse — in `notes.md`, as a table:

@@ -52,6 +52,11 @@ const finish = () => { console.log(`\n${fail ? '❌' : '✅'}  ${pass} passed, $
 //               a ring here would be a second, competing busy affordance, not a fix).
 // 'fire-and-forget' — exempt, documented reason inline.
 // 'render-ring'— exempt from the setBusy scan, but the ring markup it renders instead is asserted.
+// 'auto-loop' — exempt from setBusy because there is NO control to ring: the call is made by an
+//               automatic loop on first paint (missing wireframe previews), not by a click. Its
+//               affordance is the card's own pending face plus a sticky toast, and BOTH are asserted
+//               below — an auto-loop that goes silent is the same invisible-omission shape as the
+//               ringless button this file exists for.
 const REGISTRY = [
   { endpoint: '/api/onboard', mech: 'onboarding' },
   { endpoint: '/api/capture/start', mech: 'onboarding' },
@@ -62,9 +67,11 @@ const REGISTRY = [
   { endpoint: '/api/guided/start', mech: 'setBusy', of: 'launchGuided — every "guided capture" trigger' },
   { endpoint: '/api/guided/stop', mech: 'render-ring', of: 'endGuided — "End session & save" (ring baked into the re-rendered label while `ending`, not a runtime setBusy call)' },
   { endpoint: '/api/figma-copy', mech: 'fire-and-forget', reason: 'not awaited by the button — a ledger record fired after the (already-busy) conversion already succeeded; has its own Converting…/Ready affordance' },
+  { endpoint: '/api/figma-copy', mech: 'fire-and-forget', reason: 'the wireframe branch of the same ledger record — a copy addressed by scan id instead of page slug; identical posture to the entry above it, fired after the (already-busy) conversion succeeded' },
   { endpoint: '/api/hygiene/ack', mech: 'setBusy', of: 'hygiene card — "Keep" (ack-confirm)' },
   { endpoint: '/api/reached-by', mech: 'setBusy', of: 'hygiene card — "Done" (reached-by-confirm)' },
   { endpoint: '/api/hygiene/fold', mech: 'setBusy', of: 'hygiene card — "Fold into one"' },
+  { endpoint: '/api/wireframe-shot', mech: 'auto-loop', of: 'renderMissingPreviews — the designs band rendering a preview no round had on disk' },
 ];
 
 console.log('\ntest-busy-coverage — every api(\'/api/...\') call site is enumerated in REGISTRY');
@@ -96,6 +103,11 @@ for (let i = 0; i < Math.min(calls.length, REGISTRY.length); i++) {
     ok(!!reg.reason, `${label} — exemption reason on file`, reg.reason);
   } else if (reg.mech === 'render-ring') {
     ok(true, `${label} — exempt from the setBusy scan (ring is baked into its re-rendered label; checked separately below)`);
+  } else if (reg.mech === 'auto-loop') {
+    const before = TEMPLATE.slice(Math.max(0, call.index - LOOKBACK * 3), call.index);
+    ok(/toast\(/.test(before), `${label} — announces itself with a toast before the loop runs`);
+    ok(TEMPLATE.includes('class="shot pend"') && /\.pg\.wf \.shot\.pend/.test(TEMPLATE),
+      `${label} — the per-card pending face it updates exists in markup and stylesheet`);
   }
 }
 

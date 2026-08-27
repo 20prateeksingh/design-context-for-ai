@@ -31,8 +31,15 @@
  *                                           (also folded into /api/status as `guided`)
  *   (SSE) reuses /api/capture/events with namespaced "guided" / "guided-done" events
  *
+ * Your designs — the wireframes band (F1):
+ *   GET  /wireframes/…                    → serves the SIBLING wireframes/ tree (previews + the
+ *                                           wireframe HTML itself), guarded the same way as the library
+ *   POST /api/wireframe-shot {file}       → renders a missing preview with shot.js (serialized, one
+ *                                           Chromium at a time), then rebuilds so a reload keeps it
+ *
  * Copy for Figma (figma-exit-copy-paste PRD, F3):
  *   POST /api/figma-copy {slug, state?}   → records the exit in figma-copies.json (additive) +
+ *        …or {wireframe:'<id>'}            (a wireframe copy has no page slug; same file, same rebuild)
  *                                           rebuilds so the "Sent ‹page› to Figma" ledger event shows.
  *                                           The copy itself is 100% client-side; this only logs it.
  *
@@ -66,6 +73,57 @@ const PRESETS = {
   marketing: { depth: 2, cap: 25, loginSuggested: false },
   notsure:   { depth: 2, cap: 25, loginSuggested: false },
 };
+
+// ── wireframes/ — the design work, served beside the library ───────────────────────────────────
+// The dashboard's "Your designs" band renders previews and opens wireframe HTML, and both live in the
+// SIBLING wireframes/ dir — outside LIB, which is the only tree the static handler serves. Rather
+// than widen that root (traversal out of the library is exactly what its guard exists to stop), this
+// is a second, explicitly-rooted branch with the same guard. Requests arrive as /wireframes/… because
+// the band's srcs are written `../wireframes/…` relative to the library root: over http that resolves
+// here, and over file:// (a dashboard.html opened directly) it resolves to the real folder. One
+// string, both modes.
+const WF = path.join(KIT, 'wireframes');
+
+// Missing previews are rendered HERE, not in build-index: this is the half of the kit that already
+// spawns subprocesses, and build-index has to stay dependency-free and run-twice-identical. shot.js
+// defaults its output to <file>.preview.png — the canonical name the scan looks for — so the render
+// needs no path arithmetic. Serialized: one Chromium at a time, because a round of three approaches
+// asks for three renders the moment the band first paints. launchChromium() is the NON-persistent
+// launcher, so this never touches profiles/ and can run while a capture is in flight.
+const shotQueue = [];
+let shotRunning = false;
+const shotDone = new Map();   // abs html path → { ok, error } for the life of the process
+function pumpShots() {
+  if (shotRunning || !shotQueue.length) return;
+  shotRunning = true;
+  const job = shotQueue.shift();
+  console.log(`▢ rendering preview — ${path.relative(KIT, job.file)}`);
+  execFile(process.execPath, [path.join(__dirname, 'shot.js'), job.file, '--full'],
+    { cwd: KIT, timeout: 120000 }, (err, stdout, stderr) => {
+      const out = String(stderr || '').trim().split('\n').pop() || '';
+      if (err) { shotDone.set(job.file, { ok: false, error: out || err.message.split('\n')[0] });
+                 console.log(`⚠ preview failed — ${out || err.message.split('\n')[0]}`); }
+      else { shotDone.set(job.file, { ok: true }); }
+      for (const cb of job.waiting) { try { cb(shotDone.get(job.file)); } catch (_) {} }
+      shotRunning = false;
+      // Rebuild once the queue drains, so a reload sees the previews as part of the library's own
+      // derived state rather than only in this session's responses. Skipped while a capture holds the
+      // build (its own exit rebuilds and would race).
+      if (!shotQueue.length && !busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ preview post-build: ${e.message.split('\n')[0]}`); } }
+      pumpShots();
+    });
+}
+// Resolve a dashboard-supplied wireframe path to a real file under wireframes/, or null. Accepts the
+// two forms the client can hold (`../wireframes/…` from a baked dash payload, `/wireframes/…` from a
+// URL) and rejects everything else — no absolute host paths, no traversal, no non-HTML target.
+function resolveWireframeHtml(rel) {
+  const s = String(rel || '').split('?')[0].replace(/^\.\.\//, '/').replace(/^\/?wireframes\//, '');
+  if (!s || !/\.html?$/i.test(s)) return null;
+  let dec; try { dec = decodeURIComponent(s); } catch { return null; }
+  const abs = path.normalize(path.join(WF, dec));
+  if (!abs.startsWith(WF + path.sep)) return null;
+  return fs.existsSync(abs) ? abs : null;
+}
 
 let busy = false;              // one capture job at a time (shared by streaming + legacy + guided runs)
 let capJob = null;             // { lines:[], _partial, running, code, mode, startedAt }
@@ -391,14 +449,49 @@ const server = http.createServer((req, res) => {
         return json(res, 200, { ok: true, stopping: true });
       }
 
+      if (url === '/api/wireframe-shot') {
+        // The band asks for this when an approach has no preview PNG on disk (older rounds, or one
+        // rendered before shot.js existed). Never a placeholder and never silent: the card shows a
+        // rendering state, and a failure comes back with the reason so the panel can offer the
+        // terminal command instead. Idempotent — a second request for the same file rides the first.
+        const file = resolveWireframeHtml(data.file);
+        if (!file) return json(res, 400, { ok: false, error: 'not a wireframe HTML file under wireframes/' });
+        const prev = shotDone.get(file);
+        if (prev && prev.ok) return json(res, 200, { ok: true, cached: true });
+        const queued = shotQueue.find(j => j.file === file);
+        const waiter = (r) => json(res, r.ok ? 200 : 500, r.ok ? { ok: true } : { ok: false, error: r.error });
+        if (queued) { queued.waiting.push(waiter); return; }
+        shotQueue.push({ file, waiting: [waiter] });
+        pumpShots();
+        return;
+      }
+
       if (url === '/api/figma-copy') {
         // The Copy-for-Figma exit already ran client-side (the DOM→Figma conversion + clipboard write
         // happen entirely in the dashboard). This only RECORDS the exit in the ledger — append to the
         // additive figma-copies.json, then rebuild so the event renders. file:// mode never reaches
         // here (no server); the copy still works there, the event is just skipped — no error.
+        // A wireframe copy has no page slug — it is addressed by its scan id
+        // (`<key>/<round-dir>/<approach>`). Validated by resolving that id back to a real .html file
+        // under wireframes/ through the SAME guard the static route uses, so the ledger can never be
+        // made to record a path outside the tree.
+        const wfId = data.wireframe == null ? null : String(data.wireframe).trim().slice(0, 400);
+        if (wfId) {
+          if (!resolveWireframeHtml('../wireframes/' + wfId + '.html')) return json(res, 404, { ok: false, error: 'unknown wireframe' });
+          const engine = data.engine === 'capture' || data.engine === 'domToFigma' ? data.engine : null;
+          const fcPath = path.join(LIB, 'figma-copies.json');
+          let fc = { copies: [] };
+          try { const parsed = JSON.parse(fs.readFileSync(fcPath, 'utf8')); if (parsed && Array.isArray(parsed.copies)) fc = parsed; } catch (_) {}
+          fc.copies.push(Object.assign({ wireframe: wfId, at: new Date().toISOString() }, engine ? { engine } : null));
+          try { fs.writeFileSync(fcPath, JSON.stringify(fc, null, 2), 'utf8'); }
+          catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+          if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ figma-copy post-build: ${e.message.split('\n')[0]}`); } }
+          console.log(`⧉ figma-copy wireframe ${wfId}${engine ? ` (${engine})` : ''}`);
+          return json(res, 200, { ok: true });
+        }
         const slug = String(data.slug || '').trim();
         const state = data.state == null ? null : String(data.state).trim().slice(0, 80) || null;
-        if (!/^[A-Za-z0-9._-]+$/.test(slug)) return json(res, 400, { ok: false, error: 'need a valid slug' });
+        if (!/^[A-Za-z0-9._-]+$/.test(slug)) return json(res, 400, { ok: false, error: 'need a valid slug or wireframe id' });
         if (!fs.existsSync(path.join(LIB, 'pages', slug))) return json(res, 404, { ok: false, error: 'unknown page slug' });
         const fcPath = path.join(LIB, 'figma-copies.json');
         let fc = { copies: [] };
@@ -542,8 +635,17 @@ const server = http.createServer((req, res) => {
 
   // ── static: serve design-context/, dashboard.html as home — no path traversal ──
   const rel = decodeURIComponent(url === '/' ? '/dashboard.html' : url);
-  const file = path.normalize(path.join(LIB, rel));
-  if (!file.startsWith(LIB)) return json(res, 403, { ok: false });
+  // Two roots: the library, and the sibling wireframes/ the designs band draws from. The prefix only
+  // picks WHICH root — the guard is always "did the normalized path stay inside that root", and the
+  // wireframes prefix is STRIPPED before joining. Getting this wrong is a real leak, not a nicety:
+  // resolving /wireframes/../… against the kit root would have served profiles/ (the browser session
+  // .claude/settings.json denies even to file tools) through the dashboard. Caught by probe, 2026-08-28.
+  const wfReq = /^\/wireframes(\/|$)/.test(rel);
+  const root = wfReq ? WF : LIB;
+  const file = path.normalize(path.join(root, wfReq ? rel.replace(/^\/wireframes/, '') : rel));
+  // root + separator, not root alone: a bare prefix test also accepts a SIBLING whose name merely
+  // starts with it (design-context-private/, wireframes-old/).
+  if (file !== root && !file.startsWith(root + path.sep)) return json(res, 403, { ok: false });
   fs.readFile(file, (err, buf) => {
     if (err) {
       // First run (or pre-build): the library has no dashboard.html yet — serve the raw template
