@@ -1313,8 +1313,14 @@ function currentWorkspacePath(){
   if (location.protocol === 'file:') return workspaceFromFileUrl(location.href);
   return null;
 }
-function copyPrompt(text){ if(!text) return;
-  text = withWorkspaceLine(text, currentWorkspacePath());
+// `withLocation` defaults to TRUE — every call site keeps today's behaviour without being edited, and
+// the one payload that must NOT carry the line opts out explicitly. Exactly one caller passes false:
+// the Use-It tab's "Copy context bundle" (renderUseIt), whose whole purpose is a self-contained paste
+// for a chat-only AI that CANNOT reach the folder. Telling that AI to resolve paths against a folder
+// it has no access to is false guidance, not merely redundant — and the bundle carries no relative
+// paths to resolve anyway. Every other caller copies a prompt full of them and keeps the line.
+function copyPrompt(text, withLocation){ if(!text) return;
+  if (withLocation !== false) text = withWorkspaceLine(text, currentWorkspacePath());
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
     .then(()=>toast('Copied — paste it into your AI chat.'))
     .catch(()=>copyFallback(text)); }
@@ -4001,7 +4007,10 @@ node tools/shot.js &lt;file.html&gt; [out.png] [--full]   # preview any local HT
     btn.onclick = async ()=>{ btn.disabled=true;
       const sel = document.getElementById('bundle-page').value;
       const { text, note } = await buildBundle(sel);
-      copyPrompt(text); document.getElementById('bundle-note').textContent = note; btn.disabled=false; };
+      // `false` — the bundle is the ONE copy that must not name the workspace folder: it exists for an
+      // AI with no file access, so "resolve every path above against that folder" would be false
+      // guidance. See copyPrompt.
+      copyPrompt(text, false); document.getElementById('bundle-note').textContent = note; btn.disabled=false; };
   })();
 
   // readiness chip + initial route (honors #map / #page/<slug> deep links from onboarding or shared URLs)

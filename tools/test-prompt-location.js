@@ -146,4 +146,32 @@ ok(/workspaceFromFileUrl\s*\(\s*location\.href\s*\)/.test(currentSrc),
 ok(!/workspacePath/.test(fs.readFileSync(path.join(__dirname, 'build-index.js'), 'utf8')),
   'build-index.js never bakes a workspace path into dashboard.html');
 
+// ── The one opt-out: the chat-only context bundle ────────────────────────────────────────────────
+// SUPPLEMENTARY, not the gate. These assertions prove the source SAYS the right thing; they cannot
+// prove the clipboard CONTAINS the right thing, which is why the real gate is the live differential
+// (G5) — bundle copy without the line, then, in the same session, a normal chip copy with it. Kept
+// here anyway so an accidental default-flip or a second opt-out fails in CI rather than in a paste.
+console.log('\ntest-prompt-location — the bundle opts out, and nothing else does');
+ok(/^function copyPrompt\(\s*text\s*,\s*withLocation\s*\)/.test(copySrc),
+  'copyPrompt takes (text, withLocation)', copySrc.slice(0, 60));
+// `!== false` and not `=== true` / `if (withLocation)`: the default has to stay TRUE so every existing
+// call site keeps the line without being edited. Inverting it silently drops the line everywhere.
+ok(/withLocation\s*!==\s*false/.test(copySrc),
+  'the opt-out is `withLocation !== false` — default true, an explicit false to skip');
+
+const calls = [...TEMPLATE.matchAll(/(?<!function )\bcopyPrompt\(([^;]*?)\);/g)].map((m) => m[1]);
+ok(calls.length === 4, 'copyPrompt has exactly 4 call sites', `${calls.length} found: ${calls.join(' | ')}`);
+const optedOut = calls.filter((a) => /,\s*false\s*$/.test(a));
+ok(optedOut.length === 1, 'exactly one call site opts out', `${optedOut.length}: ${optedOut.join(' | ')}`);
+ok(/^text\s*,\s*false$/.test(optedOut[0] || ''), 'and it is the bundle call — copyPrompt(text, false)', optedOut[0]);
+// The other three copy prompts full of relative paths; they must keep the line.
+for (const [label, frag] of [
+  ['the delegated [data-prompt] handler', "b.getAttribute('data-prompt')"],
+  ['the recaptureCheck menu item', 'PROMPTS.recaptureCheck()'],
+  ['the hygiene fix-prompt button', 'hygFixPrompt('],
+]) {
+  const call = calls.find((a) => a.includes(frag));
+  ok(call !== undefined && !/,\s*false\s*$/.test(call), `${label} still gets the line`, call);
+}
+
 finish();
