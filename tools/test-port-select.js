@@ -9,15 +9,39 @@
 // The load-bearing case is the last one: a second workspace must never be handed the FIRST
 // workspace's dashboard. Reuse is matched on /api/status workspacePath, not on "the port answered".
 //
-// Usage: node tools/test-port-select.js <workspaceA> <workspaceB>
-//   Both must be real workspaces with tools/map.js. Spawns servers; always kills them.
+// Usage: node tools/test-port-select.js <workspaceA> [workspaceB]
+//   Each must be a real workspace with tools/map.js. Spawns servers; always kills them.
+//   workspaceB is OPTIONAL — without it, check 5 (the wrong-library guard) does not run.
+//
+// The workspace directory is a REQUIRED argument and there is no sane default: a wrong default
+// would run the whole suite against the wrong library, which is the exact bug check 5 exists to
+// catch. Run with no argument and this used to print FAIL three times, hang on step 4's promise,
+// then exit 0 as the event loop drained — announcing failure to the reader and success to the
+// shell. The guard below is what turns that into an honest non-zero exit.
 const { spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const net = require('net');
 
 const WS = process.argv[2];                       // workspace dir
-const OTHER = process.argv[3];                    // a second workspace dir
+const OTHER = process.argv[3];                    // a second workspace dir (optional)
 const live = new Set();
+
+const USAGE = [
+  'usage: node tools/test-port-select.js <workspaceA> [workspaceB]',
+  '       <workspaceA>  a design-context workspace directory containing tools/map.js',
+  '       [workspaceB]  optional second workspace; without it check 5 is not run',
+].join('\n');
+const die = (why) => { console.error(`test-port-select: ${why}\n${USAGE}`); process.exit(1); };
+
+if (!WS) die('no workspace argument given');
+for (const [label, dir] of [['<workspaceA>', WS], ['[workspaceB]', OTHER]]) {
+  if (!dir) continue;
+  let st = null;
+  try { st = fs.statSync(dir); } catch { /* falls through to the message below */ }
+  if (!st || !st.isDirectory()) die(`${label} is not a directory: ${dir}`);
+  if (!fs.existsSync(path.join(dir, 'tools', 'map.js'))) die(`${label} has no tools/map.js, so it is not a workspace: ${dir}`);
+}
 
 function run(cwd, args, { waitFor, timeout = 12000 } = {}) {
   return new Promise((resolve) => {
