@@ -140,7 +140,7 @@ filename alone. Never write notes FOR the band — write them for the designer, 
 
 ## 6. Show, then iterate
 
-Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
+Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. **Then run `node tools/build-index.js`** — the dashboard's **Your designs** band is baked, not live, so a round is invisible there until something re-derives it. The dashboard server does that on its own when it is running; this keeps the round visible either way, and costs a couple of seconds. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
 
 A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance. The dashboard's copy reports what it measured (a bake residue it could not read is named in the toast), but a number is not a look.
 
