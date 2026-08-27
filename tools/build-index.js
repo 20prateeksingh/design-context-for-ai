@@ -474,8 +474,22 @@ function wfRoundIntent(lines) {
   for (const ln of head) { const m = /new exploration\s*\(([^)]+)\)/i.exec(ln); if (m) { const v = wfCleanLine('a new exploration — ' + m[1], 160); if (v) return v; } }
   for (const ln of head) {
     const t = ln.trim();
-    if (!t || /^#/.test(t) || /^[|>-]/.test(t) || /^-{3,}$/.test(t) || WF_META_LINE.test(t)) continue;
-    const v = wfCleanLine(t, 160); if (v) return v;
+    if (!t || /^#/.test(t) || /^[|>-]/.test(t) || /^-{3,}$/.test(t)) continue;
+    // A paragraph that OPENS with bookkeeping usually still carries the intent in its next sentence —
+    // "This round is an iteration, not a new exploration. It takes round-2's system and fixes the hole
+    // both directions share: neither handled search…" (wikipedia round-3, found by running a second
+    // product through the band). Rejecting the whole paragraph threw the real answer away and left the
+    // caption on a grounding note further down the file. So strip the leading sentence instead — and
+    // loop, because the sentence after one bookkeeping clause is sometimes another one ("…not an
+    // iteration. Filed as round-3/ because…").
+    let cand = t;
+    for (let i = 0; i < 3 && WF_META_LINE.test(cand); i++) {
+      const cut = cand.replace(/^[^.!?]*[.!?]\s+/, '');
+      if (cut === cand) break;
+      cand = cut;
+    }
+    if (WF_META_LINE.test(cand) || cand.length < 40) continue;   // nothing substantial behind the clause
+    const v = wfCleanLine(cand, 160); if (v) return v;
   }
   return null;
 }

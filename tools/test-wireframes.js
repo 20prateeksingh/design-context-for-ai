@@ -73,6 +73,24 @@ w('orders/round-2/notes.md', [
 w('orders/round-3/01-status-first.html', '<html>');
 w('orders/round-3/notes.md', '# Orders — round 3 · intent: status first, everything else second\n');
 
+// orders/round-4 — the intent sits BEHIND a bookkeeping sentence in the same paragraph (wikipedia
+// round-3 shape, found by running a second product through the band)
+w('orders/round-4/01-live-edge.html', '<html>');
+w('orders/round-4/notes.md', [
+  '# Orders, round 4',
+  '',
+  "This round is an **iteration**, not a new exploration. It takes round-3's system and fixes the hole",
+  'both round-3 directions share: neither handled search, which is the primary navigation here.',
+].join('\n'));
+
+// orders/round-5 — bookkeeping all the way down: there is no intent to find, and inventing one is worse
+w('orders/round-5/01-refile.html', '<html>');
+w('orders/round-5/notes.md', [
+  '# Orders, round 5',
+  '',
+  'This is round 1 of a new exploration, not an iteration. Filed as round-5/ because round-4 exists.',
+].join('\n'));
+
 // new/order-tracking — a page the product does not have (§7)
 w('new/order-tracking/round-1/01-timeline-spine.html', '<html>');
 w('new/order-tracking/round-1/01-timeline-spine.preview.png', 'x');
@@ -119,8 +137,8 @@ const byId = {}; r.items.forEach(i => { byId[i.id] = i; });
 const one = (frag) => r.items.find(i => i.id.includes(frag));
 
 console.log('\ntest-wireframes — discovery: every round, every approach, nothing extra');
-eq(r.rounds.length, 6, 'six rounds found (orders×3, new/order-tracking, retired-page, index-heading)');
-eq(r.items.length, 7, 'seven wireframes found');
+eq(r.rounds.length, 8, 'eight rounds found (orders×5, new/order-tracking, retired-page, index-heading)');
+eq(r.items.length, 9, 'nine wireframes found');
 ok(!r.items.some(i => /\.baked/.test(i.approach) || /baked/.test(i.file)),
   'a .baked.html (lofi-bake\'s Figma-bound derivative) is NOT a design of its own');
 ok(!r.items.some(i => /notes-scratch|\.DS_Store/.test(i.id)), 'non-round dirs and dotfiles ignored');
@@ -153,6 +171,11 @@ ok(/^make order status/.test(orders1.intent),
   '…and the `Intent:` label is found mid-line, after the baseline sentence that precedes it', orders1.intent);
 eq(one('orders/round-3').intent, 'status first, everything else second',
   'an intent riding on the heading line is read from there');
+ok(/^It takes round-3's system and fixes the hole both round-3 directions share/.test(one('orders/round-4').intent),
+  'a bookkeeping sentence is STRIPPED, not used, and not allowed to discard the intent behind it',
+  one('orders/round-4').intent);
+eq(one('orders/round-5').intent, null,
+  '…but bookkeeping all the way down yields null rather than an invented intent');
 ok(/^month headers/.test(orders1.desc), 'bullet shape: `- **01-name** — …`', orders1.desc);
 ok(/^Model: ranking inside/.test(one('01-timeline-refined').desc), 'heading shape naming the file', one('01-timeline-refined').desc);
 ok(/^take round-1 01/.test(one('01-timeline-refined').intent), '`**Brief:**` reads as the round intent', one('01-timeline-refined').intent);
@@ -177,8 +200,8 @@ eq(JSON.stringify(a.items.map(i => i.id)), JSON.stringify(b.items.map(i => i.id)
 ok(a.rounds.filter(x => (x.at || '') === tie.toISOString()).length === 3, 'the tie really was tied (the check above means something)');
 
 console.log('\ntest-wireframes — byPage, the atlas panel\'s round badge');
-eq(r.byPage.orders.rounds, 3, 'orders has three rounds');
-eq(r.byPage.orders.items, 4, '…and four wireframes');
+eq(r.byPage.orders.rounds, 5, 'orders has five rounds');
+eq(r.byPage.orders.items, 6, '…and six wireframes');
 ok(!('retired-page' in r.byPage) && !('order-tracking' in r.byPage),
   'byPage holds only real captured pages — never an orphan or a concept');
 
