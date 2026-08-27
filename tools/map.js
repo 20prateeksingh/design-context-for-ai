@@ -39,6 +39,7 @@
  *
  * Copy for Figma (figma-exit-copy-paste PRD, F3):
  *   POST /api/figma-copy {slug, state?}   → records the exit in figma-copies.json (additive) +
+ *        …or {wireframe:'<id>'}            (a wireframe copy has no page slug; same file, same rebuild)
  *                                           rebuilds so the "Sent ‹page› to Figma" ledger event shows.
  *                                           The copy itself is 100% client-side; this only logs it.
  *
@@ -470,9 +471,27 @@ const server = http.createServer((req, res) => {
         // happen entirely in the dashboard). This only RECORDS the exit in the ledger — append to the
         // additive figma-copies.json, then rebuild so the event renders. file:// mode never reaches
         // here (no server); the copy still works there, the event is just skipped — no error.
+        // A wireframe copy has no page slug — it is addressed by its scan id
+        // (`<key>/<round-dir>/<approach>`). Validated by resolving that id back to a real .html file
+        // under wireframes/ through the SAME guard the static route uses, so the ledger can never be
+        // made to record a path outside the tree.
+        const wfId = data.wireframe == null ? null : String(data.wireframe).trim().slice(0, 400);
+        if (wfId) {
+          if (!resolveWireframeHtml('../wireframes/' + wfId + '.html')) return json(res, 404, { ok: false, error: 'unknown wireframe' });
+          const engine = data.engine === 'capture' || data.engine === 'domToFigma' ? data.engine : null;
+          const fcPath = path.join(LIB, 'figma-copies.json');
+          let fc = { copies: [] };
+          try { const parsed = JSON.parse(fs.readFileSync(fcPath, 'utf8')); if (parsed && Array.isArray(parsed.copies)) fc = parsed; } catch (_) {}
+          fc.copies.push(Object.assign({ wireframe: wfId, at: new Date().toISOString() }, engine ? { engine } : null));
+          try { fs.writeFileSync(fcPath, JSON.stringify(fc, null, 2), 'utf8'); }
+          catch (e) { return json(res, 500, { ok: false, error: e.message.split('\n')[0] }); }
+          if (!busy) { try { require('./build-index.js').buildIndex(LIB); } catch (e) { console.log(`⚠ figma-copy post-build: ${e.message.split('\n')[0]}`); } }
+          console.log(`⧉ figma-copy wireframe ${wfId}${engine ? ` (${engine})` : ''}`);
+          return json(res, 200, { ok: true });
+        }
         const slug = String(data.slug || '').trim();
         const state = data.state == null ? null : String(data.state).trim().slice(0, 80) || null;
-        if (!/^[A-Za-z0-9._-]+$/.test(slug)) return json(res, 400, { ok: false, error: 'need a valid slug' });
+        if (!/^[A-Za-z0-9._-]+$/.test(slug)) return json(res, 400, { ok: false, error: 'need a valid slug or wireframe id' });
         if (!fs.existsSync(path.join(LIB, 'pages', slug))) return json(res, 404, { ok: false, error: 'unknown page slug' });
         const fcPath = path.join(LIB, 'figma-copies.json');
         let fc = { copies: [] };

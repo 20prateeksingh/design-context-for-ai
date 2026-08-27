@@ -67,6 +67,7 @@ const REGISTRY = [
   { endpoint: '/api/guided/start', mech: 'setBusy', of: 'launchGuided — every "guided capture" trigger' },
   { endpoint: '/api/guided/stop', mech: 'render-ring', of: 'endGuided — "End session & save" (ring baked into the re-rendered label while `ending`, not a runtime setBusy call)' },
   { endpoint: '/api/figma-copy', mech: 'fire-and-forget', reason: 'not awaited by the button — a ledger record fired after the (already-busy) conversion already succeeded; has its own Converting…/Ready affordance' },
+  { endpoint: '/api/figma-copy', mech: 'fire-and-forget', reason: 'the wireframe branch of the same ledger record — a copy addressed by scan id instead of page slug; identical posture to the entry above it, fired after the (already-busy) conversion succeeded' },
   { endpoint: '/api/hygiene/ack', mech: 'setBusy', of: 'hygiene card — "Keep" (ack-confirm)' },
   { endpoint: '/api/reached-by', mech: 'setBusy', of: 'hygiene card — "Done" (reached-by-confirm)' },
   { endpoint: '/api/hygiene/fold', mech: 'setBusy', of: 'hygiene card — "Fold into one"' },

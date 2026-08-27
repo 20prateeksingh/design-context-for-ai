@@ -142,7 +142,7 @@ filename alone. Never write notes FOR the band — write them for the designer, 
 
 Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.
 
-A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance.
+A paste is a render: before presenting a Figma-bound artifact, paste it yourself (or ask the designer to) and LOOK at the frame — payload audits can't see appearance. The dashboard's copy reports what it measured (a bake residue it could not read is named in the toast), but a number is not a look.
 
 ## 7. Designing a page the product doesn't have yet
 
@@ -186,9 +186,13 @@ between a screen and a page.
 alone and every wireframe lands in Figma with the donor page's title, indistinguishable from the
 captured original. Set it to something a designer can find: `Track order · <product>`.
 
-Before converting: run `tools/lofi-bake.js` on a lofi wireframe (the CSS filter is paint-time;
-converters read computed styles and export full color otherwise) · pin the conversion width to the
-capture viewport (1440), never the operator's window.
+**Getting it into Figma.** Lofi mode is a CSS filter, which is *paint-time* — converters read computed
+styles, not pixels, so an unbaked lofi wireframe exports in full brand colour. The dashboard handles
+this for you: **⧉ Copy for Figma** on a wireframe's panel detects the filter at runtime and bakes it to
+real greys inside the conversion frame before either converter reads a style, and leaves a hi-fi
+wireframe in colour. Run `tools/lofi-bake.js` yourself only when you are converting *outside* the
+dashboard — pasting from your own browser tab, or handing someone a `.baked.html`. Either way, pin the
+conversion width to the capture viewport (1440), never the operator's window.
 
 **7.5 Assemble the vocabulary before you draw, and write down where each piece came from.** There is
 no single source page, so name the source of each pattern you reuse — in `notes.md`, as a table:

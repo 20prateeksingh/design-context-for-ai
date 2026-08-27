@@ -2986,6 +2986,77 @@ function initDashboard(){
     return Math.max(doc.documentElement.scrollHeight || 0, doc.body.scrollHeight || 0, 1);
   }
 
+  // ── LOFI BAKE — what makes a wireframe copyable at all ─────────────────────────────────────────────
+  // lofi mode (skills/wireframe-on-snapshot/SKILL.md §4) is `filter: grayscale(1)` on <html> plus a
+  // contrast/brightness rule on images. A CSS filter is a PAINT-TIME effect: getComputedStyle still
+  // returns the product's real brand colors, and both converters here read computed styles, never
+  // pixels. So a lofi wireframe copied as-is arrives in Figma in FULL BRAND COLOR — gray sketch boxes
+  // beside real product blue, the exact half-real hybrid the skill exists to prevent.
+  //
+  // tools/lofi-bake.js already solves this and is already dual-mode, so the fix is to run the SAME
+  // function on the SAME DOM we are about to convert, in the iframe's own realm — not to reimplement
+  // the maths here. It bakes the filter's own arithmetic into real values, replaces images with flat
+  // gray boxes, grays SVG fills, then removes the lofi-mode <style> so nothing double-applies.
+  //
+  // RUNTIME-DETECTED, never inferred from the path: a captured page and a hi-fi wireframe have no
+  // filter, so this is a no-op for them and they keep their real color. Nothing is gated on whether a
+  // file happens to live under wireframes/.
+  // ABSOLUTE, resolved against the DASHBOARD document — not bare relative paths. The scripts are
+  // injected into the iframe, whose base URL is the wireframe's own
+  // (…/wireframes/<page>/round-N/…html), so `_color.js` there resolves to
+  // …/wireframes/<page>/round-N/_color.js and 404s. The top document never had this problem because
+  // _dom-to-figma.js loads into the top realm, and capture.js's URL is absolute. Works on http and
+  // file:// alike, since both are resolved from document.baseURI. Found by running the real copy.
+  const lofiAsset = (name) => { try { return new URL(name, document.baseURI).href; } catch(_) { return name; } };
+  const LOFI_ASSETS = { color: () => lofiAsset('_color.js'), bake: () => lofiAsset('_lofi-bake.js') };
+  function scriptInto(doc, src){
+    return new Promise((resolve, reject)=>{
+      const s = doc.createElement('script');
+      s.src = src;
+      s.onload = ()=>resolve();
+      s.onerror = ()=>reject(new Error(src + ' did not load'));
+      doc.head.appendChild(s);
+      setTimeout(()=>reject(new Error(src + ' load timed out')), 8000);
+    });
+  }
+  // Returns null when there was nothing to bake, else { ok, stats } / { ok:false, error }. A FAILED
+  // bake is never swallowed: the copy still happens (a brand-color paste beats no paste), but the
+  // caller reports it, because "silently exported full color while printing a tidy stats line" is the
+  // precise regression tools/lofi-bake.js's header records.
+  async function bakeLofiIn(frame){
+    const doc = frame.contentDocument, w = frame.contentWindow;
+    if (!doc || !doc.documentElement) return null;
+    let filter = '';
+    try { filter = w.getComputedStyle(doc.documentElement).filter || ''; } catch(_){ return null; }
+    if (!/grayscale\(/i.test(filter)) return null;   // not a lofi artifact — leave it entirely alone
+    try {
+      await scriptInto(doc, LOFI_ASSETS.color());    // defines window.__dckColor (the shared parser)
+      await scriptInto(doc, LOFI_ASSETS.bake());     // defines window.lofiBake
+      if (typeof w.lofiBake !== 'function') throw new Error('_lofi-bake.js exposed no lofiBake()');
+      const stats = w.lofiBake();
+      await sleep(60);   // the bake mutates the DOM (images → gray boxes); let it reflow before measuring
+      return { ok: true, stats: stats || {} };
+    } catch(e){
+      console.warn('[figma] lofi bake failed — the paste will carry the product\'s real colors:', (e && e.message) || e);
+      return { ok: false, error: (e && e.message) || String(e) };
+    }
+  }
+  // One sentence for the success toast, or '' when there is nothing the designer needs to know. Built
+  // from what the bake MEASURED — `gradientsLeftUnbaked` / `colorsLeftUnbaked` are only present when
+  // something really could not be read, so a clean bake says nothing at all.
+  function lofiNote(lofi){
+    if (!lofi) return '';
+    if (!lofi.ok) return ' Lo-fi bake failed, so this paste carries the real brand colors — run `node tools/lofi-bake.js <file>` and copy the .baked.html instead.';
+    const s = lofi.stats || {};
+    // Three measured residues, all reported as one number: a gradient whose stops could not be
+    // parsed, a colour function color.js could not read, and — the strongest signal, because it is
+    // read back OFF the baked DOM rather than counted during the write — a declaration that is
+    // still not grey afterwards.
+    const left = (s.gradientsLeftUnbaked || 0) + ((s.colorsLeftUnbaked && s.colorsLeftUnbaked.length) || 0)
+               + (s.colouredLeft || 0);
+    return left ? ` Baked to lo-fi — ${left} value(s) could not be read and stayed in color.` : ' Baked to lo-fi first.';
+  }
+
   // Convert one snapshot → a Figma clipboard payload. The snapshot's page.html runs in a hidden,
   // OFFSCREEN same-origin iframe (never display:none — computed styles need real layout) so we convert
   // the TRUE product DOM, not the dashboard. Width rule (F2·2) lands the frame at the snapshot's natural
@@ -3026,19 +3097,24 @@ function initDashboard(){
       await Promise.allSettled(imgs.map(img => img.decode ? img.decode() : Promise.resolve()));
       height = contentHeight(doc, short);   // re-measure: a decoded image with no reserved box can reflow the page
       frame.style.height = height + 'px';
+      // AFTER layout/decode, BEFORE either converter reads a computed style — the bake rewrites the
+      // very properties they are about to read, and replaces images, so it must not run earlier.
+      const lofi = await bakeLofiIn(frame);
+      if (lofi) { height = contentHeight(doc, short); frame.style.height = height + 'px'; }   // gray boxes can reflow
       // Primary = capture.js (F1). Any failure — offline, CSP, load timeout, an unresolved hazard, a
       // payload with no figh2d envelope — degrades to the vendored dom-to-figma engine (F3), which is
       // announced in the UI rather than swallowed. Offline is a first-class path for this product.
       try {
         const payload = await captureViaFigma(frame);
         payload.engine = 'capture';
+        payload.lofi = lofi;
         return payload;
       } catch (e) {
         console.warn('[figma] capture.js unavailable — falling back to dom-to-figma:', (e && e.message) || e);
         const lib = await loadFigmaLib();
         const conv = lib.createFigmaConverter({ fontLoader: makeFontLoader(lib) });   // F4 — always real bytes
         const result = await conv.convert({ element: doc.body, width, height, name });
-        return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0, engine: 'domToFigma' };
+        return { item: result.toClipboardItem(), html: result.toClipboardHtml(), bytes: (result.bytes && result.bytes.length) || 0, engine: 'domToFigma', lofi };
       }
     } finally {
       frame.remove();
@@ -3067,8 +3143,17 @@ function initDashboard(){
       + ' data-figma-slug="' + esc(slug) + '"' + (state ? ' data-figma-state="' + esc(state) + '"' : '')
       + ' data-figma-name="' + esc(name) + '">' + FIG_LABEL + '</button>';
   }
+  // The wireframe variant. figmaBtn resolves its src through byId[slug], which a wireframe has no
+  // entry in — but convertSnapshot() only ever needed a src, so this is the same button with a
+  // different address. `data-figma-wf` carries the scan id for the ledger; there is no slug to send.
+  function figmaWfBtn(w){
+    if (!w || !w.file) return '';
+    const name = `${w.name} · ${w.pageLabel} round ${w.round}`;
+    return '<button type="button" class="figbtn" data-figma-src="' + esc(w.file) + '"'
+      + ' data-figma-wf="' + esc(w.id) + '" data-figma-name="' + esc(name) + '">' + FIG_LABEL + '</button>';
+  }
   function setFigBtn(btn, text, cls){ btn.textContent = text; btn.className = 'figbtn' + (btn.classList.contains('mini') ? ' mini' : '') + (cls ? ' ' + cls : ''); }
-  function figSuccess(btn, engine){
+  function figSuccess(btn, engine, lofi){
     // (figmaCache is intentionally kept — an instant same-page repeat copy skips re-conversion, §4·5)
     setFigBtn(btn, FIG_LABEL, '');
     btn.disabled = false;
@@ -3076,12 +3161,17 @@ function initDashboard(){
     // degradation (it drops radial-gradients, transform:rotate(), ::after and inline SVG), so the
     // designer is told, in the success state, rather than discovering it at paste. Names no paste
     // shortcut on purpose: this dashboard runs on both platforms and ⌘V is wrong on Windows.
-    toast(engine === 'domToFigma'
+    // The lofi note rides on the SAME toast for the same reason the engine does: a paste that came
+    // out in brand color when the designer expected gray is discovered in Figma otherwise.
+    toast((engine === 'domToFigma'
       ? 'Copied — offline fallback. Some effects may be simplified.'
-      : 'Copied — editable layers via Figma capture. Paste into your Figma file.');
+      : 'Copied — editable layers via Figma capture. Paste into your Figma file.') + lofiNote(lofi));
     // F3 — record the exit in the ledger (server mode only; file:// copies work but are logged silently).
-    if (serverMode){ const slug = btn.getAttribute('data-figma-slug'), state = btn.getAttribute('data-figma-state') || null;
-      if (slug) api('/api/figma-copy', Object.assign({ slug }, state ? { state } : null, engine ? { engine } : null)); }
+    // A wireframe has no page slug — it is addressed by its scan id, and the endpoint takes either.
+    if (serverMode){ const slug = btn.getAttribute('data-figma-slug'), state = btn.getAttribute('data-figma-state') || null,
+                     wf = btn.getAttribute('data-figma-wf');
+      if (slug) api('/api/figma-copy', Object.assign({ slug }, state ? { state } : null, engine ? { engine } : null));
+      else if (wf) api('/api/figma-copy', Object.assign({ wireframe: wf }, engine ? { engine } : null)); }
   }
   function figRearm(btn){   // F2·3: payload is cached; the NEXT click (a fresh gesture) writes instantly
     setFigBtn(btn, 'Ready — click to copy', 'armed'); btn.disabled = false;
@@ -3101,7 +3191,7 @@ function initDashboard(){
     // focused, write it instantly (no re-convert); if still unfocused, re-arm again.
     if (figmaCache && figmaCache.key === src){
       if (document.hasFocus()){ btn.disabled = true;
-        try { const r = await attemptWrite(figmaCache); r === 'ok' ? figSuccess(btn, figmaCache.engine) : figRearm(btn); }
+        try { const r = await attemptWrite(figmaCache); r === 'ok' ? figSuccess(btn, figmaCache.engine, figmaCache.lofi) : figRearm(btn); }
         catch(_){ figFail(btn); }
       } else { figRearm(btn); }
       return;
@@ -3111,11 +3201,11 @@ function initDashboard(){
     toast('big pages take ~10 seconds', true);
     try {
       const payload = await convertSnapshot(src, name);
-      figmaCache = { key: src, item: payload.item, html: payload.html, engine: payload.engine };
+      figmaCache = { key: src, item: payload.item, html: payload.html, engine: payload.engine, lofi: payload.lofi };
       toast('', false); const t=document.getElementById('toast'); if(t) t.style.display='none';
       if (document.hasFocus()){
         const r = await attemptWrite(figmaCache);
-        r === 'ok' ? figSuccess(btn, figmaCache.engine) : figRearm(btn);
+        r === 'ok' ? figSuccess(btn, figmaCache.engine, figmaCache.lofi) : figRearm(btn);
       } else {
         figRearm(btn);   // converted, but focus was lost mid-conversion — re-arm for a fresh-gesture write
       }
@@ -3650,7 +3740,7 @@ function initDashboard(){
       ${w.intent?`<div class="desc"><b>This round:</b> ${esc(w.intent)}</div>`:''}
       <div class="desc">${cap && cap!==w.intent ? esc(cap) : '<span class="meta">— no per-approach line in notes.md</span>'}</div>
       <button class="btn primary" id="wf-open" style="width:100%;margin-top:12px">Open ↗ this wireframe</button>
-      <div class="chiprow" style="margin-top:10px">${pchip('Next round on this page', PROMPTS.wireframe(w.page || w.key))}${pchip('Bake it for Figma', 'node tools/lofi-bake.js ' + w.file.replace(/^\.\.\//,''), true)}</div>
+      <div class="chiprow" style="margin-top:10px">${figmaWfBtn(w)}${pchip('Next round on this page', PROMPTS.wireframe(w.page || w.key), true)}</div>
       <div class="links" style="margin-top:8px;font-size:12px">${w.notes?`<a href="${esc(w.notes)}" target="_blank">round notes</a>`:'<span class="meta">no notes.md in this round</span>'}${w.preview?` · <a href="${esc(w.preview)}" target="_blank">full preview PNG</a>`:''}</div>
       ${w.views && w.views.length?`<h3>Other frames</h3>${w.views.map(v=>`<div class="wfrow"><a class="lnk" href="${esc(v.src)}" target="_blank">${esc(v.label)}</a></div>`).join('')}`:''}
       ${sibs.length>1?`<h3>The rest of round ${esc(w.round)}</h3>${sibs.filter(x=>x.id!==w.id).map(x=>`<div class="wfrow"><button class="lnk" data-wfgo="${esc(x.id)}">${esc(x.name)}</button><span class="wfm">${esc(fmtAgo(x.at))}</span></div>`).join('')}`:''}
