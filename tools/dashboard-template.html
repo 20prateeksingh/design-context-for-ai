@@ -1269,7 +1269,52 @@ function copyFallback(text){
   else { toast('Your browser blocked the copy — the prompt is shown below to copy by hand.', true);
          ta.addEventListener('blur', () => ta.remove(), { once:true }); }
 }
+// (prds/prompt-carries-its-workspace.md) Every shipped prompt is written in RELATIVE paths —
+// `design-context/registry.json`, `node tools/build-index.js` — i.e. for an agent whose cwd already IS
+// the workspace. But a copied prompt is pasted into a chat that was opened somewhere else (a terminal
+// started in `~`, `C:\Users\<name>`, a desktop app that can't `cd` at all), and nothing in the pasted
+// text says where the toolkit is. AGENTS.md and INSTALL.md both carry a "resolve paths against the
+// folder holding tools/" note, but those only reach an agent that has ALREADY found the folder —
+// chicken and egg. So the workspace's ABSOLUTE path is appended to the prompt at COPY TIME, here, in
+// the one funnel every copy passes through. Appended (not prepended) on purpose: copyFallback scrolls
+// its textarea to the top so the designer reads the ask on line 1 first; prepending would fight that.
+// Deliberately a statement of fact, not a `cd` command — a desktop-app agent cannot cd.
+// The two functions below are PURE and named so tools/test-prompt-location.js can extract and exercise
+// them the way test-prompts.js extracts PROMPTS. Keep them free of `{`/`}` inside string/regex literals:
+// the extractor is a balanced-brace scan, same as test-prompts.js's.
+function withWorkspaceLine(text, wsPath){
+  if (!wsPath) return text;
+  return text + '\n\nThe toolkit is at `' + wsPath + '` — resolve every path above against that folder, not against where you\'re running.';
+}
+// Derive the workspace root from a `file://` dashboard URL. build-index.js writes dashboard.html into
+// `<workspace>/design-context/`, so stripping that tail yields the root. Returns null — never a guess,
+// never a "your workspace folder" placeholder — when the URL isn't that shape; an unmeasured path is
+// worse than no line at all.
+function workspaceFromFileUrl(href){
+  if (typeof href !== 'string') return null;
+  const m = /^file:\/\/[^/]*(\/[^?#]*)/.exec(href);   // drop the (empty or `localhost`) authority, query, hash
+  if (!m) return null;
+  let p = m[1];
+  try { p = decodeURIComponent(p); } catch(_){}       // spaces are likely: the install guidance proposes "Design Context"
+  const TAIL = '/design-context/dashboard.html';
+  if (p.slice(-TAIL.length) !== TAIL) return null;
+  const root = p.slice(0, -TAIL.length);
+  if (!root) return null;
+  // Windows: `file:///C:/Users/…` — the leading slash isn't part of the path, and backslashes are the
+  // form the designer (and their agent) actually types.
+  if (/^\/[A-Za-z]:/.test(root)) return root.slice(1).replace(/\//g, '\\');
+  return root;
+}
+// Two sources, in order: the live server (map.js serves `workspacePath: KIT` on /api/status — this is
+// the same guard the Use-It tab already uses, deliberately not a second expression), then the file://
+// URL. Never baked into dashboard.html: that file is a derived artifact that can be moved or committed.
+function currentWorkspacePath(){
+  if (serverMode && STATUS && STATUS.workspacePath) return STATUS.workspacePath;
+  if (location.protocol === 'file:') return workspaceFromFileUrl(location.href);
+  return null;
+}
 function copyPrompt(text){ if(!text) return;
+  text = withWorkspaceLine(text, currentWorkspacePath());
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
     .then(()=>toast('Copied — paste it into your AI chat.'))
     .catch(()=>copyFallback(text)); }
