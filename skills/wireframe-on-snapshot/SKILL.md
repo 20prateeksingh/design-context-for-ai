@@ -119,6 +119,25 @@ have false positives — read them, don't obey them. It reports and recommends; 
 
 Open each screenshot and actually look at it: wrapped or colliding labels, clipped elements, overlapping tag chips, a region that rendered half-empty, anything that reads as broken rather than lo-fi. Fix and re-shoot before the designer ever sees it — presenting a render you haven't looked at is how clipped elements reach the designer.
 
+## 5b. notes.md is also the dashboard's caption source
+
+Everything you build under `wireframes/` appears in the dashboard's Home tab, in the **Your designs**
+band — one card per approach file, newest round first. Two lines of that card are read out of this
+round's `notes.md`, so write it for both readers:
+
+- **State the round's intent in the opening prose**, labeled: `Goal:`, `Brief:`, `Intent:`,
+  `Direction:` — or after the baseline sentence (`Baseline: … (untouched). Intent: …`). That line
+  becomes the round's caption everywhere it is shown.
+- **Give every approach one line that names its file**, in any of the shapes the parser reads: a
+  bullet (`- **02-attention-first** — …`), a heading (`## 02 — Attention first (`02-attention-first.html`)`),
+  or a table row. A render-output line (`- `01-x.html` → `01-x.preview.png``) is skipped on purpose —
+  it mentions the file without saying anything about the design.
+- **Render a preview** (`node tools/shot.js <file> --full`, §6) — that PNG is the card face. If one is
+  missing the dashboard renders it for you, but only when the designer has the server running.
+
+This is a nicety, not a contract: a round with no `notes.md` still shows up, just captioned by
+filename alone. Never write notes FOR the band — write them for the designer, and the band follows.
+
 ## 6. Show, then iterate
 
 Render each approach: `node tools/shot.js <file> --full` and show the designer the PNGs side by side with one-line rationales. Iterate on their pick in `round-2/` (new copies; never overwrite a shown round). The designer decides — recommend, don't choose.

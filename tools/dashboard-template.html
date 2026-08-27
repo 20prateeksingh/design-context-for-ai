@@ -728,6 +728,54 @@
   .pg.locked .shot { display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:11px; border-bottom:1px dashed var(--line); text-align:center; padding:0 10px; }
   .pg.locked .nm { color:var(--dim); }
   .pg.locked .unlock { display:inline-block; margin-top:4px; font-size:10.5px; color:var(--txt); border:1px solid var(--line); border-radius:20px; padding:2px 9px; }
+  /* ── Your designs — the wireframes band ──────────────────────────────────────────────────────────
+     Deliberately the SAME .pg card as the atlas: a design and a captured page are siblings on this
+     page, and every difference between them is provenance, not decoration. A round chip sits top-LEFT
+     (top-right belongs to the atlas's "stands for N"), a sketch glyph marks the footer so a wireframe
+     is never mistaken for a captured page at a glance, and the second line is mono like every other
+     measured value in this dashboard. The footer's right slot is intentionally empty. */
+  /* ── Section headers — one treatment for BOTH bands ───────────────────────────────────────────────
+     The hband above is now the shared header for the whole tab: product identity plus every metric,
+     captured and generated. Under it, "Captured pages" and "Your designs" are siblings with the same
+     anatomy — chevron + title + a one-line summary, its filter chips on the NEXT line, and the whole
+     grid collapsible. Symmetry is the point: the two halves of the kit are the same kind of thing on
+     this page, so neither may look like a subsection of the other. */
+  .sect { border-top:1px solid var(--line); padding-top:20px; margin-top:26px; }
+  .sect:first-child { border-top:0; padding-top:0; margin-top:0; }
+  .sechead { display:flex; align-items:baseline; gap:10px; width:100%; background:none; border:0;
+             padding:0 0 14px; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+  .sechead:hover .st { color:var(--accent); }
+  .sechead .chev { flex:none; width:11px; height:11px; margin-top:4px; color:var(--dim);
+                   transition:transform .18s ease; }
+  .sect.closed .sechead .chev { transform:rotate(-90deg); }
+  .sechead .st { font-size:15px; font-weight:600; color:var(--txt); }
+  .sechead .ssub { font-size:11.5px; color:var(--dim); }
+  /* Collapsed hides the chips too: they belong to the grid, and a filter row over nothing reads as broken. */
+  .sect.closed .filters, .sect.closed .atlas { display:none; }
+  @media (prefers-reduced-motion: reduce) { .sechead .chev { transition:none; } }
+  .pg.wf .rnd { position:absolute; top:8px; left:8px; font-size:10px; font-family:var(--mono);
+                background:color-mix(in srgb, var(--panel) 94%, transparent); color:var(--dim);
+                border:1px solid var(--line); border-radius:4px; padding:2px 6px; z-index:2; }
+  .pg.wf .nm { display:flex; align-items:center; gap:6px; }
+  .pg.wf .nm svg { flex:none; width:11px; height:11px; opacity:.7; }
+  .pg.wf .wfm { font-family:var(--mono); font-size:10px; color:var(--dim); display:block; margin-top:4px;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pg.wf .shot.pend { display:flex; align-items:center; justify-content:center; text-align:center;
+                      color:var(--dim); font-size:11px; padding:0 12px;
+                      background:repeating-linear-gradient(45deg, color-mix(in srgb,var(--panel-2) 70%,transparent) 0 7px, transparent 7px 14px); }
+  .wfempty { grid-column:1/-1; border:1px dashed var(--line); border-radius:10px; padding:18px 20px;
+             background:color-mix(in srgb, var(--panel) 50%, var(--bg)); }
+  .wfempty .t { font-size:12.5px; font-weight:600; color:var(--txt); display:block; margin-bottom:4px; }
+  .wfempty .meta { font-size:11.5px; color:var(--dim); }
+  .wfrow { display:flex; align-items:baseline; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); }
+  .wfrow:last-child { border-bottom:0; }
+  .wfrow .lnk { text-align:left; }
+  .wfrow .wfm { font-family:var(--mono); font-size:10px; color:var(--dim); margin-left:auto; flex:none; }
+  .wfgrp { border-bottom:1px solid var(--line); padding:6px 0; }
+  .wfgrp:last-child { border-bottom:0; }
+  .wfgrp .wfrow { border-bottom:0; padding:0; }
+  .wflinks { display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 6px; margin-top:3px; }
+  .wflinks .sep { color:var(--dim); }
 
   /* ── ledger (shared: unified rail on Home + Map, and the journal) — v2.4.1, matched to mock-ledger.png ──
      `Working ledger` is a real heading (sentence case, --txt), not an uppercase dim kicker. The timeline
@@ -2490,6 +2538,8 @@ function initDashboard(){
   // page-detail panel; × / ESC / empty-canvas click return the ledger; a tab switch resets; "Expand"
   // opens the full page doc and "← Back to map" restores zoom/pan/selection AND this rail panel.
   let railSel = null;   // slug whose detail the rail shows; null → the ledger
+  let wfSel = null;     // wireframe id whose detail the rail shows — a second, mutually exclusive
+                        // selection, because a design is not a node on the map and has no slug
   // (v2.4.2 F4) Below the stacking breakpoint the Home rail wraps UNDER the content, so swapping it to a
   // page detail changes something the user cannot see. One token governs it: --stack-bp in :root, read
   // here so the number lives in exactly one place (the @media blocks are slaved to the same value).
@@ -2565,10 +2615,11 @@ function initDashboard(){
   }
   function renderRail(){
     const el = railTarget(); if(!el) return;
+    if (wfSel && wfById[wfSel]) return renderWfDetail(el, wfById[wfSel]);
     const n = railSel ? byId[railSel] : null;
     if (n) renderDetail(el, n); else { el.innerHTML = ledgerBody(); wireHygieneCard(el); }
   }
-  function openPanel(n){ activeNode=n; railSel=n.id; renderRail();
+  function openPanel(n){ activeNode=n; railSel=n.id; wfSel=null; renderRail();
     railFade(); pulseDisc(n.id);   // (v2.5.1 F5·3) ledger→detail dissolves; the chosen disc pulses once
     const mr=document.getElementById('maprail');
     if(mr && document.getElementById('pane-map').classList.contains('active')) mr.scrollTop=0; }
@@ -2624,6 +2675,7 @@ function initDashboard(){
         ${n.foldedInto?`<div class="meta" style="margin-top:6px">Folded into <button class="lnk" data-goto="page/${esc(n.foldedInto)}">${esc(dlabel(byId[n.foldedInto]||{id:n.foldedInto}))}</button> — captured here, shown there.</div>`:''}
         ${foldedMembers.length?`<h3>Also stands for</h3><div class="desc">${foldedMembers.map(m=>`<button class="lnk" data-goto="page/${esc(m.id)}">${esc(dlabel(m))}</button>`).join(' · ')}</div>`:''}
         ${coveredHtml}
+        ${wfPageSectionHtml(n.id)}
         ${n.notes?`<h3>Designer notes</h3><div class="desc">${esc(n.notes)}</div>`:''}
         <h3>States</h3>
         ${(n.states||[]).map(s=>`<div class="state"><span>${esc(s.name)}</span><span class="stateacts"><span class="tag ${s.captured?'':'pending'}">${s.captured?'captured':'pending'}</span>${s.captured?figmaBtn(n.id, s.name, true):''}</span></div>`).join('') || '<div class="meta">none recorded</div>'}
@@ -2645,11 +2697,15 @@ function initDashboard(){
         else toast(`Run: node tools/capture.js --state ${n.id}:${name} --url "${url}"`); };
     }
   }
-  window.closePanel = function(){ const had=railSel!=null; railSel=null; activeNode=null; renderRail();
+  window.closePanel = function(){ const had=railSel!=null||wfSel!=null; railSel=null; wfSel=null; activeNode=null; renderRail();
     if(had) railFade(); };   // (v2.5.1 F5·3) detail→ledger dissolves too; a no-op close stays still
   // × on the rail panel + ESC both return the rail to the ledger (F4·3)
   document.addEventListener('click', e=>{ if(e.target.closest && e.target.closest('[data-rail-close]')) window.closePanel(); });
-  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && railSel) window.closePanel(); });
+  // [data-wfgo] appears in both panels (a wireframe's siblings, and a page's "Designs on this page"),
+  // so it is delegated once rather than re-wired per render.
+  document.addEventListener('click', e=>{ const b=e.target.closest && e.target.closest('[data-wfgo]');
+    if(b) openWf(wfById[b.getAttribute('data-wfgo')]); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && (railSel||wfSel)) window.closePanel(); });
   // F1: expand → full doc, recording provenance (and the map node to reopen on return)
   function openFullDoc(slug){ const onMap = document.getElementById('pane-map').classList.contains('active');
     pageOrigin = onMap ? 'map' : 'home'; if (onMap) mapReopen = slug;
@@ -3462,6 +3518,189 @@ function initDashboard(){
       <div class="railfoot">every capture, read, and design run is appended · <button class="elink" data-goto="journal">full journal</button></div>`;
   }
 
+  // ── YOUR DESIGNS — the wireframes band (built on the snapshots, never inside the library) ──────────
+  // DASH.wireframes is one flat, newest-first list of every generated wireframe (build-index's
+  // scanWireframes). One card per wireframe FILE — the artifact a designer actually looks at — with the
+  // round's parsed intent and the approach's rationale carried into the hover peek and the panel rather
+  // than onto the card face, which stays name + meta the way Figma's own file cards do.
+  const WF = Array.isArray(DASH.wireframes) ? DASH.wireframes : [];
+  const wfById = {}; WF.forEach(w => { wfById[w.id] = w; });
+  // A wireframe belongs to its ROUND KEY, which build-index carries on every item — never rebuilt from
+  // w.page here, because an orphan (design work on a page a re-capture retired) has no page and no
+  // concept, and reconstructing it would file it under a nonexistent "new/null".
+  const wfKeyOf = w => (w.key || w.page || (w.concept ? 'new/' + w.concept : 'other'));
+  // pages that have design work, for the atlas panel's "Designs on this page" section
+  const wfForPage = (slug) => WF.filter(w => w.page === slug);
+  const WF_GLYPH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.8" y="2.5" width="12.4" height="11" rx="1.5"/><path d="M1.8 6.2h12.4M6.2 6.2v7.3"/></svg>';
+
+  // Relative time, formatted HERE rather than baked: "edited 2 days ago" is the one label on these
+  // cards that would otherwise drift, and computing it client-side keeps build-index's output
+  // free of anything time-dependent (the run-twice-identical property).
+  function fmtAgo(iso){
+    if(!iso) return '';
+    const t = Date.parse(iso); if(isNaN(t)) return '';
+    const s = Math.max(0, (Date.now() - t) / 1000);
+    if(s < 90) return 'just now';
+    const units = [[60,'minute'],[3600,'hour'],[86400,'day'],[604800,'week'],[2629800,'month'],[31557600,'year']];
+    for(let i=units.length-1;i>=0;i--){ const [sec,name]=units[i];
+      if(s >= sec){ const n = Math.round(s/sec); return `${n} ${name}${n===1?'':'s'} ago`; } }
+    return 'just now';
+  }
+  const wfCaption = w => w.desc || w.intent || null;
+
+  // "Designs on this page" — rendered on BOTH surfaces a captured page has: the rail panel and the
+  // full page doc. Built once here for exactly the reason coveredShapeHtml is: a click from the
+  // atlas can land on either one, and a section that exists on only one reads as missing work.
+  function wfPageSectionHtml(slug){
+    const ws = wfForPage(slug); if(!ws.length) return '';
+    const rs = [];
+    for(const w of ws){ let r = rs.find(x=>x.dir===w.roundDir); if(!r) rs.push(r={dir:w.roundDir, round:w.round, at:w.at, items:[]}); r.items.push(w); }
+    return `<h3>Designs on this page</h3>`
+      + `<div class="meta">${ws.length} wireframe${ws.length===1?'':'s'} across ${rs.length} round${rs.length===1?'':'s'} — built on a copy of this snapshot, which is untouched.</div>`
+      + rs.map(r=>`<div class="wfgrp"><div class="wfrow"><span class="meta">round ${esc(r.round)}</span>`
+        + `<span class="wfm">${esc(fmtAgo(r.at))}</span></div><div class="wflinks">`
+        + r.items.map(w=>`<button class="lnk" data-wfgo="${esc(w.id)}">${esc(w.name)}</button>`).join('<span class="sep">·</span>')
+        + `</div></div>`).join('');
+  }
+
+  // One card. `data-wf` holds the id; the whole face is a button that opens the panel, exactly like an
+  // atlas card — actions live in the panel, never on the face.
+  function wfCardHtml(w){
+    const face = w.preview
+      ? img2(w.preview, 'shot', '', w.preview)
+      : `<span class="shot pend" data-pend="${esc(w.id)}">${serverMode ? 'rendering preview…' : 'no preview yet'}</span>`;
+    const isNew = !!w.concept, isOrphan = !w.page && !w.concept;
+    return `<button class="pg wf" data-wf="${esc(w.id)}" title="${esc(w.file.replace(/^\.\.\//,''))}">
+      <span class="rnd">Round ${esc(w.round)}</span>
+      ${face}
+      <span class="m"><span class="nm">${WF_GLYPH}<span>${esc(w.name)}</span></span>
+      <span class="wfm">${esc(w.pageLabel)}${isNew ? ' · new page' : (isOrphan ? ' · page retired' : '')} · ${esc(fmtAgo(w.at) || 'undated')}</span></span></button>`;
+  }
+
+  // Accordion state for the Home tab's two sections. In memory, not localStorage: this dashboard has
+  // no persisted client state anywhere (every action reloads the page after a rebuild), and a section
+  // that stayed collapsed across a reload would hide work the designer just asked for. Survives
+  // re-renders within a session, resets on reload — deliberately.
+  const sectOpen = { pages: true, designs: true };
+  const CHEV = '<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>';
+  // One header for both bands — the captured half and the generated half are siblings on this page.
+  function sectHead(id, title, sub){
+    return `<button class="sechead" data-sect="${id}" aria-expanded="${sectOpen[id]?'true':'false'}" aria-controls="sect-${id}">`
+      + CHEV + `<span class="st">${esc(title)}</span><span class="ssub">${esc(sub)}</span></button>`;
+  }
+  // Delegated once, for both sections and every re-render.
+  document.addEventListener('click', e=>{
+    const h = e.target.closest && e.target.closest('.sechead[data-sect]'); if(!h) return;
+    const id = h.dataset.sect, sec = h.closest('.sect');
+    sectOpen[id] = !sectOpen[id];
+    if(sec) sec.classList.toggle('closed', !sectOpen[id]);
+    h.setAttribute('aria-expanded', sectOpen[id] ? 'true' : 'false');
+  });
+
+  function wfBandHtml(){
+    const pad2 = (x)=>String(x).padStart(2,'0');
+    if(!WF.length){
+      return sectHead('designs', 'Your designs', 'nothing built yet — designs land here, the library stays untouched')
+        + `<div class="atlas"><div class="wfempty"><b class="t">No wireframes yet</b>
+          <div class="meta">Ask your AI to explore a change on any page above. It works on a <b>copy</b> of that
+          page's captured HTML in <code>wireframes/</code>, so the real product's snapshot is never edited —
+          and every approach it renders shows up here.</div>
+          <div class="chiprow" style="margin-top:10px">${pchip('Copy the wireframe prompt', PROMPTS.wireframe(firstSlug()), true)}</div>
+        </div></div>`;
+    }
+    // filter chips by what the work is ON — the same "All (NN)" grammar the atlas uses above
+    const keys = [];
+    for(const w of WF){ const k = wfKeyOf(w); if(!keys.some(x=>x.k===k)) keys.push({k, label:w.pageLabel, isNew:!!w.concept, n:0}); }
+    for(const w of WF){ const e = keys.find(x=>x.k===wfKeyOf(w)); if(e) e.n++; }
+    const chips = [`<button class="filt on" data-wff="all">All (${pad2(WF.length)})</button>`]
+      .concat(keys.map(e=>`<button class="filt" data-wff="${esc(e.k)}">${esc(short(e.label,22))}${e.isNew?' ✦':''} (${pad2(e.n)})</button>`));
+    const rounds = new Set(WF.map(w=>wfKeyOf(w)+'/'+w.roundDir)).size;
+    const pagesN = new Set(WF.filter(w=>w.page).map(w=>w.page)).size;
+    const newN = new Set(WF.filter(w=>w.concept).map(w=>w.concept)).size;
+    const on = [pagesN ? `${pagesN} captured page${pagesN===1?'':'s'}` : '', newN ? `${newN} new-page concept${newN===1?'':'s'}` : ''].filter(Boolean).join(' + ');
+    return sectHead('designs', 'Your designs',
+        `${WF.length} wireframe${WF.length===1?'':'s'} · ${rounds} round${rounds===1?'':'s'}${on?` on ${on}`:''} · library untouched`)
+      + `<div class="filters">${chips.join('')}</div>
+      <div class="atlas wfatlas" id="wfatlas">${WF.map(wfCardHtml).join('')}</div>`;
+  }
+
+  // Hover peek — the parsed notes.md line lives here (and in the panel), not on the card face.
+  function showWfPeek(w, cx, cy){
+    if(!w) return; clearTimeout(peekHideT);
+    const cap = wfCaption(w);
+    peekEl.innerHTML = `${w.preview ? img2(w.preview,'pk-shot','',w.preview) : ''}
+      <div class="pk-b"><div class="pk-nm">${esc(w.name)}</div>
+      <div class="pk-rt">${esc(w.pageLabel)} · round ${esc(w.round)}</div>
+      <div class="pk-desc${cap?'':' dorm'}">${cap ? esc(short(cap,150)) : 'no notes.md line for this approach'}</div>
+      <div class="pk-foot"><span>${w.page ? 'on a captured page' : (w.concept ? 'a page the product does not have' : 'its page is no longer in the library')}</span><span class="pk-hint">click to inspect</span></div></div>`;
+    peekEl.classList.add('open'); peekEl.setAttribute('aria-hidden','false'); wireThumbs(peekEl); positionPeek(cx,cy);
+  }
+
+  // The panel. Everything actionable about a wireframe is here — opening it, its extra frames, its
+  // notes, and the next round — because the card face carries no actions by design.
+  function renderWfDetail(el, w){
+    const CLOSE = '<button class="rclose" data-rail-close aria-label="close — back to the ledger">×</button>';
+    const cap = wfCaption(w);
+    const kb = w.bytes ? `${(w.bytes/1024).toFixed(w.bytes>1024*100?0:1)} KB` : '';
+    const sibs = WF.filter(x => wfKeyOf(x)===wfKeyOf(w) && x.roundDir===w.roundDir);
+    el.innerHTML = `<div class="railpanel">${CLOSE}<h2>${esc(w.name)}</h2>
+      <div class="route">${esc(w.file.replace(/^\.\.\//,''))}</div>
+      ${w.preview?`<a href="${esc(w.preview)}" target="_blank" aria-label="open full preview">${img2(w.preview,'pshot','',w.preview)}</a>`:''}
+      <div class="meta">${w.page?`on <b>${esc(w.pageLabel)}</b>`:(w.concept?`a new page — <b>${esc(w.pageLabel)}</b>, not in the product`:`on <b>${esc(w.pageLabel)}</b> — a page no longer in this library`)} · round ${esc(w.round)} · edited ${esc(fmtAgo(w.at)||'—')}${kb?` · ${esc(kb)}`:''}</div>
+      ${w.intent?`<div class="desc"><b>This round:</b> ${esc(w.intent)}</div>`:''}
+      <div class="desc">${cap && cap!==w.intent ? esc(cap) : '<span class="meta">— no per-approach line in notes.md</span>'}</div>
+      <button class="btn primary" id="wf-open" style="width:100%;margin-top:12px">Open ↗ this wireframe</button>
+      <div class="chiprow" style="margin-top:10px">${pchip('Next round on this page', PROMPTS.wireframe(w.page || w.key))}${pchip('Bake it for Figma', 'node tools/lofi-bake.js ' + w.file.replace(/^\.\.\//,''), true)}</div>
+      <div class="links" style="margin-top:8px;font-size:12px">${w.notes?`<a href="${esc(w.notes)}" target="_blank">round notes</a>`:'<span class="meta">no notes.md in this round</span>'}${w.preview?` · <a href="${esc(w.preview)}" target="_blank">full preview PNG</a>`:''}</div>
+      ${w.views && w.views.length?`<h3>Other frames</h3>${w.views.map(v=>`<div class="wfrow"><a class="lnk" href="${esc(v.src)}" target="_blank">${esc(v.label)}</a></div>`).join('')}`:''}
+      ${sibs.length>1?`<h3>The rest of round ${esc(w.round)}</h3>${sibs.filter(x=>x.id!==w.id).map(x=>`<div class="wfrow"><button class="lnk" data-wfgo="${esc(x.id)}">${esc(x.name)}</button><span class="wfm">${esc(fmtAgo(x.at))}</span></div>`).join('')}`:''}
+      ${w.page && byId[w.page]?`<div class="meta" style="margin-top:10px">Built on <button class="lnk" data-goto="page/${esc(w.page)}">${esc(dlabel(byId[w.page]))}</button> — that snapshot is untouched.</div>`:''}
+      <div class="meta" style="margin-top:8px">A wireframe is design work, not captured fact: nothing here was extracted from the real product except the shell and content it was built on.</div>
+    </div>`;
+    const open = el.querySelector('#wf-open');
+    if(open) open.onclick = ()=>window.open(w.file, '_blank');
+    wireThumbs(el);
+  }
+  function openWf(w){
+    if(!w) return;
+    wfSel = w.id; railSel = null; activeNode = null;
+    // The rail only exists on Home and Map. A design link is also reachable from the full page doc
+    // ("Designs on this page") and, in principle, from anywhere else this delegate fires — so hop Home
+    // first, the same hand-off openFullDoc makes in the other direction, and let renderHome's own
+    // renderRail() paint the panel from the selection just set. Without this the panel renders into a
+    // rail nobody can see and the click looks broken.
+    const onRail = document.getElementById('pane-home').classList.contains('active')
+                || document.getElementById('pane-map').classList.contains('active');
+    if(!onRail){ location.hash = 'home'; return; }
+    renderRail(); railFade();
+  }
+
+  // Missing previews: rendered, not placeheld. Fires once per load, sequentially (the server runs one
+  // Chromium at a time anyway), and swaps each card's face in as it lands. Without a server there is
+  // nothing to spawn, so the face says so and the panel's command is the way through.
+  let wfShotsStarted = false;
+  async function renderMissingPreviews(){
+    if(wfShotsStarted || !serverMode) return;
+    const todo = WF.filter(w => !w.preview);
+    if(!todo.length) return;
+    wfShotsStarted = true;
+    toast(`Rendering ${todo.length} missing wireframe preview${todo.length===1?'':'s'}…`, true);
+    let ok = 0;
+    for(const w of todo){
+      const r = await api('/api/wireframe-shot', { file: w.file });
+      const cell = document.querySelector(`[data-pend="${w.id.replace(/"/g,'\\"')}"]`);
+      if(r && r.ok){
+        ok++;
+        w.preview = w.file.replace(/\.html?$/i, '') + '.preview.png';
+        if(cell){ cell.outerHTML = img2(w.preview,'shot','',w.preview); wireThumbs(document.getElementById('wfatlas')); }
+      } else if(cell){
+        cell.textContent = 'preview failed — see the panel';
+        cell.title = (r && r.error) || 'render failed';
+      }
+    }
+    toast(ok===todo.length ? `Rendered ${ok} preview${ok===1?'':'s'}.` : `Rendered ${ok} of ${todo.length} — the rest need a terminal.`);
+  }
+
   function renderHome(){
     // F3 (hygiene-speaks-designer): a folded member drops its own atlas card — the rep's card carries it
     // ("stands for N" via the existing template badge below). byId still holds every node unfiltered, so
@@ -3469,7 +3708,12 @@ function initDashboard(){
     const I=DASH.identity, pend=DASH.pendingDescriptions||0, nodes=DATA.nodes.filter(n=>!n.foldedInto);
     const described=nodes.filter(n=>!n.descPending), templates=nodes.filter(n=>n.kind==='template');
     const withStates=nodes.filter(n=>(n.states||[]).some(s=>s.captured));
-    const subtitle = pend>0 ? `${I.name} — ${I.downloaded} pages, as they really look` : `${I.name} — ${I.downloaded} pages, all described`;
+    // The band names the product; the two section headers below carry their own counts, and the facts
+    // row is the one place every metric on this tab is stated together.
+    const pagesSub = pend>0
+      ? `${I.downloaded} of ${I.found} found · ${pend} still to describe · as they really look`
+      : `${I.downloaded} of ${I.found} found · all described · as they really look`;
+    const wfRoundsTotal = new Set(WF.map(x=>wfKeyOf(x)+'/'+x.roundDir)).size;
     // (covered-shapes) same rule as the map: a shape a captured page already stands for gets no locked
     // card — its "stands for N" badge is right there on that page's own card. overflowN still counts it
     // (lockedTotal is unfiltered), so the atlas never understates how much is undownloaded.
@@ -3506,19 +3750,25 @@ function initDashboard(){
       <div class="gridwrap">
         <div class="hband">
           <div class="ident">${logo}
-            <div class="who"><b>${esc(subtitle)}</b>
+            <div class="who"><b>${esc(I.name)}</b>
               ${I.description?`<div class="desc"><span class="dtxt">${esc(I.description.text)}</span><span class="ai" title="meta description · observed from the captured page">observed</span></div>`:''}</div>
           </div>
           <div class="hfacts">
             ${fact('found', I.found)}
             ${fact('downloaded', I.downloaded)}
             ${fact('described', `${I.described}/${I.describable}`)}
+            ${fact('wireframes', WF.length)}
+            ${fact('rounds', wfRoundsTotal)}
             ${fact('captured · current', fmtDate(I.capturedAt))}
           </div>
         </div>
         <div class="hbody">
-          <div class="filters">${filters.join('')}</div>
-          <div class="atlas" id="atlas">${nodes.map(cardHtml).join('')}${ghostsShown.map(ghostHtml).join('')}${overflow}</div>
+          <section class="sect${sectOpen.pages?'':' closed'}" id="sect-pages">
+            ${sectHead('pages', 'Captured pages', pagesSub)}
+            <div class="filters">${filters.join('')}</div>
+            <div class="atlas" id="atlas">${nodes.map(cardHtml).join('')}${ghostsShown.map(ghostHtml).join('')}${overflow}</div>
+          </section>
+          <section class="sect${sectOpen.designs?'':' closed'}" id="sect-designs">${wfBandHtml()}</section>
         </div>
       </div>
       <aside class="rail" id="homerail"></aside>
@@ -3541,6 +3791,26 @@ function initDashboard(){
     atlas.querySelectorAll('.pg[data-ghost]').forEach(c=>{
       c.onclick=()=>{ const n=byId[c.dataset.ghost]; if(n) selectPage(n); };
     });
+    // the designs band: same hover-peek / click-panel ladder as the atlas, on its own selection
+    const wfatlas=document.getElementById('wfatlas');
+    if(wfatlas){
+      wireThumbs(wfatlas);
+      wfatlas.addEventListener('mouseover', e=>{ const c=e.target.closest('.pg[data-wf]'); if(c) showWfPeek(wfById[c.dataset.wf], e.clientX, e.clientY); });
+      wfatlas.addEventListener('mousemove', e=>{ if(peekEl.classList.contains('open')) positionPeek(e.clientX, e.clientY); });
+      wfatlas.addEventListener('mouseout', e=>{ if(e.target.closest('.pg[data-wf]')) hidePeek(); });
+      wfatlas.querySelectorAll('.pg[data-wf]').forEach(c=>{
+        c.onclick=()=>{ hidePeek(); openWf(wfById[c.dataset.wf]); };
+        c.addEventListener('focus', ()=>{ const r=c.getBoundingClientRect(); showWfPeek(wfById[c.dataset.wf], r.right-40, r.top); });
+        c.addEventListener('blur', hidePeek);
+      });
+      document.querySelectorAll('#pane-home .filt[data-wff]').forEach(b=>b.onclick=()=>{
+        document.querySelectorAll('#pane-home .filt[data-wff]').forEach(x=>x.classList.toggle('on', x===b));
+        const k=b.dataset.wff;
+        wfatlas.querySelectorAll('.pg[data-wf]').forEach(c=>{ const w=wfById[c.dataset.wf];
+          c.style.display = (k==='all' || (w && wfKeyOf(w)===k)) ? '' : 'none'; });
+      });
+      renderMissingPreviews();
+    }
     document.querySelectorAll('#pane-home .filt[data-filt]').forEach(b=>b.onclick=()=>{
       document.querySelectorAll('#pane-home .filt[data-filt]').forEach(x=>x.classList.toggle('on', x===b));
       const f=b.dataset.filt;
@@ -3611,6 +3881,7 @@ function initDashboard(){
       <div class="dcols">
         <div class="dleft">
           ${n.screenshot?`<div class="shotwrap skel"><a href="${esc(n.screenshot)}" target="_blank"><img class="dshot capped fade" data-src="${esc(n.screenshot)}" alt=""></a></div><button class="shot-expand" id="shot-exp">expand full length</button>`:'<span class="dshot hatch" style="height:400px;display:block"></span>'}
+          ${wfPageSectionHtml(slug)}
           <h3>States</h3>
           <div class="strip">
             ${states.length?states.map((s,i)=>`<span class="stt${i===0?' on':''}">${s.captured?img2('pages/'+esc(slug)+'/states/'+esc(s.name)+'/screenshot.png','stt-shot'):'<span class="ph"></span>'}${esc(s.name)}${s.captured?('<br>'+figmaBtn(slug, s.name, true)):''}</span>`).join(''):''}
