@@ -84,6 +84,61 @@ const PRESETS = {
 // string, both modes.
 const WF = path.join(KIT, 'wireframes');
 
+// ── Is the baked dashboard behind the design work? ─────────────────────────────────────────────────
+// dashboard.html carries the "Your designs" band as DATA, baked by build-index's scanWireframes();
+// this server only serves wireframes/ as files. So a round written after the last build is real on
+// disk and absent from the page — which is exactly what a designer hits, because the wireframe skill
+// says to render previews and stop, and CLAUDE.md claimed the band was read "straight off the tree".
+// Found by an end-to-end run on a fresh clone (2026-08-28): three approaches on disk, band empty,
+// "wireframes 0 · rounds 0", and a hard reload cannot help.
+//
+// Rather than require everyone to remember `node tools/build-index.js`, the server refreshes itself
+// when the tree is newer than the page it is about to serve. Same posture as the rebuilds already
+// wired after a capture, a figma-copy and a hygiene action — this is just the one nothing triggered.
+// Bounded three ways: only on a dashboard.html request, never while a capture holds the build, and
+// skipped when there is no build yet (a first run has the wizard to show, not a stale band). The
+// rebuild is synchronous, so that one request pays for it (~2-3s on a small library); a wrong page
+// served instantly is the worse trade.
+const WF_MTIME_MAX_DEPTH = 4;   // wireframes/<page|new>/<concept?>/round-N/<file>
+function newestMtimeUnder(dir, depth = 0) {
+  let newest = 0, entries;
+  // Stat the directory ITSELF, not only its children. Removing a whole round folder bumps the mtime
+  // of its PARENT and of nothing else — so a walk that only stats entries sees an addition and misses
+  // a deletion, and a deleted round would keep showing on the dashboard forever. (Found by testing
+  // the removal direction after the addition already worked, 2026-08-28.)
+  try { newest = fs.statSync(dir).mtimeMs; } catch { return 0; }
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return newest; }
+  for (const e of entries) {
+    if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+    const p = path.join(dir, e.name);
+    try {
+      const st = fs.statSync(p);
+      if (st.mtimeMs > newest) newest = st.mtimeMs;
+      if (e.isDirectory() && depth < WF_MTIME_MAX_DEPTH) {
+        const inner = newestMtimeUnder(p, depth + 1);
+        if (inner > newest) newest = inner;
+      }
+    } catch (_) {}
+  }
+  return newest;
+}
+// Returns true when it rebuilt, false when a rebuild was needed and failed, null when nothing to do.
+function refreshIfDesignsAreNewer() {
+  if (busy) return null;
+  let dashAt;
+  try { dashAt = fs.statSync(path.join(LIB, 'dashboard.html')).mtimeMs; } catch { return null; }
+  const wfAt = newestMtimeUnder(WF);
+  if (!wfAt || wfAt <= dashAt) return null;
+  try {
+    require('./build-index.js').buildIndex(LIB);
+    console.log('↻ designs changed since the last build — dashboard refreshed');
+    return true;
+  } catch (e) {
+    console.log(`⚠ design refresh failed, serving the previous dashboard: ${e.message.split('\n')[0]}`);
+    return false;
+  }
+}
+
 // Missing previews are rendered HERE, not in build-index: this is the half of the kit that already
 // spawns subprocesses, and build-index has to stay dependency-free and run-twice-identical. shot.js
 // defaults its output to <file>.preview.png — the canonical name the scan looks for — so the render
@@ -635,6 +690,8 @@ const server = http.createServer((req, res) => {
 
   // ── static: serve design-context/, dashboard.html as home — no path traversal ──
   const rel = decodeURIComponent(url === '/' ? '/dashboard.html' : url);
+  // The dashboard is the only file here that can be behind the filesystem (see above).
+  if (path.basename(rel) === 'dashboard.html') refreshIfDesignsAreNewer();
   // Two roots: the library, and the sibling wireframes/ the designs band draws from. The prefix only
   // picks WHICH root — the guard is always "did the normalized path stay inside that root", and the
   // wireframes prefix is STRIPPED before joining. Getting this wrong is a real leak, not a nicety:
@@ -707,7 +764,15 @@ function openBrowser(url) {
 
 function announce(port) {
   console.log(`\n🗺  Design context: http://localhost:${port}`);
-  console.log(`   Empty library → the dashboard runs onboarding (URL, sign-in, capture — no terminal).`);
+  // This line used to be unconditional, so it announced an empty library over a workspace with 8
+  // captured pages, 8 descriptions and 3 wireframes on disk (found by the same end-to-end run).
+  if (isFirstRun()) {
+    console.log(`   Empty library → the dashboard runs onboarding (URL, sign-in, capture — no terminal).`);
+  } else {
+    let pages = 0;
+    try { pages = fs.readdirSync(path.join(LIB, 'pages')).filter(n => !n.startsWith('.')).length; } catch (_) {}
+    console.log(`   ${pages} page${pages === 1 ? '' : 's'} captured → opens on Home: your captured pages, and the designs built on them.`);
+  }
   console.log(`   (Local only — nothing is exposed beyond this machine. Ctrl+C to stop.)\n`);
   if (OPEN) openBrowser(`http://localhost:${port}`);
 }

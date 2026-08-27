@@ -42,8 +42,12 @@ Run: `node tools/login.js --url <URL>` and wait for them to confirm. Never ask f
 ## 4. Capture
 
 ```
-node tools/capture.js --url <URL> [--depth 2]
+node tools/capture.js --url <URL> [--depth 2] [--product <name>]
 ```
+
+**Check the name before you run it.** Without `--product`, the workspace is named after the first label of the hostname — fine for `flipkart.com` → `flipkart`, wrong for `en.wikipedia.org` → **`en`**, and that name becomes the dashboard's title, its avatar letter and `INDEX.md`'s heading. If the derived name would not be what the designer calls their product, pass `--product` (e.g. `--product wikipedia`). A subdomain-first URL is the usual tell.
+
+**Cap and depth interact, and the cap wins.** `--depth 2` asks for one example of each repeating page type, but those are captured *after* depth 1 — so a cap that depth-1 nav already fills means depth 2 never runs and you get no detail-page examples. If the designer asked for depth 2, give the cap room (roughly nav + one per template) or tell them plainly that the cap consumed it. The console says `⚠ cap N hit — stopping depth-2` when this happens; do not let that scroll past unreported.
 
 Runs with a visible browser so the designer can watch. While it runs, you may narrate briefly ("it found your nav — 12 pages, capturing each"). If it exits with a login redirect → step 3. If a site blocks or challenges the browser, say so honestly; don't retry endlessly.
 
