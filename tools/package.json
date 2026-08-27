@@ -4,7 +4,8 @@
   "description": "Product-agnostic design-context capture: nav sitemap + editable page snapshots",
   "scripts": {
     "login": "node login.js",
-    "capture": "node capture.js"
+    "capture": "node capture.js",
+    "test": "node test-all.js"
   },
   "dependencies": {
     "js-beautify": "^1.15.4",

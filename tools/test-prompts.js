@@ -11,6 +11,11 @@
  * `new Function` — plain data + arrow functions returning strings, no external I/O), invoke every
  * entry with a representative fixture slug, then resolve every `tools/…`/`skills/…`/`design-context/…`
  * reference in the resolved text:
+ *
+ * The literal is not closed: `PROMPTS.figma` reads `IS_MAC`, declared outside it. It is materialized
+ * TWICE, with `IS_MAC` injected as `true` and as `false`, and every assertion below runs against both
+ * — plus a section at the end that asserts the two branches actually differ and each names the
+ * shortcut it shipped with. See the note above `materialize`.
  *   - tools/*, skills/*  → must exist as a real file in this package (they ship with the kit).
  *   - design-context/*   → must be on the canonical shape a build always produces, or on the explicit
  *                          ALLOWLIST below with a documented reason.
@@ -56,26 +61,47 @@ for (let i = braceStart; i < TEMPLATE.length; i++) {
 ok(braceEnd !== -1, 'PROMPTS object literal is balanced (matching close brace found)');
 if (braceEnd === -1) finish();
 
-let PROMPTS;
-try {
-  PROMPTS = new Function('return ' + TEMPLATE.slice(braceStart, braceEnd + 1))();
-  ok(true, 'PROMPTS object evaluates without error');
-} catch (e) {
-  ok(false, 'PROMPTS object evaluates without error', e.message);
-  finish();
+// `PROMPTS.figma` closes over `IS_MAC`, which is declared at dashboard-template.html:1107 — OUTSIDE
+// this literal — so materializing the literal on its own throws ReferenceError the moment figma() is
+// called. That is what made this file red from 2026-08-02 to 2026-08-27. Platform-awareness is
+// correct SHIPPED behaviour, so the dependency is injected here rather than removed there.
+// Both branches are materialized and EVERY assertion below runs against each: a single-branch fix
+// would restore green while leaving half of `figma` untested, which is how this got here.
+const LITERAL = TEMPLATE.slice(braceStart, braceEnd + 1);
+const materialize = (isMac) => new Function('IS_MAC', 'return ' + LITERAL)(isMac);
+const PLATFORMS = [['mac', true], ['win', false]];
+const MATERIALIZED = {};
+for (const [label, isMac] of PLATFORMS) {
+  try {
+    MATERIALIZED[label] = materialize(isMac);
+    ok(true, `PROMPTS object evaluates without error (IS_MAC=${isMac})`);
+  } catch (e) {
+    ok(false, `PROMPTS object evaluates without error (IS_MAC=${isMac})`, e.message);
+    finish();
+  }
 }
 
-console.log('\ntest-prompts — every entry resolves to a string with a fixture slug');
+console.log('\ntest-prompts — every entry resolves to a string with a fixture slug (both platforms)');
 const FIXTURE_SLUG = 'home';
-const resolved = {};
-for (const [name, entry] of Object.entries(PROMPTS)) {
-  try { resolved[name] = String(entry(FIXTURE_SLUG)); ok(true, `PROMPTS.${name}() resolves to a string`); }
-  catch (e) { ok(false, `PROMPTS.${name}() resolves to a string`, e.message); }
+const RESOLVED = {};   // platform label → { promptName: resolvedText }
+for (const [label] of PLATFORMS) {
+  const out = (RESOLVED[label] = {});
+  for (const [name, entry] of Object.entries(MATERIALIZED[label])) {
+    try { out[name] = String(entry(FIXTURE_SLUG)); ok(true, `[${label}] PROMPTS.${name}() resolves to a string`); }
+    catch (e) { ok(false, `[${label}] PROMPTS.${name}() resolves to a string`, e.message); }
+  }
+  // prds/beta-marker.md §R: A.12 (patternMining) joined the 11 — assert the count explicitly, so a
+  // 13th prompt landing without a deliberate bump here fails loudly instead of just falling through
+  // into the LOCKED_TOKENS/LOCKED_NEG "new prompt" failures below.
+  ok(Object.keys(out).length === 12, `[${label}] PROMPTS carries exactly 12 entries`, `${Object.keys(out).length} found`);
 }
-// prds/beta-marker.md §R: A.12 (patternMining) joined the 11 — assert the count explicitly, so a 13th
-// prompt landing without a deliberate bump here fails loudly instead of just falling through into the
-// LOCKED_TOKENS/LOCKED_NEG "new prompt" failures below.
-ok(Object.keys(resolved).length === 12, 'PROMPTS carries exactly 12 entries', `${Object.keys(resolved).length} found`);
+
+// Every per-prompt assertion below runs once per platform. `name` is the display-qualified name
+// (`[win] PROMPTS.figma`); `key` is the bare prompt name, for the LOCKED_* table lookups.
+function* eachPrompt() {
+  for (const [label] of PLATFORMS)
+    for (const [key, text] of Object.entries(RESOLVED[label])) yield [`[${label}] PROMPTS.${key}`, text, key];
+}
 
 // ── Canonical shape: what a build always produces, regardless of product ──────────────────────────
 // Root-level files build-index.js/capture.js always write once ANY capture has run. Anything under
@@ -106,12 +132,12 @@ function classify(ref) {
 }
 
 console.log('\ntest-prompts — every design-context/·tools/·skills/ reference resolves or is allowlisted');
-for (const [name, text] of Object.entries(resolved)) {
+for (const [name, text] of eachPrompt()) {
   const refs = extractPathRefs(text);
   for (const ref of refs) {
     const verdict = classify(ref);
     ok(verdict === 'ok' || verdict === 'ok-allowlisted',
-      `PROMPTS.${name} → \`${ref}\``,
+      `${name} → \`${ref}\``,
       verdict === 'ok-allowlisted' ? `allowlisted: ${ALLOWLIST[ref]}` : verdict);
   }
 }
@@ -122,32 +148,32 @@ for (const [name, text] of Object.entries(resolved)) {
 const MARKER = '- FILL THIS IN: ';
 
 console.log('\ntest-prompts — every prompt holds the shared shape (line 1 · blank · 2–5 `-` lines)');
-for (const [name, text] of Object.entries(resolved)) {
+for (const [name, text] of eachPrompt()) {
   const lines = text.split('\n');
   const body = lines.slice(2).filter((l) => l.trim());
-  ok(lines.length >= 2, `PROMPTS.${name} is multi-line`, `${lines.length} line(s) — still a paragraph`);
-  ok(!lines[0].startsWith('- ') && lines[0].trim().length > 0, `PROMPTS.${name} line 1 is the ask, not a bullet`);
-  ok(lines[1] === '', `PROMPTS.${name} line 2 is blank`, JSON.stringify(lines[1]));
-  ok(body.length >= 2 && body.length <= 5, `PROMPTS.${name} body is 2–5 lines`, `${body.length} lines`);
-  ok(body.every((l) => l.startsWith('- ')), `PROMPTS.${name} body is plain \`-\` bullets`,
+  ok(lines.length >= 2, `${name} is multi-line`, `${lines.length} line(s) — still a paragraph`);
+  ok(!lines[0].startsWith('- ') && lines[0].trim().length > 0, `${name} line 1 is the ask, not a bullet`);
+  ok(lines[1] === '', `${name} line 2 is blank`, JSON.stringify(lines[1]));
+  ok(body.length >= 2 && body.length <= 5, `${name} body is 2–5 lines`, `${body.length} lines`);
+  ok(body.every((l) => l.startsWith('- ')), `${name} body is plain \`-\` bullets`,
     body.filter((l) => !l.startsWith('- ')).join(' / '));
-  ok(!body.some((l) => l.startsWith('- - ') || /^-\s{2,}/.test(l)), `PROMPTS.${name} has no nested list`);
+  ok(!body.some((l) => l.startsWith('- - ') || /^-\s{2,}/.test(l)), `${name} has no nested list`);
 }
 
 // Chat inputs render `**bold**`/`_em_` as literal characters — A.8 shipped `**…**` for months.
 console.log('\ntest-prompts — no markdown emphasis anywhere (chat inputs render it literally)');
-for (const [name, text] of Object.entries(resolved)) {
-  ok(!text.includes('**'), `PROMPTS.${name} has no \`**\``);
+for (const [name, text] of eachPrompt()) {
+  ok(!text.includes('**'), `${name} has no \`**\``);
   // `_` only counts as emphasis outside backticks — file/flag names legitimately carry underscores.
-  ok(!/(^|\s)_[^_`]+_(\s|[.,;:]|$)/.test(text.replace(/`[^`]+`/g, '`')), `PROMPTS.${name} has no \`_em_\``);
+  ok(!/(^|\s)_[^_`]+_(\s|[.,;:]|$)/.test(text.replace(/`[^`]+`/g, '`')), `${name} has no \`_em_\``);
 }
 
 console.log('\ntest-prompts — every ‹placeholder› is findable: the marker line, last in the body');
-for (const [name, text] of Object.entries(resolved)) {
+for (const [name, text] of eachPrompt()) {
   if (!text.includes('‹')) continue;
   const body = text.split('\n').slice(2).filter((l) => l.trim());
-  ok(text.includes(MARKER.trimStart()), `PROMPTS.${name} carries the "${MARKER.trim()}" marker`);
-  ok(body[body.length - 1].startsWith(MARKER), `PROMPTS.${name} ends on the marker line`, body[body.length - 1]);
+  ok(text.includes(MARKER.trimStart()), `${name} carries the "${MARKER.trim()}" marker`);
+  ok(body[body.length - 1].startsWith(MARKER), `${name} ends on the marker line`, body[body.length - 1]);
 }
 
 // ── Token-set parity: the reshape may not move a path, command, § or flag ──────────────────────────
@@ -198,27 +224,53 @@ const LOCKED_NEG = {
 const negMultiset = (s) => (s.match(NEGATION) || []).reduce((m, x) => { const k = x.toLowerCase(); m[k] = (m[k] || 0) + 1; return m; }, {});
 
 console.log('\ntest-prompts — token-set parity with the pre-reshape strings (paths · commands · § · flags)');
-ok(Object.keys(LOCKED_TOKENS).length === Object.keys(resolved).length,
-  'LOCKED_TOKENS covers every shipped prompt',
-  `${Object.keys(LOCKED_TOKENS).length} locked vs ${Object.keys(resolved).length} shipped`);
-for (const [name, text] of Object.entries(resolved)) {
-  const locked = LOCKED_TOKENS[name];
-  if (!locked) { ok(false, `PROMPTS.${name} has a LOCKED_TOKENS entry`, 'new prompt — add its pre-reshape token set'); continue; }
+for (const [label] of PLATFORMS)
+  ok(Object.keys(LOCKED_TOKENS).length === Object.keys(RESOLVED[label]).length,
+    `[${label}] LOCKED_TOKENS covers every shipped prompt`,
+    `${Object.keys(LOCKED_TOKENS).length} locked vs ${Object.keys(RESOLVED[label]).length} shipped`);
+for (const [name, text, key] of eachPrompt()) {
+  const locked = LOCKED_TOKENS[key];
+  if (!locked) { ok(false, `${name} has a LOCKED_TOKENS entry`, 'new prompt — add its pre-reshape token set'); continue; }
   for (const cls of Object.keys(CLASSES)) {
     const want = locked[cls] || [], got = uniq(text, CLASSES[cls]);
     const dropped = want.filter((t) => !got.includes(t));
     const added = got.filter((t) => !want.includes(t));
-    ok(dropped.length === 0 && added.length === 0, `PROMPTS.${name} ${cls} set unchanged (${want.length})`,
+    ok(dropped.length === 0 && added.length === 0, `${name} ${cls} set unchanged (${want.length})`,
       [dropped.length ? `dropped: ${dropped.join(' ')}` : '', added.length ? `added: ${added.join(' ')}` : ''].filter(Boolean).join(' · '));
   }
 }
 
 console.log('\ntest-prompts — no prohibition was softened (locked negation multiset)');
-for (const [name, text] of Object.entries(resolved)) {
-  const want = LOCKED_NEG[name], got = negMultiset(text);
-  if (!want) { ok(false, `PROMPTS.${name} has a LOCKED_NEG entry`, 'new prompt — add its pre-reshape negation counts'); continue; }
+for (const [name, text, key] of eachPrompt()) {
+  const want = LOCKED_NEG[key], got = negMultiset(text);
+  if (!want) { ok(false, `${name} has a LOCKED_NEG entry`, 'new prompt — add its pre-reshape negation counts'); continue; }
   const w = JSON.stringify(Object.entries(want).sort()), g = JSON.stringify(Object.entries(got).sort());
-  ok(w === g, `PROMPTS.${name} negations unchanged (${JSON.stringify(want)})`, `now ${JSON.stringify(got)}`);
+  ok(w === g, `${name} negations unchanged (${JSON.stringify(want)})`, `now ${JSON.stringify(got)}`);
+}
+
+// ── The IS_MAC branch itself, asserted positively ─────────────────────────────────────────────────
+// Everything above would still pass if IS_MAC were merely stubbed and its effect never checked —
+// which is exactly how a "fix" for the ReferenceError could restore green while testing nothing.
+// These assertions are the reason the injection is a fix and not a stub.
+console.log('\ntest-prompts — PROMPTS.figma is platform-aware, and each branch is the one that shipped');
+const figmaMac = RESOLVED.mac.figma, figmaWin = RESOLVED.win.figma;
+ok(figmaMac !== figmaWin, 'PROMPTS.figma differs between the two IS_MAC branches',
+  'identical — the branch is dead, or IS_MAC is being ignored');
+ok(figmaMac.includes('⌘V'), 'PROMPTS.figma on Mac names ⌘V', JSON.stringify(figmaMac));
+ok(!figmaMac.includes('Ctrl+V'), 'PROMPTS.figma on Mac does not name Ctrl+V', JSON.stringify(figmaMac));
+ok(figmaWin.includes('Ctrl+V'), 'PROMPTS.figma on non-Mac names Ctrl+V', JSON.stringify(figmaWin));
+ok(!figmaWin.includes('⌘V'), 'PROMPTS.figma on non-Mac does not name ⌘V', JSON.stringify(figmaWin));
+// Neither shortcut is backticked, so LOCKED_TOKENS.figma (`code: []`) is unaffected by the branch.
+// Pinned here so a future edit that backticks one is caught by a named assertion rather than by a
+// token-set diff that fires on only one platform.
+for (const [label] of PLATFORMS)
+  ok((RESOLVED[label].figma.match(/`[^`]+`/g) || []).length === 0,
+    `[${label}] PROMPTS.figma carries no backticked token (LOCKED_TOKENS.figma is empty)`,
+    (RESOLVED[label].figma.match(/`[^`]+`/g) || []).join(' '));
+// figma is the ONLY prompt allowed to vary by platform.
+for (const key of Object.keys(RESOLVED.mac)) {
+  if (key === 'figma') continue;
+  ok(RESOLVED.mac[key] === RESOLVED.win[key], `PROMPTS.${key} is identical on both platforms`);
 }
 
 finish();
